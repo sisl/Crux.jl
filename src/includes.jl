@@ -6,10 +6,14 @@ using POMDPSimulators
 using Parameters
 using TensorBoardLogger
 using Flux
+using Flux.Optimise: train!
 using CUDA
+using LinearAlgebra
 
 include("utils.jl")
 include("experience_buffer.jl")
-include("logging.jl")
 include("policies.jl")
+include("logging.jl")
 include("dqn.jl")
+include("vpg.jl")
+

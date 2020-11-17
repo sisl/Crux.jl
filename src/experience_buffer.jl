@@ -113,3 +113,22 @@ function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::Experi
         copyto!(target[k], source[k][:, ids])
     end
 end
+
+function gen_buffer(mdps, pol, N; desired_return = nothing, max_tries = 100*N, max_steps = 100, nonzero_transitions_only = false)
+    b = ExperienceBuffer(mdps[1], N)
+    i = 1
+    while length(b) < N && i < max_tries
+        mdp = mdps[mod1(i, length(mdps))]
+        h = simulate(HistoryRecorder(max_steps = max_steps), mdp, pol)
+        if isnothing(desired_return) || undiscounted_reward(h) ≈ desired_return
+            for (s, a, r, sp) in eachstep(h, "(s, a, r, sp)")
+                if !nonzero_transitions_only || r != 0
+                    push!(b, s, a, r, sp, isterminal(mdp, sp), mdp)
+                end
+            end
+        end
+        i += 1
+    end
+    b
+end
+

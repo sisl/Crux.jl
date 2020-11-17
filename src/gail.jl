@@ -26,8 +26,7 @@ end
 
 function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_nda::Union{Nothing, ExperienceBuffer}, λ_nda::Float32)
     L_e, L_π = BCELoss(D, 𝒟_expert, 1.f0), BCELoss(D, 𝒟_π, 0.f0)
-    L_e + L_π
-    # isnothing(𝒟_nda) ? L_e + L_π : L_e + λ_nda*L_π + (1.f0 - λ_nda)*BCELoss(D, nda, 0.f0)
+    isnothing(𝒟_nda) ? L_e + L_π : L_e + λ_nda*L_π + (1.f0 - λ_nda)*BCELoss(D, 𝒟_nda, 0.f0)
 end
 
 function Lᴳ(π, D, 𝒟::ExperienceBuffer, γ::Float32, #=maxQ,=# L)
@@ -55,7 +54,7 @@ function POMDPs.solve(𝒮::GAILSolver, mdp)
         
         lossD, gradD = train!(𝒮.D, () -> Lᴰ(𝒮.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮.λ_nda), 𝒮.optD, 𝒮.device)
         # maxQ = maximum(Q⁻(𝒟_π[:sp]), dims=1)
-        lossG, gradG = train!(𝒮.π, () -> Lᴳ(𝒮.π, 𝒮.D, 𝒟_π, γ, #=maxQ,=# 𝒮.L), 𝒮.opt, 𝒮.device)
+        lossG, gradG = train!(𝒮.π, () -> Lᴳ(𝒮.π, 𝒮.D, 𝒟_π, γ, #=maxQ,=# 𝒮.L) + Lᴳ(𝒮.π, 𝒮.D, 𝒟_nda, γ, #=maxQ,=# 𝒮.L), 𝒮.opt, 𝒮.device)
         
         # elapsed(𝒮.i, 𝒮.target_update_period) && begin copyto!(Q⁻, 𝒮.π.Q); copyto!(D⁻, 𝒮.D.Q) end
         log(𝒮.log, 𝒮.i, mdp, 𝒮.π, rng = 𝒮.rng, data = [logloss(lossG, gradG, suffix = "G"), 

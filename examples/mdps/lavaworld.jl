@@ -6,11 +6,15 @@ simple_display(mdp::SimpleGridWorld) = render(mdp, (s = GWPos(7,5),), color = s-
 
 lavaworld_rewards(lava, lava_penalty, goals, goal_reward) = merge(Dict(GWPos(p...) => lava_penalty for p in lava), Dict(GWPos(p...) => goal_reward for p in goals))
 
-function random_lava(size, num_tiles; goal = [(7,5)], lava_penalty = -1, goal_reward = 1, rng = Random.GLOBAL_RNG)
-    lava = [(rand(rng, 1:size[1]), rand(rng, 1:size[2])) for i=1:num_tiles]
-    goal = (rand(rng, 1:size[1]), rand(rng, 1:size[2]))
-    filter!(e->e≠goal, lava)
-    lavaworld_rewards(lava, lava_penalty, [goal], goal_reward)
+function random_lava(size, num_tiles; goal = :random, lava_penalty = -1, goal_reward = 1, rng = Random.GLOBAL_RNG)
+    g = goal == :random ? (rand(rng, 1:size[1]), rand(rng, 1:size[2])) :  goal
+    lava = []
+    while length(lava) < num_tiles
+        p = (rand(rng, 1:size[1]), rand(rng, 1:size[2]))
+        p != g && push!(lava, p)
+    end 
+    @assert !(g in lava)
+    lavaworld_rewards(lava, lava_penalty, [g], goal_reward)
 end
 
 function update_lava!(mdp::SimpleGridWorld)

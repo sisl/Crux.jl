@@ -16,6 +16,7 @@ function continual_learning!(model, train_fn, train_data, test_data, eval_fn; op
     eval_curves   
 end
 
+
 function plot_results(eval_curves; task_names = ["Task $i" for i=1:length(eval_curves)], eval_metric = "Accuracy", title = "Training on Sequential Tasks")
     offset, epochs = 0, length(eval_curves[length(eval_curves)])
     p = plot(title = title, ylabel = eval_metric, xlabel="Training Steps", legend = :bottomright)

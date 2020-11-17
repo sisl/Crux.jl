@@ -1,0 +1,55 @@
+using POMDPs, POMDPModels, POMDPModelTools, Random
+
+POMDPs.gen(mdp::SimpleGridWorld, s, a, rng = Random.GLOBAL_RNG) = (sp = rand(transition(mdp, s, a )), r = reward(mdp, s, a))
+
+simple_display(mdp::SimpleGridWorld) = render(mdp, (s = GWPos(7,5),), color = s->10.0*reward(mdp, s))
+
+lavaworld_rewards(lava, lava_penalty, goals, goal_reward) = merge(Dict(GWPos(p...) => lava_penalty for p in lava), Dict(GWPos(p...) => goal_reward for p in goals))
+
+function random_lava(size, num_tiles; goal = [(7,5)], lava_penalty = -1, goal_reward = 1, rng = Random.GLOBAL_RNG)
+    lava = [(rand(rng, 1:size[1]), rand(rng, 1:size[2])) for i=1:num_tiles]
+    goal = (rand(rng, 1:size[1]), rand(rng, 1:size[2]))
+    filter!(e->e≠goal, lava)
+    lavaworld_rewards(lava, lava_penalty, [goal], goal_reward)
+end
+
+function update_lava!(mdp::SimpleGridWorld)
+    [delete!(mdp.rewards, k) for k in keys(mdp.rewards)]
+    [delete!(mdp.terminate_from, k) for k in mdp.terminate_from]
+    rs = random_lava(mdp.size, 6)
+    for k in keys(rs)
+        mdp.rewards[k] = rs[k]
+        push!(mdp.terminate_from, k)
+    end
+end
+
+function POMDPs.initialstate(mdp::SimpleGridWorld)
+    # update_lava!(mdp)
+    # return Deterministic(GWPos(1,5))
+    while true
+        x, y = rand(1:mdp.size[1]), rand(1:mdp.size[2])
+        !(GWPos(x,y) in mdp.terminate_from) && return Deterministic(GWPos(x,y))
+    end
+end 
+            
+function POMDPs.convert_s(::Type{V}, s::GWPos, mdp::SimpleGridWorld) where {V<:AbstractArray}
+    svec = zeros(Float32, mdp.size..., 3)
+    !isterminal(mdp, s) && (svec[s[1], s[2], 3] = 1.)
+    for p in states(mdp)
+        reward(mdp, p) < 0 && (svec[p[1], p[2], 2] = 1.)
+        reward(mdp, p) > 0 && (svec[p[1], p[2], 1] = 1.)
+    end
+    svec[:]
+end
+
+POMDPs.convert_s(::Type{GWPos}, v::V, mdp::SimpleGridWorld) where {V<:AbstractArray} = GWPos(findfirst(reshape(v, mdp.size..., :)[:,:,3] .== 1.0).I)
+
+function gen_occupancy(buffer, mdp)
+    occupancy = Dict(s => 0 for s in states(mdp))
+    for i=1:length(buffer)
+        s = convert_s(GWPos, buffer[:s][:,i], mdp)
+        occupancy[s] += 1
+    end
+    occupancy
+end
+

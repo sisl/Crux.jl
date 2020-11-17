@@ -16,4 +16,5 @@ include("policies.jl")
 include("logging.jl")
 include("dqn.jl")
 include("vpg.jl")
+include("gail.jl")
 

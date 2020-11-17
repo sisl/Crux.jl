@@ -75,12 +75,12 @@ push_step!(b::ExperienceBuffer, mdp, s, policy::Policy; rng::AbstractRNG = Rando
 
 push_step!(b::ExperienceBuffer, mdp, s, policy::Policy, exploration_policy::Policy, i::Int; rng::AbstractRNG = Random.GLOBAL_RNG) = push_step!(b, mdp, s, action(exploration_policy, policy, i, s), rng = rng)
 
-function Base.fill!(b_in::ExperienceBuffer, mdp, policy; rng::AbstractRNG = Random.GLOBAL_RNG, baseline = nothing, max_steps = 100)
+function Base.fill!(b_in::ExperienceBuffer, mdp, policy, N = capacity(b_in); rng::AbstractRNG = Random.GLOBAL_RNG, baseline = nothing, max_steps = 100)
     b = isgpu(b_in) ? empty_like(b_in, device = cpu) : b_in
     clear!(b)
     γ = Float32(discount(mdp))
-    while length(b) < capacity(b)
-        h = simulate(HistoryRecorder(max_steps = min(max_steps, capacity(b) - length(b)), rng = rng), mdp, policy)
+    while length(b) < N
+        h = simulate(HistoryRecorder(max_steps = min(max_steps, N - length(b)), rng = rng), mdp, policy)
         start, Nsteps = b.next_ind, length(h)
         [push!(b, s, a, r, sp, isterminal(mdp, sp), mdp) for (s, a, r, sp) in eachstep(h, "(s, a, r, sp)")]
         if !isnothing(baseline)
@@ -106,6 +106,7 @@ function Base.copyto!(target::ExperienceBuffer, source::ExperienceBuffer)
 end
     
 function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer)
+    @assert length(target) <= length(source)
     N = length(target)
     ids = rand(rng, 1:source.elements, N)
     for k in keys(target.data)

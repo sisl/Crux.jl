@@ -9,6 +9,9 @@ using Flux
 using Flux.Optimise: train!
 using CUDA
 using LinearAlgebra
+using ValueHistories
+using DataStructures
+
 
 include("utils.jl")
 include("experience_buffer.jl")

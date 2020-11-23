@@ -18,7 +18,7 @@ simple_display(test_tasks[9])
 Qnet(args...) = Chain(Dense(input_dim, 128, relu), Dense(128,64, relu), Dense(64, 4), args...) 
 
 dqn_steps = 20000 # to learn an expert policy
-gail_steps = 2000
+gail_steps = 10000
 expert_buffer_size = 1000 
 nda_buffer_size = 1000
 λ_nda = 0.5f0 # Constant for NDA. λ = 1 ignores the NDA trajectories
@@ -41,12 +41,16 @@ mean([discounted_return(t, DQNPolicy(π_dqn.Q, t)) for t in test_tasks])
 expert_trajectories = ExperienceBuffer(expert_task, 1000)
 fill!(expert_trajectories, expert_task, π_dqn)
 
+sum(expert_trajectories[:r])
+
 # Solve with GAIL
 𝒮_gail = GAILSolver(π = DQNPolicy(Qnet(), expert_task), 
                     D = DQNPolicy(Qnet(softmax), expert_task),
-                    N = gail_steps,
+                    N = 2000,
                     expert_buffer = expert_trajectories,
                     batch_size = 128,
+                    target_update_period = 100,
+                    log = LoggerParams(dir = "log/gail", period = 50),
                     exploration_policy = EpsGreedyPolicy(expert_task, LinearDecaySchedule(start=1., stop=0.1, steps=gail_steps/2))
                     )
 π_gail = solve(𝒮_gail, expert_task)
@@ -60,7 +64,8 @@ mean([discounted_return(t, DQNPolicy(π_gail.Q, t)) for t in test_tasks])
 nda_trajectories = gen_buffer(nda_tasks, RandomPolicy(expert_task), nda_buffer_size, desired_return = -1., nonzero_transitions_only = false)
 𝒮_nda_gail = GAILSolver(π = DQNPolicy(Qnet(), expert_task), 
                     D = DQNPolicy(Qnet(softmax), expert_task),
-                    N = 600,
+                    N = 1000,
+                    λ_nda = .5f0,
                     expert_buffer = expert_trajectories,
                     nda_buffer = nda_trajectories,
                     batch_size = 128,
@@ -74,10 +79,6 @@ mean([discounted_return(t, DQNPolicy(π_nda_gail.Q, t)) for t in test_tasks])
 
                     
 ## Make some plots
-using Cairo, Fontconfig, Compose, ColorSchemes
-set_default_graphic_size(35cm,10cm)
-r = compose(Compose.context(0,0,1cm, 0cm), Compose.rectangle()) # spacer
-
 # Plot on the training MDP
 expert_occupancy = gen_occupancy(expert_trajectories, expert_task)
 c_expert = render(expert_task, (s = GWPos(7,5),), color = s->reward(expert_task,s) <0 ? -10. :  Float64(expert_occupancy[s]) / 2., policy = π_dqn)

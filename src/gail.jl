@@ -29,14 +29,14 @@ function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_
     isnothing(𝒟_nda) ? L_e + L_π : L_e + λ_nda*L_π + (1.f0 - λ_nda)*BCELoss(D, 𝒟_nda, 0.f0)
 end
 
-function Lᴳ(π, D, 𝒟::ExperienceBuffer, γ::Float32, #=maxQ,=# L)
+function Lᴳ(π, D, 𝒟::ExperienceBuffer, γ::Float32, maxQ, L)
     avals = sum(value(π, 𝒟[:s]) .* 𝒟[:a], dims = 1) 
-    target = sum(value(D, 𝒟[:s]) .* 𝒟[:a], dims = 1) #.+ γ .* (1f0 .- 𝒟[:done]) .* maxQ
+    target = sum(D(𝒟[:s]) .* 𝒟[:a], dims = 1) #=.+ γ .* (1f0 .- 𝒟[:done]) .* maxQ=#
     L(avals, target)
 end
 
 function POMDPs.solve(𝒮::GAILSolver, mdp)
-    # Q⁻, D⁻ = deepcopy(𝒮.π.Q) |> 𝒮.device, deepcopy(𝒮.D.Q) |> 𝒮.device
+    Q⁻, D⁻ = deepcopy(𝒮.π.Q) |> 𝒮.device, deepcopy(𝒮.D.Q) |> 𝒮.device
     buffer = ExperienceBuffer(mdp, 𝒮.buffer.size)
     fill!(buffer, mdp, RandomPolicy(mdp), 𝒮.buffer.init, rng = 𝒮.rng)
     𝒟_π = ExperienceBuffer(mdp, 𝒮.batch_size, device = 𝒮.device, Nelements = 𝒮.batch_size)
@@ -53,10 +53,10 @@ function POMDPs.solve(𝒮::GAILSolver, mdp)
         !isnothing(𝒮.nda_buffer) && rand!(𝒮.rng, 𝒟_nda, 𝒮.nda_buffer)
         
         lossD, gradD = train!(𝒮.D, () -> Lᴰ(𝒮.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮.λ_nda), 𝒮.optD, 𝒮.device)
-        # maxQ = maximum(Q⁻(𝒟_π[:sp]), dims=1)
-        lossG, gradG = train!(𝒮.π, () -> Lᴳ(𝒮.π, 𝒮.D, 𝒟_π, γ, #=maxQ,=# 𝒮.L) + Lᴳ(𝒮.π, 𝒮.D, 𝒟_nda, γ, #=maxQ,=# 𝒮.L), 𝒮.opt, 𝒮.device)
+        maxQ = maximum(Q⁻(𝒟_π[:sp]), dims=1)
+        lossG, gradG = train!(𝒮.π, () -> Lᴳ(𝒮.π, D⁻, 𝒟_π, γ, maxQ, 𝒮.L)  +  Lᴳ(𝒮.π, D⁻, 𝒟_nda, γ, maxQ, 𝒮.L), 𝒮.opt, 𝒮.device)
         
-        # elapsed(𝒮.i, 𝒮.target_update_period) && begin copyto!(Q⁻, 𝒮.π.Q); copyto!(D⁻, 𝒮.D.Q) end
+        elapsed(𝒮.i, 𝒮.target_update_period) && begin copyto!(Q⁻, 𝒮.π.Q); copyto!(D⁻, 𝒮.D.Q) end
         log(𝒮.log, 𝒮.i, mdp, 𝒮.π, rng = 𝒮.rng, data = [logloss(lossG, gradG, suffix = "G"), 
                                                         logloss(lossD, gradD, suffix = "D"), 
                                                         logexploration(𝒮.exploration_policy, 𝒮.i)])

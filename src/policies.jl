@@ -45,7 +45,7 @@ end
 
 function fill_gae!(b::ExperienceBuffer, start::Int, Nsteps::Int, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
-    for i in reverse(get_indices(b, start, Nsteps))
+    for i in reverse(circular_indices(start, Nsteps, length(b)))
         Vsp = V(b[:sp][:,i])
         Vs = V(b[:s][:,i])
         @assert length(Vs) == 1
@@ -56,7 +56,7 @@ end
 
 function fill_returns!(b::ExperienceBuffer, start::Int, Nsteps::Int, γ::Float32)
     r = 0f0
-    for i in reverse(get_indices(b, start, Nsteps))
+    for i in reverse(circular_indices(start, Nsteps, length(b)))
         r = b[:r][i] + γ*r
         b[:return][:, i] .= r
     end
@@ -65,31 +65,32 @@ end
 ## Categorical Policy
 mutable struct DQNPolicy <: Policy
     Q
-    mdp
+    actions
     Q_GPU
+    Q⁻
 end
 
-DQNPolicy(Q, mdp; device = cpu) = DQNPolicy(Q, mdp, todevice(Q, device))
+DQNPolicy(Q, actions; device = cpu) = DQNPolicy(Q, actions, todevice(Q, device), deepcopy(𝒮.π.Q) |> 𝒮.device)
 
 network(π::DQNPolicy, device) = (device == gpu) ? [π.Q_GPU] : [π.Q]
 
-POMDPs.action(π::DQNPolicy, s) = actions(π.mdp)[argmax(π.Q(convert_s(AbstractVector, s, π.mdp)))]
+POMDPs.action(π::DQNPolicy, s::AbstractArray) = π.actions[argmax(π.Q(s))]
 
 POMDPs.value(π::DQNPolicy, s::AbstractArray) = network(π, device(s))[1](s)
 
 ## Categorical Policy
 mutable struct CategoricalPolicy <: Policy
     A
-    mdp
+    actions
     rng::AbstractRNG
     A_GPU
 end
 
-CategoricalPolicy(A, mdp; device = cpu, rng::AbstractRNG = Random.GLOBAL_RNG) = CategoricalPolicy(A, mdp, rng, todevice(A, device))
+CategoricalPolicy(A, actions; device = cpu, rng::AbstractRNG = Random.GLOBAL_RNG) = CategoricalPolicy(A, actions, rng, todevice(A, device))
 
 network(π::CategoricalPolicy, device) = (device == gpu) ? [π.A_GPU] : [π.A]
 
-POMDPs.action(π::CategoricalPolicy, s) = actions(π.mdp)[rand(π.rng, Categorical(π.A(convert_s(AbstractVector, s, π.mdp))))]
+POMDPs.action(π::CategoricalPolicy, s::AbstractArray) = π.actions[rand(π.rng, Categorical(π.A(s)))]
 
 logits(π::CategoricalPolicy, s::AbstractArray) = network(π, device(s))[1](s)
     
@@ -102,19 +103,17 @@ end
 @with_kw mutable struct GaussianPolicy <: Policy
     μ
     logΣ
-    mdp
     rng::AbstractRNG = Random.GLOBAL_RNG
     μ_GPU = nothing
     logΣ_GPU = nothing
 end
 
-GaussianPolicy(μ, logΣ, mdp; rng::AbstractRNG = Random.GLOBAL_RNG) = GaussianPolicy(μ, logΣ, mdp, rng, todevice(μ, device), todevice(logΣ, device))
+GaussianPolicy(μ, logΣ; rng::AbstractRNG = Random.GLOBAL_RNG) = GaussianPolicy(μ, logΣ, rng, todevice(μ, device), todevice(logΣ, device))
 
 network(π::GaussianPolicy, device) = (device == gpu) ? [π.μ, π.logΣ] : [π.μ_GPU, π.logΣ_GPU]
 
-function POMDPs.action(π::GaussianPolicy, s)
-    svec = convert_s(AbstractVector, s, π.mdp)
-    d = MvNormal(π.μ(svec), diagm(0=>exp.(π.logΣ).^2))
+function POMDPs.action(π::GaussianPolicy, s::AbstractArry)
+    d = MvNormal(π.μ(s), diagm(0=>exp.(π.logΣ).^2))
     rand(rng, d)
 end
 

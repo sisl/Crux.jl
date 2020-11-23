@@ -33,3 +33,28 @@ end
 logloss(loss, grad; name = "loss", suffix = "") = Dict(string(name, suffix) => loss) # TODO Gradient
 logexploration(policy, i; name = "eps") = policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
 
+## Stuff for plotting
+function smooth(v, weight = 0.6)
+    N = length(v)
+    smoothed = Array{Float64, 1}(undef, N)
+    smoothed[1] = v[1]
+    for i = 2:N
+        smoothed[i] = smoothed[i-1] * weight + (1 - weight) * v[i]
+    end
+    smoothed
+end
+
+function readtb(logdir)
+    hist = MVHistory()
+    TensorBoardLogger.map_summaries(logdir) do tag, iter, val
+        push!(hist, Symbol(tag), iter, val)
+    end
+    hist
+end
+
+function readtb(logdir, key)
+    h = readtb(logdir)[key]
+    h.iterations, h.values
+end
+    
+

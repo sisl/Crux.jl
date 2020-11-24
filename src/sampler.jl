@@ -1,5 +1,3 @@
-abstract type Sampler end
-
 @with_kw struct Sampler
     mdp
     π::Policy

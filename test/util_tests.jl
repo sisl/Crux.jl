@@ -1,5 +1,6 @@
 include("../src/includes.jl")
 using Test
+using POMDPModels
 
 vgpu = CuArray{Float32, 2}(undef, 10, 10)
 @test device(vgpu) == gpu

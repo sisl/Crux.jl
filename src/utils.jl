@@ -17,6 +17,12 @@ function inv_query(t::FenwickTree, v)
 end
 
 value(t::FenwickTree, i) = t[i] - t[i-1]
+
+function update!(t::FenwickTree, i, v)
+    old = value(t, i)
+    inc!(t, i, v - old)
+end
+
 ## GPU Stuff
 function Base.copyto!(Cto::Chain, Cfrom::Chain)
     for i = 1:length(Flux.params(Cto).order.data)

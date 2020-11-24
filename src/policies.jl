@@ -43,24 +43,7 @@ function Flux.Optimise.train!(b::Baseline, 𝒟::ExperienceBuffer)
     sync!(b,  device(𝒟))
 end
 
-function fill_gae!(b::ExperienceBuffer, start::Int, Nsteps::Int, V, λ::Float32, γ::Float32)
-    A, c = 0f0, λ*γ
-    for i in reverse(circular_indices(start, Nsteps, length(b)))
-        Vsp = V(b[:sp][:,i])
-        Vs = V(b[:s][:,i])
-        @assert length(Vs) == 1
-        A = c*A + b[:r][1,i] + (1.f0 - b[:done][1,i])*γ*Vsp[1] - Vs[1]
-        b[:advantage][:, i] .= A
-    end
-end
 
-function fill_returns!(b::ExperienceBuffer, start::Int, Nsteps::Int, γ::Float32)
-    r = 0f0
-    for i in reverse(circular_indices(start, Nsteps, length(b)))
-        r = b[:r][i] + γ*r
-        b[:return][:, i] .= r
-    end
-end
 
 ## Categorical Policy
 mutable struct DQNPolicy <: Policy

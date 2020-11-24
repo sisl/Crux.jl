@@ -19,6 +19,8 @@ first(b)
 b[2] .== v
 b[2]
 
+#TODO: iterator?
+
 vlarge = rand(10000)
 t = FenwickTree(vlarge)
 h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)

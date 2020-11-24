@@ -27,24 +27,33 @@ td_error(π, 𝒟, y) = abs.(q_predicted(π, 𝒟) .- y)
 
 #TODO: Look at RL class DQN pong for inspo on gpu usage and frame processing
 function POMDPs.solve(𝒮::DQNSolver, mdp)
+    # Log the pre-train performance
     𝒮.i == 1 && log(𝒮.log, 0, mdp, 𝒮.π)
-    𝒟 = ExperienceBuffer(mdp, 𝒮.batch_size, device = 𝒮.device, Nelements = 𝒮.batch_size)
+    
+    # Initialize minibatch buffer and sampler
+    𝒟 = ExperienceBuffer(mdp, 𝒮.batch_size, device = 𝒮.device, indices = prioritized(𝒮.buffer))
     γ = Float32(discount(mdp))
     s = Sampler(mdp, 𝒮.π, 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
     
     # Fill the buffer as needed
-    Nfill = max(0, 𝒮.buffer_init - length(𝒮.buffer))
-    push!(𝒮.buffer, steps!(s, i = 𝒮.i, Nsteps = Nfill))
-    𝒮.i += Nfill
+    𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i = 𝒮.i)
     
-    for 𝒮.i = range(𝒮.i, length = 𝒮.N, step = 𝒮.Δtrain) 
+    for 𝒮.i = range(𝒮.i, length = 𝒮.N, step = 𝒮.Δtrain)
+        # Take a step in the environment
         push!(𝒮.buffer, steps!(s, i = 𝒮.i, Nsteps = 𝒮.Δtrain))
-        rand!(𝒮.rng, 𝒟, buffer)
+        
+        # Sample a minibatch
+        rand!(𝒮.rng, 𝒟, buffer, i = 𝒮.i)
+        
+        # Compute target, td_error and td_loss for backprop
         y = target(𝒮.Q⁻, 𝒟, γ)
-        prioritized(𝒮.buffer) && update_priorities!(buffer, 𝒟, td_error(𝒮.π, 𝒟, y))
+        prioritized(𝒮.buffer) && update_priorities!(buffer, 𝒟.indices, td_error(𝒮.π, 𝒟, y))
         loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L), 𝒮.opt, 𝒮.device)
         
+        # Update target network 
         elapsed(𝒮.i - 𝒮.Δtrain + 1:𝒮.i, 𝒮.Δtarget_update) && copyto!(𝒮.Q⁻, 𝒮.π.Q)
+        
+        # Log results
         log(𝒮.log, 𝒮.i, mdp, 𝒮.π, data = [logloss(loss, grad), logexploration(𝒮.exploration_policy, 𝒮.i)])
     end
     𝒮.π

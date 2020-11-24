@@ -8,6 +8,9 @@ const MinHeap = MutableBinaryHeap{Float32, DataStructures.FasterForward}
     indices::Vector{Int} = []
     priorities::Union{Nothing, MinHeap} = nothing
     priority_sums::Union{Nothing, FenwickTree} = nothing
+    α::Float64 = 0.6
+    β::Function = (i) -> 0.5
+    max_priority::Float64 = 1.0
 end
 
 function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae = false)
@@ -16,7 +19,7 @@ function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae
         :a => Atype(undef, adim, size), 
         :sp => Atype(undef, sdim, size), 
         :r => Atype(undef, 1, size), 
-        :done => Atype(undef, 1, size)
+        :done => Atype(undef, 1, size),
         )
     if gae
         b.data[:return] = Atype(undef, 1, size)
@@ -24,7 +27,7 @@ function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae
     end
 end
     
-function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae = false, Ninit = 0, prioritized = false)
+function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae = false, prioritized = false)
     Atype = device == gpu ? CuArray{Float32,2} : Array{Float32,2}
     data = mdp_data(sdim, adim, capacity, Atype = Atype, gae = gae)
     b = ExperienceBuffer(data = data, capacity = capacity)
@@ -59,9 +62,6 @@ end
 device(b::ExperienceBuffer{CuArray{Float32, 2}}) = gpu
 device(b::ExperienceBuffer{Array{Float32, 2}}) = cpu
 
-isgpu(b::ExperienceBuffer{CuArray{Float32, 2}}) = true
-isgpu(b::ExperienceBuffer{Array{Float32, 2}}) = false
-
 # Note: data can be a dictionary or an experience buffer
 function Base.push!(b::ExperienceBuffer, data)
     N, C = size(data[first(keys(data))], 2), capacity(b)
@@ -71,47 +71,52 @@ function Base.push!(b::ExperienceBuffer, data)
     end
     prioritized(b) && update_priorties!(b, I, MAX_PRIORITY*ones(N))
         
-        
-    end
-        
     b.elements = min(C, b.elements + N)
     b.next_ind = mod1(b.next_ind + N, C)
 end
 
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     for i=1:I
-        update!(b.priorities, i, v[i])
-        update!(b.priority_sums, i, v[i])
+        update!(b.priorities, i, v[i]^b.α)
+        update!(b.priority_sums, i, v[i]^b.α)
+        b.max_priority = max(v[i], b.max_priority)
     end
 end
 
-function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer)
-    @assert length(target) <= length(source)
-    N = length(target)
+function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer; i = 1)
+    prioritized(source) ? prioritized_sample!(target, source, rng, i=i) : uniform_sample!(target, source, rng)
+end
+
+function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG;)
+    @assert capacity(target) <= length(source)
+    N = capacity(target)
     ids = rand(rng, 1:source.elements, N)
     for k in keys(target.data)
-        copyto!(target[k], source[k][:, ids])
+        copyto!(target.data[k], source[k][:, ids])
     end
 end
 
+# With guidance from https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
+function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; i = 1)
+    N, B = length(source), length(target)
+    ptot = prioritized_sum[N]
+    Δp = ptot / B
+    ids = [inverse_query(source.priority_sums, (j + rand(rng)) * Δp) for j=1:B]
+    pmin = first(source.priorities) / ptot
+    max_w = (p_min*N)^source.β(i)
+    ws = [(N * source.priorities[id] / ptot)^source.β(i) for id in ids] ./ max_w
+    
+    # Add the indices to the target and the weights to the target
+    target.indices = ids
+    for k in keys(target.data)
+        copyto!(target.data[k], source[k][:, ids])
+    end
+    !haskey(target.data, :weight) && (target.data[:weight] = deepcopy(target.data[:r]))
+    copyto!(target.data[:weight], ws)
+end
 
-# function Base.fill!(b_in::ExperienceBuffer, mdp, N = capacity(b_in); policy = RandomPolicy(mdp), rng::AbstractRNG = Random.GLOBAL_RNG, baseline = nothing, max_steps = 100)
-#     b = isgpu(b_in) ? empty_like(b_in, device = cpu) : b_in
-#     clear!(b)
-#     push_episodes!(b, mdp, N, policy = policy, rng = rng, baseline = baseline, max_steps = max_steps)
-#     isgpu(b_in) && copyto!(b_in, b) # Copy from cpu buffer to the given gpu buffer
-# end
-# 
-# function Base.fill(::Type{ExperienceBuffer}, mdp, N::Int; policy = RandomPolicy(mdp), capacity = N, rng::AbstractRNG = Random.GLOBAL_RNG, baseline = nothing, max_steps = 100, device = cpu)
-#     buffer = ExperienceBuffer(mdp, capacity, device = device)
-#     fill!(buffer, mdp, N, policy = policy, rng = rng, baseline = baseline, max_steps = max_steps)
-#     buffer
-# end
-# 
-# function Base.merge(buffers::ExperienceBuffer...; capacity = sum(length.(buffers)))
-#     new_buff = empty_like(buffers[1], capacity = capacity)
-#     for b in buffers
-#         push!(new_buff, b)
-#     end
-#     new_buff            
-# end
+function fillto!(b::ExperienceBuffer, s::Sampler, N::Int; i = 1)
+    Nfill = max(0, N - length(b))
+    Nfill > 0 && push!(b, steps!(s, i = i, Nsteps = Nfill))
+    Nfill
+end

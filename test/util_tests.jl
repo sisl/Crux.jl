@@ -2,11 +2,44 @@ include("../src/includes.jl")
 using Test
 using POMDPModels
 
-vgpu = CuArray{Float32, 2}(undef, 10, 10)
-@test device(vgpu) == gpu
+## sdim and adim
+mdp = SimpleGridWorld()
+@test sdim(mdp) == 2
+@test adim(mdp) == 4
 
-vcpu = Array{Float32, 2}(undef, 10, 10)
-@test device(vcpu) == cpu
+## Fenwick Trees
+t = FenwickTree(ones(10))
+v = rand(16)
+t2pow = FenwickTree(v)
+
+# Inverse query on non power of 2 arrays
+@test inv_query(t, 0.5) == 1
+@test inv_query(t, 1.0) == 1
+@test inv_query(t, 0) == 1
+@test inv_query(t, -1) == 1
+@test inv_query(t, 3.0) == 3
+@test inv_query(t, 3.5) == 4
+@test inv_query(t, 4.0) == 4
+@test inv_query(t, 9.5) == 10
+@test inv_query(t, 10) == 10
+@test inv_query(t, 11) == 11
+
+# power of 2 arrays
+for i=1:1000
+    r = 5*rand()
+    ind = inv_query(t2pow, r)
+
+    @test t2pow[ind] ≥ r
+    @test t2pow[ind-1] < r
+end
+@test inv_query(t2pow, t2pow[16]) == 16
+
+# value test
+@test all(value(t, i) == 1 for i=1:10)
+@test all(value(t, i) == 1 for i=1:10)
+
+# update! test
+
 
 
 ## Binary heap test
@@ -34,30 +67,9 @@ h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)
 @time inv_query(t, 200)
 @time value(t, 999)
 
-## FenwickTree
-t = FenwickTree(ones(10))
-v = rand(16)
-t2pow = FenwickTree(v)
+## Gpu stuff
+vgpu = CuArray{Float32, 2}(undef, 10, 10)
+@test device(vgpu) == gpu
 
-# Inverse query on non power of 2 arrays
-@test inv_query(t, 0.5) == 1
-@test inv_query(t, 1.0) == 1
-@test inv_query(t, 0) == 1
-@test inv_query(t, -1) == 1
-@test inv_query(t, 3.0) == 3
-@test inv_query(t, 3.5) == 4
-@test inv_query(t, 4.0) == 4
-@test inv_query(t, 9.5) == 10
-@test inv_query(t, 10) == 10
-@test inv_query(t, 11) == 11
-
-# power of 2 arrays
-for i=1:1000
-    r = 5*rand()
-    ind = inv_query(t2pow, r)
-
-    @test t2pow[ind] ≥ r
-    @test t2pow[ind-1] < r
-end
-
-@test inv_query(t2pow, t2pow[16]) == 16
+vcpu = Array{Float32, 2}(undef, 10, 10)
+@test device(vcpu) == cpu

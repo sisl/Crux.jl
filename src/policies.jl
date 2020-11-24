@@ -95,7 +95,7 @@ GaussianPolicy(μ, logΣ; rng::AbstractRNG = Random.GLOBAL_RNG) = GaussianPolicy
 
 network(π::GaussianPolicy, device) = (device == gpu) ? [π.μ, π.logΣ] : [π.μ_GPU, π.logΣ_GPU]
 
-function POMDPs.action(π::GaussianPolicy, s::AbstractArry)
+function POMDPs.action(π::GaussianPolicy, s::AbstractArray)
     d = MvNormal(π.μ(s), diagm(0=>exp.(π.logΣ).^2))
     rand(rng, d)
 end

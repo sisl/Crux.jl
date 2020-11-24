@@ -2,7 +2,7 @@
     π::Policy
     baseline::Union{Baseline, Nothing}
     N::Int64
-    buffer::BufferParams = BufferParams(size = 100)
+    buffer
     max_steps::Int64 = 100
     opt = ADAM(1e-3)
     device = cpu

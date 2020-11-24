@@ -5,7 +5,7 @@
     exploration_policy::Union{ExplorationPolicy, Nothing} = nothing
     rng::AbstractRNG = Random.GLOBAL_RNG
     s = rand(rng, initialstate(mdp))
-    svec::AbstractArry = convert_s(AbstractArray, s, mdp)
+    svec::AbstractArray = convert_s(AbstractArray, s, mdp)
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
@@ -61,7 +61,7 @@ function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, return
     episode_starts = zeros(Int, Neps)
     episode_ends = zeros(Int, Neps)
     j, k = 1, 1
-    for k <= Neps
+    while k <= Neps
         episode_starts[k] = j
         while true
             step!(data, j, sampler, explore = explore, i = i + (i-1), baseline = baseline)
@@ -74,7 +74,7 @@ function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, return
         episode_ends[k] = j
     end
     trim!(data, j)
-    return_episodes ? data, zip(episode_starts, episode_ends) : data
+    return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
 ## Undiscounted returns
@@ -89,7 +89,7 @@ end
 ## Discounted returns
 function discounted_return(data, start, stop)
     r = 0f0
-    for i in reverse(start:stop))
+    for i in reverse(start:stop)
         r = data[:r][1, i] + γ*r
     end
     r

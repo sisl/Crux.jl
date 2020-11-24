@@ -12,7 +12,7 @@
     batch_size::Int = 32
     target_update_period::Int = 500
     log = LoggerParams(dir = "log/gail", period = 10)
-    buffer::BufferParams = BufferParams(init = 200, size = 1000)
+    buffer
     device = cpu
     rng::AbstractRNG = Random.GLOBAL_RNG
     i::Int64 = 1

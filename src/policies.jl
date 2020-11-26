@@ -42,10 +42,11 @@ function Flux.Optimise.train!(b::Baseline, 𝒟::ExperienceBuffer)
     end
     sync!(b,  device(𝒟))
 end
+    
 
 
 
-## Categorical Policy
+## Deep Q-network Policy
 mutable struct DQNPolicy <: Policy
     Q
     actions
@@ -53,13 +54,15 @@ mutable struct DQNPolicy <: Policy
     Q⁻
 end
 
-DQNPolicy(Q, actions; device = cpu) = DQNPolicy(Q, actions, todevice(Q, device), deepcopy(𝒮.π.Q) |> 𝒮.device)
+DQNPolicy(Q, actions; device = cpu) = DQNPolicy(Q, actions, todevice(Q, device), deepcopy(Q) |> device)
 
 network(π::DQNPolicy, device) = (device == gpu) ? [π.Q_GPU] : [π.Q]
 
-POMDPs.action(π::DQNPolicy, s::AbstractArray) = π.actions[argmax(π.Q(s))]
+POMDPs.action(π::DQNPolicy, s::S) where S <: AbstractArray = π.actions[argmax(value(π, s))]
 
-POMDPs.value(π::DQNPolicy, s::AbstractArray) = network(π, device(s))[1](s)
+POMDPs.value(π::DQNPolicy, s::S) where S <: AbstractArray = network(π, device(s))[1](s)
+
+device(π::DQNPolicy) = isnothing(π.Q_GPU) ? cpu : gpu
 
 ## Categorical Policy
 mutable struct CategoricalPolicy <: Policy

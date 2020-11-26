@@ -2,9 +2,34 @@ include("../src/includes.jl")
 using POMDPModels
 using Test
 
-## Experience Buffer
+## data structures
+@test MinHeap == MutableBinaryHeap{Float32, DataStructures.FasterForward}
+
+## mdp_data
+d1 = mdp_data(3, 4, 100)
+d2 = mdp_data(3, 4, 100, gae = true)
+d3 = mdp_data(3, 4, 100, Atype = CuArray{Float32, 2})
+
+@test size(d1[:s]) == (3, 100) && size(d2[:s]) == (3, 100) && size(d3[:s]) == (3, 100)
+@test size(d1[:sp]) == (3, 100) && size(d2[:sp]) == (3, 100) && size(d3[:sp]) == (3, 100)
+@test size(d1[:a]) == (4, 100) && size(d2[:a]) == (4, 100) && size(d3[:a]) == (4, 100)
+@test size(d1[:r]) == (1, 100) && size(d2[:r]) == (1, 100) && size(d3[:r]) == (1, 100)
+@test size(d1[:done]) == (1, 100) && size(d2[:done]) == (1, 100) && size(d3[:done]) == (1, 100)
+@test size(d2[:return]) == (1, 100) && size(d2[:advantage]) == (1, 100)
+@test !haskey(d1, :return) && !haskey(d1, :advantage)
+@test d3[:s] isa CuArray
+
+## circular_indices
+@test circular_indices(4, 60, 100) == [4:63 ...]
+@test circular_indices(1, 100, 100) == [1:100 ...]
+@test circular_indices(1, 101, 100) == [2:100 ..., 1]
+@test circular_indices(1, 120, 100) == [21:100 ..., 1:20 ...]
+@test circular_indices(90, 20, 100) == [90:100 ..., 1:9 ...]
+
+## Construction
 b = ExperienceBuffer(2, 4, 100, gae = true)
-b_gpu = empty_like(b, device = gpu)
+bpriority = ExperienceBuffer(2, 4, 50, prioritized = true, gae = true)
+b_gpu = ExperienceBuffer(b, device = gpu)
 
 @test b isa ExperienceBuffer{Array{Float32, 2}}
 @test b_gpu isa ExperienceBuffer{CuArray{Float32, 2}}
@@ -16,6 +41,7 @@ b_gpu = empty_like(b, device = gpu)
 @test :r in keys(b_gpu.data)
 @test :done in keys(b_gpu.data)
 
+## Base functions 
 @test keys(b) == keys(b.data)
 
 @test size(b[:s]) == (2,0)
@@ -25,34 +51,94 @@ b_gpu = empty_like(b, device = gpu)
 @test size(b_gpu[:s]) == (2,0)
 @test length(b_gpu) == 0
 @test capacity(b_gpu) == 100
-push!(b, Dict(:s =>rand(2), :a => rand(4), :s => rand(2), :r => 1., :done => 1., :advantage => 1., :return => :1))
 
-mdp = SimpleGridWorld(size = (10,10), tprob = .7)
-push!(b, rand(2), :up,1., rand(2), 1., mdp)
-@test length(b) == 2
-@test b.next_ind == 3
+@test prioritized(bpriority)
+@test device(b) == cpu
+@test device(bpriority) == cpu
+@test device(b_gpu) == gpu
 
-clear!(b)
-@test length(b) == 0
-@test b.next_ind == 1
+## push!
+#push dictionary with one element
+d = Dict(:s => 2*ones(2), :a => ones(4), :sp => ones(2), :r => 1, :done => 0)
+push!(b, d)
+@test length(b) == 1
+@test b[:s] == 2*ones(2,1)
+@test b[:a] == ones(4,1)
+@test b[:sp] == ones(2,1)
+@test b[:r] == ones(1,1)
+@test b[:done] == zeros(1,1)
 
-@test isgpu(b_gpu)
-@test !isgpu(b)
+# push dictionary with more than one element
+d = Dict(:s => 3*ones(2,3), :a => 4*ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
+push!(b, d)
+@test length(b) == 4
+@test b[:s][:,2:end] ==  3*ones(2,3)
+@test b[:a][:,2:end] == 4*ones(4,3)
+@test b[:sp][:,2:end] == 5*ones(2,3)
+@test b[:r][:,2:end] == 6*ones(1,3)
+@test b[:done][:,2:end] == ones(1,3)
 
-fill!(b, mdp, policy = RandomPolicy(mdp))
-@test length(b) == 100
-@test circular_indices(4, 60, length(b)) == [4:63 ...]
-@test circular_indices(1, 100, length(b)) == [1:100 ...]
-@test circular_indices(1, 101, length(b)) == [2:100 ..., 1]
-@test circular_indices(1, 120, length(b)) == [21:100 ..., 1:20 ...]
-@test circular_indices(90, 20, length(b)) == [90:100 ..., 1:9 ...]
+# push a buffer
+push!(b, b)
+@test length(b) == 8
+for k in keys(b)
+    @test b[k][:, 1:4] == b[k][:, 5:8]
+end
 
-baseline = Baseline(Chain(Dense(2,32, relu), Dense(32, 1)))
-fill_gae!(b, 1, 100, baseline.V, 0.9f0, 0.7f0)
-fill_returns!(b, 1, 100, 0.7f0)
+## update_priorities!
+update_priorities!(bpriority, [1,2,3], [1., 2., 3.])
+@test bpriority.max_priority == 3.0
+@test bpriority.priorities[1] ≈ 1f0^bpriority.α
+@test bpriority.priorities[2] ≈ 2f0^bpriority.α
+@test bpriority.priorities[3] ≈ 3f0^bpriority.α
+@test bpriority.minsort_priorities[1] ≈ 1f0^bpriority.α
+@test bpriority.minsort_priorities[2] ≈ 2f0^bpriority.α
+@test bpriority.minsort_priorities[3] ≈ 3f0^bpriority.α
 
-bmerge = merge(b, b, capacity = 300)
-@test length(bmerge) == 200
-@test capacity(bmerge) == 300
-@test bmerge[:s][:, 1:100] == bmerge[:s][:, 101:200] 
+push!(bpriority, d)
+push!(bpriority, d)
+@test bpriority.max_priority == 3.0
+for i=1:6
+    @test bpriority.priorities[i] ≈ 3f0^bpriority.α
+    @test bpriority.minsort_priorities[i] ≈ 3f0^bpriority.α
+end
+    
+
+## sampling
+
+# uniform sample
+t = ExperienceBuffer(2, 4, 10)
+rand!(Random.GLOBAL_RNG, t, b)
+
+t = ExperienceBuffer(2, 4, 3)
+rng = MersenneTwister(0)
+ids = rand(rng, 1:length(b), 3)
+rand!(MersenneTwister(0), t, b)
+
+for k in keys(t)
+    @test t[k] == b[k][:,ids]
+end
+
+# Priority samples
+bpriority[:s] .= rand(Float32, 2, 6)
+update_priorities!(bpriority, [1:6...], [1.:6. ...])
+t = ExperienceBuffer(2, 4, 1000)
+priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
+
+rand!(rng, t, bpriority)
+
+# Test the the frequency of samples is proportional to their priority
+freqs = [sum(t.indices .== i) for i=1:6] ./ length(t)
+probs = priorities ./ sum(priorities)
+relerr = abs.(freqs .- probs) ./ probs
+@test all(relerr .< 0.01)
+
+@test all(t[:s] .== bpriority[:s][:,t.indices])
+@test all(t[:weight] .<= 1.)
+
+## merge 
+# bmerge = merge(b, b, capacity = 300)
+# @test length(bmerge) == 200
+# @test capacity(bmerge) == 300
+# @test bmerge[:s][:, 1:100] == bmerge[:s][:, 101:200] 
 

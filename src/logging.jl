@@ -6,15 +6,17 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
     dir::String = "log/"
     period::Int64 = 100
     logger =  TBLogger(dir, tb_increment)
-    eval::Function = (task, solution; kwargs...) -> Dict("discounted_return" => discounted_return(task, solution; kwargs...))
+    eval::Function = (task, solution; rng) -> Dict("discounted_return" => discounted_return(task, solution; rng = rng))
     other::Function = (p) -> Dict()
     verbose::Bool = true
     rng::AbstractRNG = Random.GLOBAL_RNG
 end
 
-function Base.log(p::LoggerParams, i, task, solution; data = [], last_i = nothing)
-    !elapsed(i, p.period, last_i = last_i) && return
-    perf = p.eval(task, solution, rng = rng)
+#Note that i can be an int or a unitrange
+function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, task, solution; data = [])
+    !elapsed(i, p.period) && return
+    i = i[end]
+    perf = p.eval(task, solution, rng = p.rng)
     p.verbose && print("Step: $i, ")
     for dict in [perf, data..., p.other(solution)]  
         for (k,v) in dict
@@ -26,7 +28,8 @@ function Base.log(p::LoggerParams, i, task, solution; data = [], last_i = nothin
 end
 
 # Built-in functions for logging common training things
-logloss(loss, grad; name = "loss", suffix = "") = Dict(string(name, suffix) => loss) # TODO Gradient
+logloss(loss; name = "loss", suffix = "") = Dict(string(name, suffix) => loss)
+loggradient(grad; name = "grad_norm") = Dict(name => norm(grad))
 logexploration(policy, i; name = "eps") = policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
 
 ## Stuff for plotting

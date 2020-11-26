@@ -14,9 +14,9 @@ using DataStructures
 
 
 include("utils.jl")
-include("sampler.jl")
 include("experience_buffer.jl")
 include("policies.jl")
+include("sampler.jl")
 include("logging.jl")
 include("dqn.jl")
 include("vpg.jl")

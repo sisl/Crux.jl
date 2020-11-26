@@ -29,10 +29,13 @@ end
 function POMDPs.initialstate(mdp::SimpleGridWorld)
     # update_lava!(mdp)
     # return Deterministic(GWPos(1,5))
-    while true
-        x, y = rand(1:mdp.size[1]), rand(1:mdp.size[2])
-        !(GWPos(x,y) in mdp.terminate_from) && return Deterministic(GWPos(x,y))
+    function istate(rng::AbstractRNG)
+        while true
+            x, y = rand(rng, 1:mdp.size[1]), rand(rng, 1:mdp.size[2])
+            !(GWPos(x,y) in mdp.terminate_from) && return GWPos(x,y)
+        end
     end
+    return ImplicitDistribution(istate)
 end 
             
 function POMDPs.convert_s(::Type{V}, s::GWPos, mdp::SimpleGridWorld) where {V<:AbstractArray}

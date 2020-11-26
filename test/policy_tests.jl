@@ -1,10 +1,28 @@
 include("../src/includes.jl")
 using Test
 
-Qnet = Chain(Dense(2,32, relu), Dense(32, 4))
-π = DQNPolicy(Qnet, mdp; device = cpu)
+## DQN Policy
+π = DQNPolicy(Chain(Dense(2,32, relu), Dense(32, 4)), (1,2,3,4); device = cpu)
+π_gpu = DQNPolicy(Chain(Dense(2,32, relu), Dense(32, 4)), (1,2,3,4); device = gpu)
 
-@test size(value(π, b[:s])) == (4,100)
+@test network(π, cpu) == [π.Q]
+@test network(π, gpu) == [nothing]
+@test network(π_gpu, cpu) == [π_gpu.Q]
+@test network(π_gpu, gpu) == [π_gpu.Q_GPU]
 
-y = target(Qnet, b, 0.9)
-sum(value(π, b[:s]) .* b[:a], dims = 1)
+s = rand(2)
+@test action(π, s) == argmax(π.Q(s))
+@test action(π_gpu, s) == argmax(π_gpu.Q(s))
+
+@test π.Q(s) == π.Q⁻(s)
+
+sb = rand(2,100)
+@test size(value(π, sb)) == (4,100)
+@test value(π, sb) == π.Q(sb)
+@test size(value(π_gpu, sb)) == (4,100)
+@test all(value(π_gpu, sb) .≈ value(π_gpu, sb |> gpu) |> cpu)
+
+## sync!
+π_gpu.Q_GPU = π.Q |> gpu
+@test all(value(π_gpu, sb |> gpu) |> cpu .≈ value(π, sb))
+

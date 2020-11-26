@@ -4,7 +4,7 @@ adim(mdp) = length(actions(mdp))
 
 ## Efficient inverse query for fenwick tree 
 # Taken from https://codeforces.com/blog/entry/61364
-function inv_query(t::FenwickTree, v)
+function inverse_query(t::FenwickTree, v)
     tot, pos, N = 0, 0, length(t)
     for i=floor(Int, log2(N)):-1:0
         new_pos = pos + 1 << i
@@ -16,32 +16,22 @@ function inv_query(t::FenwickTree, v)
     pos + 1
 end
 
-value(t::FenwickTree, i) = t[i] - t[i-1]
+Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
 
-function update!(t::FenwickTree, i, v)
-    old = value(t, i)
-    inc!(t, i, v - old)
-end
+DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
 
 ## GPU Stuff
+device(v::CuArray) = gpu
+device(v::AbstractArray) = cpu
+
+todevice(C, device) = (device == gpu) ? (C |> gpu) : nothing
+
 function Base.copyto!(Cto::Chain, Cfrom::Chain)
     for i = 1:length(Flux.params(Cto).order.data)
         copyto!(Flux.params(Cto).order.data[i], Flux.params(Cfrom).order.data[i])
     end
 end
 
-todevice(C, device) = (device == gpu) ? (C |> gpu) : nothing
-
-device(v::AbstractArray) = (v isa CuArray) ? gpu : cpu
-
-function LinearAlgebra.norm(grads, params, p::Real = 2)
-    norms = []
-    for param in params
-        push!(norm(grads[param].data[:], p))
-    end
-    norm(norms, p)
-end
-
-
-
+## Flux stuff
+LinearAlgebra.norm(grads::Flux.Zygote.Grads, p::Real = 2) = norm([norm(grads[θ] |> cpu, p) for θ in grads.params], p)
 

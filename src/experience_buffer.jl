@@ -7,7 +7,9 @@ function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae
         :sp => Atype(undef, sdim, size), 
         :r => Atype(undef, 1, size), 
         :done => Atype(undef, 1, size),
+        :weight => Atype(undef, 1, size),
         )
+    copyto!(data[:weight], ones(1, size))
     if gae
         data[:return] = Atype(undef, 1, size)
         data[:advantage] = Atype(undef, 1, size)
@@ -68,11 +70,12 @@ device(b::ExperienceBuffer{CuArray{Float32, 2}}) = gpu
 device(b::ExperienceBuffer{Array{Float32, 2}}) = cpu
 
 # Note: data can be a dictionary or an experience buffer
-function Base.push!(b::ExperienceBuffer, data)
-    N, C = size(data[first(keys(data))], 2), capacity(b)
+function Base.push!(b::ExperienceBuffer, data; ids = nothing)
+    ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids
+    N, C = length(ids), capacity(b)
     I = circular_indices(b.next_ind, N, C)
     for k in keys(data)
-        b.data[k][:, I] .= data[k]
+        copyto!(view(b.data[k], :, I), data[k][:, ids])
     end
     prioritized(b) && update_priorities!(b, I, b.max_priority*ones(N))
         
@@ -89,36 +92,32 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     end
 end
 
-function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer; i = 1)
-    prioritized(source) ? prioritized_sample!(target, source, rng, i=i) : uniform_sample!(target, source, rng)
+function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer...; i = 1)
+    lengths = [length.(source)...]
+    batches = floor.(Int, capacity(target) .* lengths ./ sum(lengths))
+    batches[1] += capacity(target) - sum(batches)
+    
+    for (b, B) in zip(source, batches)
+        B == 0 && continue
+        prioritized(b) ? prioritized_sample!(target, b, rng, i=i, B=B) : uniform_sample!(target, b, rng, B=B)
+    end
 end
 
-function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG;)
-    B = capacity(target)
+function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; B = capacity(target))
     ids = rand(rng, 1:length(source), B)
-    for k in keys(target.data)
-        copyto!(target.data[k], source[k][:, ids])
-    end
-    target.elements = B
+    push!(target, source, ids = ids)
 end
 
 # With guidance from https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
-function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; i = 1)
-    N, B = length(source), capacity(target)
+function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; i = 1, B = capacity(target))
+    N = length(source)
     ptot = prefixsum(source.priorities, N)
     Δp = ptot / B
-    ids = [inverse_query(source.priorities, (j + rand(rng) - 1) * Δp) for j=1:B]
+    target.indices = [inverse_query(source.priorities, (j + rand(rng) - 1) * Δp) for j=1:B]
     pmin = first(source.minsort_priorities) / ptot
     max_w = (pmin*N)^(-source.β(i))
-    ws = [(N * source.priorities[id] / ptot)^source.β(i) for id in ids] ./ max_w
+    source[:weight][1, target.indices] .= [(N * source.priorities[id] / ptot)^source.β(i) for id in target.indices] ./ max_w
     
-    # Add the indices to the target and the weights to the target
-    target.indices = ids
-    for k in keys(target.data)
-        k == :weight && continue
-        copyto!(target.data[k], source[k][:, ids])
-    end
-    !haskey(target.data, :weight) && (target.data[:weight] = deepcopy(target.data[:r]))
-    copyto!(target.data[:weight], ws)
-    target.elements = B
+    push!(target, source, ids = target.indices)
 end
+

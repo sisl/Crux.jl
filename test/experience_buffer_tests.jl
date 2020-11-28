@@ -40,6 +40,7 @@ b_gpu = ExperienceBuffer(b, device = gpu)
 @test :sp in keys(b_gpu.data)
 @test :r in keys(b_gpu.data)
 @test :done in keys(b_gpu.data)
+@test :weight in keys(b_gpu.data)
 
 ## Base functions 
 @test keys(b) == keys(b.data)
@@ -59,7 +60,7 @@ b_gpu = ExperienceBuffer(b, device = gpu)
 
 ## push!
 #push dictionary with one element
-d = Dict(:s => 2*ones(2), :a => ones(4), :sp => ones(2), :r => 1, :done => 0)
+d = Dict(:s => 2*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(b, d)
 @test length(b) == 1
 @test b[:s] == 2*ones(2,1)
@@ -107,10 +108,10 @@ end
 ## sampling
 
 # uniform sample
-t = ExperienceBuffer(2, 4, 10)
+t = ExperienceBuffer(2, 4, 10, gae = true)
 rand!(Random.GLOBAL_RNG, t, b)
 
-t = ExperienceBuffer(2, 4, 3)
+t = ExperienceBuffer(2, 4, 3, gae = true)
 rng = MersenneTwister(0)
 ids = rand(rng, 1:length(b), 3)
 rand!(MersenneTwister(0), t, b)
@@ -119,15 +120,38 @@ for k in keys(t)
     @test t[k] == b[k][:,ids]
 end
 
+# Test the multi-buffer sampling
+t1 = ExperienceBuffer(2, 4, 10)
+d = Dict(:s => ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+push!(t1, d)
+
+t2 = ExperienceBuffer(2, 4, 10)
+d = Dict(:s => 2*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+push!(t2, d)
+
+t3 = ExperienceBuffer(2, 4, 10)
+d = Dict(:s => 3*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+push!(t3, d)
+
+t = ExperienceBuffer(2, 4, 10, gae = true)
+rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
+
+@test all(t[:s][:, 1:4] .== 1.0)
+@test all(t[:s][:, 5:7] .== 2.0)
+@test all(t[:s][:, 8:10] .== 3.0)
+
+
+
 # Priority samples
 bpriority[:s] .= rand(Float32, 2, 6)
 update_priorities!(bpriority, [1:6...], [1.:6. ...])
-t = ExperienceBuffer(2, 4, 1000)
+t = ExperienceBuffer(2, 4, 1000, gae=true)
 priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
 
 rand!(rng, t, bpriority)
 
 # Test the the frequency of samples is proportional to their priority
+length(t)
 freqs = [sum(t.indices .== i) for i=1:6] ./ length(t)
 probs = priorities ./ sum(priorities)
 relerr = abs.(freqs .- probs) ./ probs

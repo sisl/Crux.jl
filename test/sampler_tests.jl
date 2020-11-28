@@ -7,8 +7,8 @@ mdp = SimpleGridWorld()
 
 exploration_policy = EpsGreedyPolicy(LinearDecaySchedule(start=1., stop=0.1, steps=100/2), Random.GLOBAL_RNG, actions(mdp))
 
-s1 = Sampler(mdp = mdp, π = FunctionPolicy((s) -> :up), max_steps = 500)
-s2 = Sampler(mdp = mdp, π = FunctionPolicy((s) -> :up), max_steps = 50, exploration_policy = exploration_policy)
+s1 = Sampler(mdp, FunctionPolicy((s) -> :up), max_steps = 500)
+s2 = Sampler(mdp, FunctionPolicy((s) -> :up), max_steps = 50, exploration_policy = exploration_policy)
 
 ## explore
 @test !explore(s1)
@@ -70,4 +70,14 @@ length(b)
 baseline = Baseline(Chain(Dense(2,32, relu), Dense(32, 1)))
 fill_gae!(b, 1,5, baseline.V, 0.9f0, 0.7f0)
 fill_returns!(b, 1, 5, 0.7f0)
+
+## Test sampling with a vector of mdps
+mdps = [mdp, mdp, mdp]
+
+samplers = Sampler(mdps, FunctionPolicy((s) -> :up))
+@test length(samplers) == 3
+
+data = steps!(samplers, Nsteps = 5)
+data[:s]
+@test size(data[:s],2) == 15
 

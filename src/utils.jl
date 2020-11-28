@@ -2,6 +2,9 @@
 sdim(mdp) = length(convert_s(AbstractVector, rand(initialstate(mdp)), mdp))
 adim(mdp) = length(actions(mdp))
 
+## Other
+weighted_mean(weights) = (y) -> mean(y .* weights)
+
 ## Efficient inverse query for fenwick tree 
 # Taken from https://codeforces.com/blog/entry/61364
 function inverse_query(t::FenwickTree, v)

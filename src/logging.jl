@@ -5,21 +5,21 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 @with_kw struct LoggerParams
     dir::String = "log/"
     period::Int64 = 100
-    logger =  TBLogger(dir, tb_increment)
-    eval::Function = (task, solution; rng) -> Dict("discounted_return" => discounted_return(task, solution; rng = rng))
-    other::Function = (p) -> Dict()
+    logger = TBLogger(dir, tb_increment)
+    extras = []
     verbose::Bool = true
-    rng::AbstractRNG = Random.GLOBAL_RNG
 end
 
+Base.log(p::Nothing, i, data...)  = nothing
+
 #Note that i can be an int or a unitrange
-function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, task, solution; data = [])
+function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
-    perf = p.eval(task, solution, rng = p.rng)
     p.verbose && print("Step: $i, ")
-    for dict in [perf, data..., p.other(solution)]  
-        for (k,v) in dict
+    for dict in [data..., p.extras...]
+        d = dict()
+        for (k,v) in d
             log_value(p.logger, k, v, step = i)
             p.verbose && print(", ", k, ": ", v)
         end
@@ -28,9 +28,16 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, task, solution; dat
 end
 
 # Built-in functions for logging common training things
-logloss(loss; name = "loss", suffix = "") = Dict(string(name, suffix) => loss)
-loggradient(grad; name = "grad_norm") = Dict(name => norm(grad))
-logexploration(policy, i; name = "eps") = policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
+log_performance(tasks::AbstractVector, solution, name, fn, rng) = Dict("$(name)/T$i" => fn(tasks[i], solution, rng = rng) for i=1:length(tasks))
+log_performance(task, solution, name, fn, rng) = Dict(name => fn(task, solution; rng = rng))
+
+log_discounted_return(task, solution, rng) = () -> log_performance(task, solution, "discounted_return", discounted_return, rng)
+log_undiscounted_return(task, solution, rng) = () -> log_performance(task, solution, "undiscounted_return", undiscounted_return, rng)
+log_failure(task, solution, rng) = () -> log_performance(task, solution, "failure_rate", failure, rng)
+    
+log_loss(loss; name = "loss", suffix = "") = () -> Dict(string(name, suffix) => loss)
+log_gradient(grad; name = "grad_norm") = () -> Dict(name => norm(grad))
+log_exploration(policy, i; name = "eps") = () -> policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
 
 ## Stuff for plotting
 function smooth(v, weight = 0.6)
@@ -55,5 +62,30 @@ function readtb(logdir, key)
     h = readtb(logdir)[key]
     h.iterations, h.values
 end
+
+function plot_learning_curves(dirs; 
+        ylabel = "Discounted Reward",  
+        xlabel = "Training Steps", 
+        values = fill(:discounted_return, length(dirs)), 
+        p = plot(), 
+        rng = MersenneTwister(5), 
+        colors = [get(colorschemes[:rainbow], rand(rng)) for i=1:Ntasks],
+        vertical_lines = [],
+        vline_range = (0, 1), 
+        thick_every = 1
+    )
+    # Plot the vertical lines (usually for multitask learning or to designate a point on the curve)
+    for i = 1:length(vertical_lines)
+        plot!(p, [vertical_lines[i], vertical_lines[i]], [vline_range...], color = :black, linewidth = i % thick_every == 0 ? 3 : 1, label = "")
+    end
     
+    # Plot the learning curves
+    plot!(p, ylabel = ylabel, legend = :bottomright)
+    for i in 1:length(dirs)
+        x, y = readtb(dirs[i], values[i])
+        plot!(p, x, y, alpha = 0.3, color = colors[i], label = "")
+        plot!(p, x, smooth(y), color = colors[i], label = "Task $i", linewidth =2 )
+    end
+    p
+end
 

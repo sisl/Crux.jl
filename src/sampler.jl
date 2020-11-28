@@ -10,6 +10,12 @@
     episode_checker::Function = (data, start, stop) -> true
 end
 
+Sampler(mdp, π::Policy; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) = Sampler(mdp = mdp, π = π, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng)
+
+function Sampler(mdps::AbstractVector, π::Policy; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG)
+    [Sampler(mdp = mdps[i], π = π, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng) for i in 1:length(mdps)]
+end
+
 explore(s::Sampler) = !isnothing(s.exploration_policy)
 
 function step!(data, j::Int, sampler::Sampler; i = 0, baseline = nothing)
@@ -50,6 +56,18 @@ function steps!(sampler::Sampler; Nsteps = 1, i = 0, baseline = nothing)
     data
 end
 
+function steps!(samplers::Vector{Sampler}; Nsteps = 1, i = 0, baseline = nothing)
+    data = mdp_data(sdim(samplers[1].mdp), adim(samplers[1].mdp), Nsteps*length(samplers), gae = !isnothing(baseline))
+    j = 1
+    for s=1:Nsteps
+        for sampler in samplers
+            step!(data, j, sampler, i = i + (j-1), baseline = baseline)
+            j += 1
+        end
+    end
+    data
+end
+
 function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, return_episodes = false)
     sampler.episode_length = 0
     data = mdp_data(sdim(sampler.mdp), adim(sampler.mdp), Neps*sampler.max_steps, gae = !isnothing(baseline))
@@ -72,7 +90,7 @@ function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, return
     return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
-function fillto!(b::ExperienceBuffer, s::Sampler, N::Int; i = 1)
+function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{Sampler}}, N::Int; i = 1)
     Nfill = max(0, N - length(b))
     Nfill > 0 && push!(b, steps!(s, i = i, Nsteps = Nfill))
     Nfill
@@ -81,8 +99,8 @@ end
 ## Undiscounted returns
 undiscounted_return(data, start, stop) = sum(data[:r][1,start:stop])
 
-function undiscounted_return(mdp, policy; Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
-    s = Sampler(mdp = mdp, π = policy, max_steps = max_steps, rng = rng)
+function undiscounted_return(mdp, π; Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
+    s = Sampler(mdp, π, max_steps = max_steps, rng = rng)
     data = episodes!(s, Neps = Neps)
     sum(data[:r]) / Neps
 end
@@ -96,8 +114,8 @@ function discounted_return(data, start, stop, γ)
     r
 end
 
-function discounted_return(mdp, policy; Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
-    s = Sampler(mdp = mdp, π = policy, max_steps = max_steps, rng = rng)
+function discounted_return(mdp, π; Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
+    s = Sampler(mdp, π, max_steps = max_steps, rng = rng)
     data, episodes = episodes!(s, Neps = Neps, return_episodes = true)
     mean([discounted_return(data, e..., discount(mdp)) for e in episodes])
 end
@@ -105,8 +123,8 @@ end
 ## Failures
 failure(data, start, stop; threshold = 0.) = undiscounted_return(data, start, stop) < threshold
 
-function failure(mdp, policy; threshold = 0., Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
-    s = Sampler(mdp = mdp, π = policy, max_steps = max_steps, rng = rng)
+function failure(mdp, π; threshold = 0., Neps = 100, max_steps = 100, rng::AbstractRNG = Random.GLOBAL_RNG)
+    s = Sampler(mdp, π, max_steps = max_steps, rng = rng)
     data, episodes = episodes!(s, Neps = Neps, return_episodes = true)
     mean([failure(data, e..., threshold = threshold) for e in episodes])
 end

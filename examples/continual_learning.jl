@@ -1,11 +1,11 @@
-include("../src/includes.jl")
+using Shard, Flux, POMDPPolicies
 include("mdps/lavaworld.jl")
 using Plots
 
 ## Continual Learning params
 Ncycles = 3
 Ntasks = 3
-Nsteps_per_cycle = 15000
+Nsteps_per_cycle = 200 #15000
 N = Ncycles*Ntasks*Nsteps_per_cycle
 
 ## Build the tasks

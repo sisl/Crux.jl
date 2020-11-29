@@ -12,11 +12,13 @@ module Shard
     using LinearAlgebra
     using ValueHistories
     using DataStructures
-
+    using Plots
+    using ColorSchemes
+    
     export sdim, adim, device, todevice
     include("utils.jl")
     
-    export inverse_query, mdp_data, circular_indices, ExperienceBuffer, capacity, 
+    export MinHeap, inverse_query, mdp_data, circular_indices, ExperienceBuffer, 
            prioritized, update_priorities!, uniform_sample!, prioritized_sample!
     include("experience_buffer.jl")
     
@@ -24,28 +26,28 @@ module Shard
            DQNPolicy, CategoricalPolicy, GaussianPolicy
     include("policies.jl")
     
-    export Sampler, explore, step!, steps!, episodes!, fillto!m, 
+    export Sampler, explore, step!, steps!, episodes!, fillto!, 
            undiscounted_return, discounted_return, failure, fill_gae!, fill_returns!
     include("sampler.jl")
     
-    export LoggerParams, log_perforamnce, log_discounted_return, 
+    export elapsed, LoggerParams, log_perforamnce, log_discounted_return, 
            log_undiscounted_return, log_failure, log_val, log_loss, log_gradient, 
            log_exploration, smooth, readtb, plot_learning_curves
     include("logging.jl")
     
     export MultitaskDecaySchedule, sequential_learning, experience_replay
-    include("multitask_learning.jl")
+    include("solvers/multitask_learning.jl")
     
     export weighted_mean, target, q_predicted, td_loss, td_error
-    include("value_common.jl")
+    include("solvers/value_common.jl")
     
     export DQNSolver
-    include("dqn.jl")
+    include("solvers/dqn.jl")
     
     export VPGSolver
-    include("vpg.jl")
+    include("solvers/vpg.jl")
     
     export DQNGAILSolver
-    include("dqn_gail.jl")
+    include("solvers/dqn_gail.jl")
 end
 

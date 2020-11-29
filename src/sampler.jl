@@ -134,19 +134,19 @@ end
 function fill_gae!(data, start::Int, stop::Int, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
     for i in reverse(start:stop)
-        Vsp = V(b[:sp][:,i])
-        Vs = V(b[:s][:,i])
+        Vsp = V(data[:sp][:,i])
+        Vs = V(data[:s][:,i])
         @assert length(Vs) == 1
-        A = c*A + b[:r][1,i] + (1.f0 - b[:done][1,i])*γ*Vsp[1] - Vs[1]
-        b[:advantage][:, i] .= A
+        A = c*A + data[:r][1,i] + (1.f0 - data[:done][1,i])*γ*Vsp[1] - Vs[1]
+        data[:advantage][:, i] .= A
     end
 end
 
 function fill_returns!(data, start::Int, stop::Int, γ::Float32)
     r = 0f0
     for i in reverse(start:stop)
-        r = b[:r][1, i] + γ*r
-        b[:return][:, i] .= r
+        r = data[:r][1, i] + γ*r
+        data[:return][:, i] .= r
     end
 end
 

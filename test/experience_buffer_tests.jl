@@ -1,6 +1,10 @@
 using Shard
 using POMDPModels
 using Test
+using DataStructures
+using CUDA
+using Flux
+using Random
 
 ## data structures
 @test MinHeap == MutableBinaryHeap{Float32, DataStructures.FasterForward}
@@ -91,7 +95,7 @@ d3 = mdp_data(3, 4, 100, Atype = CuArray{Float32, 2})
 ## Construction
 b = ExperienceBuffer(2, 4, 100, gae = true)
 bpriority = ExperienceBuffer(2, 4, 50, prioritized = true, gae = true)
-b_gpu = ExperienceBuffer(b, device = gpu)
+b_gpu = b |> gpu
 
 @test b isa ExperienceBuffer{Array{Float32, 2}}
 @test b_gpu isa ExperienceBuffer{CuArray{Float32, 2}}
@@ -116,9 +120,9 @@ b_gpu = ExperienceBuffer(b, device = gpu)
 @test capacity(b_gpu) == 100
 
 @test prioritized(bpriority)
-@test device(b) == cpu
-@test device(bpriority) == cpu
-@test device(b_gpu) == gpu
+@test Shard.device(b) == cpu
+@test Shard.device(bpriority) == cpu
+@test Shard.device(b_gpu) == gpu
 
 ## push!
 #push dictionary with one element

@@ -1,4 +1,4 @@
-include("../src/includes.jl") # this will be replaced with a using statement eventually
+using Shard, Flux
 include("mdps/gridworld.jl")
 
 g = SimpleGridWorld(size = (10,10), tprob = .7)

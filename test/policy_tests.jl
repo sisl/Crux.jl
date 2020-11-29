@@ -1,5 +1,7 @@
 using Shard
 using Test
+using Flux
+using POMDPs
 
 ## DQN Policy
 π = DQNPolicy(Chain(Dense(2,32, relu), Dense(32, 4)), (1,2,3,4); device = cpu)

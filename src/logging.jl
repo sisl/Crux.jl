@@ -1,4 +1,3 @@
-
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
@@ -70,7 +69,7 @@ function plot_learning_curves(dirs;
         values = fill(:discounted_return, length(dirs)), 
         p = plot(), 
         rng = MersenneTwister(5), 
-        colors = [get(colorschemes[:rainbow], rand(rng)) for i=1:Ntasks],
+        colors = [get(colorschemes[:rainbow], rand(rng)) for i=1:length(values)],
         vertical_lines = [],
         vline_range = (0, 1), 
         thick_every = 1

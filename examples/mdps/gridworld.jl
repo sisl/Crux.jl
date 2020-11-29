@@ -1,4 +1,4 @@
-using POMDPModels, POMDPModelTools
+using POMDPs, POMDPModels, POMDPModelTools, Random
 
 POMDPs.gen(mdp::SimpleGridWorld, s, a, rng = Random.GLOBAL_RNG) = (sp = rand(rng, transition(mdp, s, a )), r = reward(mdp, s, a))
 

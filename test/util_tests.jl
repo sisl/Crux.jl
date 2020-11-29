@@ -3,6 +3,7 @@ using Test
 using POMDPModels
 using Flux
 using LinearAlgebra
+using CUDA
 
 ## sdim and adim
 mdp = SimpleGridWorld()

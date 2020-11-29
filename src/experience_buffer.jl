@@ -75,8 +75,13 @@ function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae
     b
 end
 
-function ExperienceBuffer(b::ExperienceBuffer; device = device(b))
-    data = Dict(k => v |> device for (k,v) in b.data)
+function Flux.gpu(b::ExperienceBuffer)
+    data = Dict(k => v |> gpu for (k,v) in b.data)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
+end
+
+function Flux.cpu(b::ExperienceBuffer)
+    data = Dict(k => v |> cpu for (k,v) in b.data)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
@@ -86,7 +91,7 @@ Base.keys(b::ExperienceBuffer) = keys(b.data)
 
 Base.length(b::ExperienceBuffer) = b.elements
 
-capacity(b::ExperienceBuffer) = size(first(b.data)[2], 2)
+DataStructures.capacity(b::ExperienceBuffer) = size(first(b.data)[2], 2)
 
 prioritized(b::ExperienceBuffer) = !isnothing(b.priorities)
 

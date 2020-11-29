@@ -1,5 +1,6 @@
 using Shard
 using Test
+using POMDPPolicies
 
 
 m = MultitaskDecaySchedule(10, [1,2,3])

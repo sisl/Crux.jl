@@ -1,4 +1,4 @@
-include("../src/includes.jl") # this will be replaced with a using statement eventually
+using Shard, Flux
 include("mdps/lavaworld.jl")
 
 
@@ -19,7 +19,7 @@ Qnet() = Chain(Dense(input_dim, 128, relu), Dense(128,64, relu), Dense(64, 4))
 as = actions(expert_task) 
 
 dqn_steps = 20000 # to learn an expert policy
-gail_steps = 10000
+gail_steps = 2000
 expert_buffer_size = 1000 
 nda_buffer_size = 1000
 λ_nda = 0.5f0 # Constant for NDA. λ = 1 ignores the NDA trajectories
@@ -50,42 +50,7 @@ sum(expert_trajectories[:r])
 π_gail = solve(𝒮_gail, expert_task)
 
 # Check failure rates after training
-failure_rate(expert_task, π_gail)
-mean([failure_rate(t, DQNPolicy(π_gail.Q, t)) for t in test_tasks])
-mean([discounted_return(t, DQNPolicy(π_gail.Q, t)) for t in test_tasks])
-
-# Solve with NDA-GAIL
-nda_trajectories = gen_buffer(nda_tasks, RandomPolicy(expert_task), nda_buffer_size, desired_return = -1., nonzero_transitions_only = false)
-𝒮_nda_gail = GAILSolver(π = DQNPolicy(Qnet(), expert_task), 
-                    D = DQNPolicy(Qnet(softmax), expert_task),
-                    N = 1000,
-                    λ_nda = .5f0,
-                    expert_buffer = expert_trajectories,
-                    nda_buffer = nda_trajectories,
-                    batch_size = 128,
-                    exploration_policy = EpsGreedyPolicy(expert_task, LinearDecaySchedule(start=1., stop=0.1, steps=gail_steps/2))
-                    )
-π_nda_gail = solve(𝒮_nda_gail, expert_task)
-
-failure_rate(expert_task, π_nda_gail)
-mean([failure_rate(t, DQNPolicy(π_nda_gail.Q, t)) for t in test_tasks])
-mean([discounted_return(t, DQNPolicy(π_nda_gail.Q, t)) for t in test_tasks])
-
-                    
-## Make some plots
-# Plot on the training MDP
-expert_occupancy = gen_occupancy(expert_trajectories, expert_task)
-c_expert = render(expert_task, (s = GWPos(7,5),), color = s->reward(expert_task,s) <0 ? -10. :  Float64(expert_occupancy[s]) / 2., policy = π_dqn)
-c_gail = render(mdp, (s = GWPos(7,5),), color = s->10.0*reward(mdp, s), policy =π_gail)
-c_nda_gail = render(mdp, (s = GWPos(7,5),), color = s->10.0*reward(mdp, s), policy = ChainPolicy(nda_gail_net,mdp))
-hstack(c_expert, r, c_gail, r, c_nda_gail) |> SVG("images/mdp1.svg")
-
-c_expert2 = render(mdp2, (s = GWPos(7,5),), color = s->10.0*reward(mdp2, s), policy = ChainPolicy(dqn_net, mdp2))
-c_gail2 = render(mdp2, (s = GWPos(7,5),), color = s->10.0*reward(mdp2, s), policy = ChainPolicy(gail_net, mdp2))
-c_nda_gail2 = render(mdp2, (s = GWPos(7,5),), color = s->10.0*reward(mdp2, s), policy = ChainPolicy(nda_gail_net, mdp2))
-hstack(c_expert2, r, c_gail2, r, c_nda_gail2) |> SVG("images/mdp2.svg")
-
-nda_occupancy = gen_occupancy(nda_trajectories, mdp2)
-c_expert = render(mdp2, (s = GWPos(7,5),), color = s-> Float64(nda_occupancy[s]) / 1.6, policy = ChainPolicy(dqn_net, mdp))
-
+failure(expert_task, π_gail)
+mean([failure(t, π_gail) for t in test_tasks])
+mean([discounted_return(t, π_gail) for t in test_tasks])
 

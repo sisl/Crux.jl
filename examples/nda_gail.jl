@@ -5,8 +5,8 @@ include("mdps/lavaworld.jl")
 # Setup the problem parameters
 sz = (7,5)
 input_dim = prod(sz)*3 # three channels represent player position, lava, and goal
-N_nda = 100
-N_test = 100
+N_nda = 10
+N_test = 10
 expert_task = SimpleGridWorld(size = sz, tprob = 1.0, rewards = random_lava(sz, 1, goal = (7,5), rng = MersenneTwister(0)))
 nda_tasks = [SimpleGridWorld(size = sz, tprob = 1.0,  rewards = random_lava(sz, 1, goal = (7,5))) for _=1:N_nda]
 test_tasks = [SimpleGridWorld(size = sz, tprob = 1.0,  rewards = random_lava(sz, 1, goal = (7,5))) for _=1:N_test]
@@ -15,7 +15,8 @@ simple_display(expert_task)
 simple_display(nda_tasks[3])
 simple_display(test_tasks[9])
 
-Qnet(args...) = Chain(Dense(input_dim, 128, relu), Dense(128,64, relu), Dense(64, 4), args...) 
+Qnet() = Chain(Dense(input_dim, 128, relu), Dense(128,64, relu), Dense(64, 4))
+as = actions(expert_task) 
 
 dqn_steps = 20000 # to learn an expert policy
 gail_steps = 10000
@@ -24,35 +25,28 @@ nda_buffer_size = 1000
 λ_nda = 0.5f0 # Constant for NDA. λ = 1 ignores the NDA trajectories
 
 ## solve with DQN
-𝒮_dqn = DQNSolver(π = DQNPolicy(Qnet(), expert_task, device = gpu),
-                  N=dqn_steps, 
-                  batch_size = 128, 
-                  exploration_policy = EpsGreedyPolicy(expert_task, LinearDecaySchedule(start=1., stop=0.1, steps=dqn_steps/2)),
-                  device = gpu
-                  )
+𝒮_dqn = DQNSolver(π = DQNPolicy(Qnet(), as), sdim = input_dim, N=dqn_steps, batch_size = 128)
 π_dqn = solve(𝒮_dqn, expert_task)
 
 # Check failure rates after training
-failure_rate(expert_task, π_dqn)
-mean([failure_rate(t, DQNPolicy(π_dqn.Q, t)) for t in test_tasks])
-mean([discounted_return(t, DQNPolicy(π_dqn.Q, t)) for t in test_tasks])
+failure(expert_task, π_dqn)
+mean([failure(t, π_dqn) for t in test_tasks])
+mean([failure(t, π_dqn) for t in test_tasks])
 
 ## Fill a buffer with expert trajectories
-expert_trajectories = ExperienceBuffer(expert_task, 1000)
-fill!(expert_trajectories, expert_task, π_dqn)
-
+expert_trajectories = ExperienceBuffer(steps!(Sampler(mdp = expert_task, π = π_dqn), Nsteps = expert_buffer_size))
 sum(expert_trajectories[:r])
 
 # Solve with GAIL
-𝒮_gail = GAILSolver(π = DQNPolicy(Qnet(), expert_task), 
-                    D = DQNPolicy(Qnet(softmax), expert_task),
-                    N = 2000,
-                    expert_buffer = expert_trajectories,
-                    batch_size = 128,
-                    target_update_period = 100,
-                    log = LoggerParams(dir = "log/gail", period = 50),
-                    exploration_policy = EpsGreedyPolicy(expert_task, LinearDecaySchedule(start=1., stop=0.1, steps=gail_steps/2))
-                    )
+𝒮_gail = DQNGAILSolver(π = DQNPolicy(Qnet(), as), 
+                       D = DQNPolicy(Qnet(), as), 
+                       sdim = input_dim,
+                       N = gail_steps,
+                       expert_buffer = expert_trajectories,
+                       batch_size = 128,
+                       Δtarget_update = 100,
+                       Δtrain = 1,
+                       )
 π_gail = solve(𝒮_gail, expert_task)
 
 # Check failure rates after training

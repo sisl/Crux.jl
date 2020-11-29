@@ -2,27 +2,6 @@
 sdim(mdp) = length(convert_s(AbstractVector, rand(initialstate(mdp)), mdp))
 adim(mdp) = length(actions(mdp))
 
-## Other
-weighted_mean(weights) = (y) -> mean(y .* weights)
-
-## Efficient inverse query for fenwick tree 
-# Taken from https://codeforces.com/blog/entry/61364
-function inverse_query(t::FenwickTree, v)
-    tot, pos, N = 0, 0, length(t)
-    for i=floor(Int, log2(N)):-1:0
-        new_pos = pos + 1 << i
-        if new_pos <= N && tot + t.bi_tree[new_pos] < v
-            tot += t.bi_tree[new_pos]
-            pos = new_pos
-        end
-    end
-    pos + 1
-end
-
-Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
-
-DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
-
 ## GPU Stuff
 device(v::CuArray) = gpu
 device(v::AbstractArray) = cpu

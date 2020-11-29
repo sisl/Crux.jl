@@ -16,7 +16,7 @@ Base.log(p::Nothing, i, data...)  = nothing
 function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
-    p.verbose && print("Step: $i, ")
+    p.verbose && print("Step: $i")
     for dict in [data..., p.extras...]
         d = dict()
         for (k,v) in d
@@ -34,9 +34,10 @@ log_performance(task, solution, name, fn, rng) = Dict(name => fn(task, solution;
 log_discounted_return(task, solution, rng) = () -> log_performance(task, solution, "discounted_return", discounted_return, rng)
 log_undiscounted_return(task, solution, rng) = () -> log_performance(task, solution, "undiscounted_return", undiscounted_return, rng)
 log_failure(task, solution, rng) = () -> log_performance(task, solution, "failure_rate", failure, rng)
-    
-log_loss(loss; name = "loss", suffix = "") = () -> Dict(string(name, suffix) => loss)
-log_gradient(grad; name = "grad_norm") = () -> Dict(name => norm(grad))
+
+log_val(val; name, suffix = "") = () -> Dict(string(name, suffix) => val)
+log_loss(loss; name = "loss", suffix = "") = log_val(loss, name = name, suffix = suffix)
+log_gradient(grad; name = "grad_norm", suffix = "") = log_val(norm(grad), name = name, suffix = suffix)
 log_exploration(policy, i; name = "eps") = () -> policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
 
 ## Stuff for plotting

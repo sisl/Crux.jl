@@ -18,14 +18,6 @@
     i::Int = 0
 end
 
-target(Q⁻, 𝒟, γ::Float32) = 𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* maximum(Q⁻(𝒟[:sp]), dims=1)
-
-q_predicted(π, 𝒟) = sum(value(π, 𝒟[:s]) .* 𝒟[:a], dims = 1)
-
-td_loss(π, 𝒟, y, L) =  L(q_predicted(π, 𝒟), y, agg = weighted_mean(𝒟[:weight]))
-
-td_error(π, 𝒟, y) = abs.(q_predicted(π, 𝒟) .- y)
-
 function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(mdp, 𝒮.π, 𝒮.rng))

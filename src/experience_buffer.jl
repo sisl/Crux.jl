@@ -1,5 +1,23 @@
 const MinHeap = MutableBinaryHeap{Float32, DataStructures.FasterForward}
 
+# Efficient inverse query for fenwick tree : adapted from https://codeforces.com/blog/entry/61364
+function inverse_query(t::FenwickTree, v)
+    tot, pos, N = 0, 0, length(t)
+    for i=floor(Int, log2(N)):-1:0
+        new_pos = pos + 1 << i
+        if new_pos <= N && tot + t.bi_tree[new_pos] < v
+            tot += t.bi_tree[new_pos]
+            pos = new_pos
+        end
+    end
+    pos + 1
+end
+
+Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
+
+DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
+
+# construction of common mdp data
 function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae = false)
     data = Dict(
         :s => Atype(undef, sdim, size), 
@@ -17,13 +35,14 @@ function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae
     data
 end
 
+# Function to comput index ranges on a circular buffer
 function circular_indices(start, Nsteps, l)
     stop = mod1(start+Nsteps-1, l)
     Nsteps > l && (start = stop+1) # Handle overlap
     (stop >= start) ? collect(start:stop) : [start:l..., 1:stop...]
 end
     
-
+## Experience Buffer stuff
 @with_kw mutable struct ExperienceBuffer{T <: AbstractArray} 
     data::Dict{Symbol, T}
     elements::Int64 = 0
@@ -35,6 +54,11 @@ end
     α::Float32 = 0.6
     β::Function = (i) -> 0.5f0
     max_priority::Float32 = 1.0
+end
+
+function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
+    elements = size(first(data)[2], 2)
+    ExperienceBuffer(data = data, elements = elements)
 end
 
 function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae = false, prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0)

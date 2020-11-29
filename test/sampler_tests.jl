@@ -1,4 +1,4 @@
-include("../src/includes.jl")
+using Shard
 using Test
 using POMDPPolicies
 include("../examples/mdps/gridworld.jl")

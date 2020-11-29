@@ -2,7 +2,8 @@
     π::Policy
     baseline::Union{Baseline, Nothing}
     N::Int64
-    buffer
+    buffer_size::Int = 1000
+    batch_size::Int = 32
     max_steps::Int64 = 100
     opt = ADAM(1e-3)
     device = cpu
@@ -14,6 +15,9 @@ end
 vpg_loss(π, 𝒟) = -mean(logpdf(π, 𝒟[:s], 𝒟[:a]) .* 𝒟[:advantage])
 
 function POMDPs.solve(𝒮::VPGSolver, mdp)
+    # Log the pre-train performance
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(mdp, 𝒮.π, 𝒮.rng))
+    
     𝒟 = ExperienceBuffer(mdp, 𝒮.buffer.size, device = 𝒮.device, gae = true, Nelements = 𝒮.buffer.size)
     ΔN = length(𝒟)
     

@@ -1,4 +1,4 @@
-include("../src/includes.jl")
+using Shard
 using POMDPModels
 using Test
 

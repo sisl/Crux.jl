@@ -1,4 +1,4 @@
-module AdversarialDriving
+module Shard
     using Random
     using Distributions
     using POMDPs

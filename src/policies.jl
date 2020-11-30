@@ -1,6 +1,8 @@
 ## General GPU support for policies
 Flux.params(π::Policy, device) = Flux.params(network(π, device)...)
 
+device(π::Policy) = isnothing(network(π, gpu)[1]) ? cpu : gpu
+
 function sync!(π::Policy, device)
     device == cpu && return 
     cpu_nets, gpu_nets = network(π, cpu),  network(π, gpu)
@@ -11,12 +13,24 @@ end
 
 function Flux.Optimise.train!(π::Policy, loss::Function, opt, device)
     θ = Flux.params(π, device)
-    loss, back = Flux.pullback(loss, θ)
+    l, back = Flux.pullback(loss, θ)
     grad = back(1f0)
     Flux.update!(opt, θ, grad)
     sync!(π, device)
-    loss, grad
+    l, grad
 end
+
+function Flux.Optimise.train!(π::Policy, loss::Function, 𝒟::ExperienceBuffer, B, opt, device; rng::AbstractRNG = Random.GLOBAL_RNG)
+    losses, grads = [], []
+    for i in partition(shuffle(rng, 1:length(𝒟)), B)
+        mb = minibatch(𝒟, i)
+        l, g = train!(π, ()->loss(mb), opt, device)
+        push!(losses, l)
+        push!(grads, g)
+    end
+    losses, grads
+end
+
 
 ## Baseline
 mutable struct Baseline <: Policy
@@ -62,7 +76,6 @@ POMDPs.action(π::DQNPolicy, s::S) where S <: AbstractArray = π.actions[argmax(
 
 POMDPs.value(π::DQNPolicy, s::S) where S <: AbstractArray = network(π, device(s))[1](s)
 
-device(π::DQNPolicy) = isnothing(π.Q_GPU) ? cpu : gpu
 
 ## Categorical Policy
 mutable struct CategoricalPolicy <: Policy

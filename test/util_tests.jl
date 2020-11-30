@@ -12,10 +12,10 @@ mdp = SimpleGridWorld()
 
 ## Gpu stuff
 vcpu = zeros(Float32, 10, 10)
-@test device(vcpu) == cpu
+@test Shard.device(vcpu) == cpu
 
 vgpu = todevice(vcpu, gpu)
-@test device(vgpu) == gpu
+@test Shard.device(vgpu) == gpu
 
 @test isnothing(todevice(vcpu, cpu))
 
@@ -45,6 +45,7 @@ l = loss(x, y) # ~ 3
 
 θ = Flux.params(W, b)
 grads = Flux.gradient(() -> loss(x, y), θ)
+
 @test norm(grads) > 2
 
 

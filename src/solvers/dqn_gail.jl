@@ -20,7 +20,7 @@
     Δtrain::Int = 4 
     log = LoggerParams(dir = "log/gail", period = 10)
     device = device(π)
-    i::Int64 = 1
+    i::Int64 = 0
 end
 
 const LBCE = Flux.Losses.logitbinarycrossentropy

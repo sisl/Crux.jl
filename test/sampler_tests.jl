@@ -70,8 +70,8 @@ push!(b, d)
 ## Generalized Advantage Estimation
 #TODO: For policy gradient
 baseline = Baseline(Chain(Dense(2,32, relu), Dense(32, 1)))
-fill_gae!(b, 1,5, baseline.V, 0.9f0, 0.7f0)
-fill_returns!(b, 1, 5, 0.7f0)
+fill_gae!(b, 1:5, baseline.V, 0.9f0, 0.7f0)
+fill_returns!(b, 1:5, 0.7f0)
 
 ## Test sampling with a vector of mdps
 mdps = [mdp, mdp, mdp]

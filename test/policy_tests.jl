@@ -22,7 +22,7 @@ sb = rand(2,100)
 @test size(value(π, sb)) == (4,100)
 @test value(π, sb) == π.Q(sb)
 @test size(value(π_gpu, sb)) == (4,100)
-@test all(value(π_gpu, sb) .≈ value(π_gpu, sb |> gpu) |> cpu)
+@test mean(abs.(value(π_gpu, sb) .- (value(π_gpu, sb |> gpu) |> cpu))) < 1e-7
 
 ## sync!
 π_gpu.Q_GPU = π.Q |> gpu

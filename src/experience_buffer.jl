@@ -85,6 +85,8 @@ function Flux.cpu(b::ExperienceBuffer)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
+minibatch(b::ExperienceBuffer, indices) = Dict(k => view(b.data[k], :, indices) for k in keys(b))
+
 Base.getindex(b::ExperienceBuffer, key::Symbol) = view(b.data[key], :, 1:b.elements)
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)

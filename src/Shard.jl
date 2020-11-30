@@ -3,7 +3,6 @@ module Shard
     using Distributions
     using POMDPs
     using POMDPPolicies
-    using POMDPSimulators
     using Parameters
     using TensorBoardLogger
     using Flux
@@ -14,19 +13,20 @@ module Shard
     using DataStructures
     using Plots
     using ColorSchemes
+    using Base.Iterators: partition
     
     export sdim, adim, device, todevice
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, circular_indices, ExperienceBuffer, 
-           prioritized, update_priorities!, uniform_sample!, prioritized_sample!
+           minibatch, prioritized, update_priorities!, uniform_sample!, prioritized_sample!
     include("experience_buffer.jl")
     
     export sync!, Baseline, network, logits, 
            DQNPolicy, CategoricalPolicy, GaussianPolicy
     include("policies.jl")
     
-    export Sampler, explore, step!, steps!, episodes!, fillto!, 
+    export Sampler, explore, terminate_episode!, step!, steps!, episodes!, fillto!, 
            undiscounted_return, discounted_return, failure, fill_gae!, fill_returns!
     include("sampler.jl")
     

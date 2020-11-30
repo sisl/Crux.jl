@@ -152,6 +152,13 @@ for k in keys(b)
     @test b[k][:, 1:4] == b[k][:, 5:8]
 end
 
+## minibatch
+I = [1,2,4]
+d = minibatch(b, I)
+for k in keys(d)
+    @test all(d[k] .== b[k][:, I])
+end 
+
 ## update_priorities!
 update_priorities!(bpriority, [1,2,3], [1., 2., 3.])
 @test bpriority.max_priority == 3.0

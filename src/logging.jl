@@ -1,7 +1,7 @@
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
-@with_kw struct LoggerParams
+@with_kw mutable struct LoggerParams
     dir::String = "log/"
     period::Int64 = 100
     logger = TBLogger(dir, tb_increment)
@@ -35,8 +35,10 @@ log_undiscounted_return(task, solution, rng) = () -> log_performance(task, solut
 log_failure(task, solution, rng) = () -> log_performance(task, solution, "failure_rate", failure, rng)
 
 log_val(val; name, suffix = "") = () -> Dict(string(name, suffix) => val)
-log_loss(loss; name = "loss", suffix = "") = log_val(loss, name = name, suffix = suffix)
-log_gradient(grad; name = "grad_norm", suffix = "") = log_val(norm(grad), name = name, suffix = suffix)
+log_loss(loss::T; name = "loss", suffix = "") where T <: Real = log_val(loss, name = name, suffix = suffix)
+log_loss(losses::T; name = "loss", suffix = "") where T <: AbstractArray = log_val(mean(losses), name = name, suffix = suffix)
+log_gradient(grad::T; name = "grad_norm", suffix = "") where T <: Real = log_val(norm(grad), name = name, suffix = suffix)
+log_gradient(grads::T; name = "grad_norm", suffix = "") where T <: AbstractArray = log_val(mean(norm.(grads)), name = name, suffix = suffix)
 log_exploration(policy, i; name = "eps") = () -> policy isa EpsGreedyPolicy ? Dict(name => policy.eps(i)) : Dict()
 
 ## Stuff for plotting

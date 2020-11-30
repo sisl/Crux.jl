@@ -1,15 +1,17 @@
 @with_kw mutable struct VPGSolver <: Solver 
     π::Policy
-    baseline::Union{Baseline, Nothing}
-    N::Int64
-    buffer_size::Int = 1000
+    sdim::Int
+    adim::Int
+    baseline::Baseline
+    N::Int64 = 1000
+    ΔN::Int = 1000
     batch_size::Int = 32
     max_steps::Int64 = 100
     opt = ADAM(1e-3)
-    device = cpu
+    device = device(π)
     rng::AbstractRNG = Random.GLOBAL_RNG
     log = LoggerParams(dir = "log/vpg", period = 500)
-    i::Int64 = 1
+    i::Int64 = 0
 end
 
 vpg_loss(π, 𝒟) = -mean(logpdf(π, 𝒟[:s], 𝒟[:a]) .* 𝒟[:advantage])
@@ -18,15 +20,26 @@ function POMDPs.solve(𝒮::VPGSolver, mdp)
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(mdp, 𝒮.π, 𝒮.rng))
     
-    𝒟 = ExperienceBuffer(mdp, 𝒮.buffer.size, device = 𝒮.device, gae = true, Nelements = 𝒮.buffer.size)
-    ΔN = length(𝒟)
+    # Construct the experience buffer and sampler
+    𝒟 = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.ΔN, device = 𝒮.device, gae = true)
+    γ = Float32(discount(mdp))
+    s = Sampler(mdp, 𝒮.π, max_steps = 𝒮.max_steps, rng = 𝒮.rng)
     
-    𝒮.i == 1 && log(𝒮.log, 0, mdp, 𝒮.π, rng = 𝒮.rng)
-    for 𝒮.i = ΔN+𝒮.i : ΔN : 𝒮.i + 𝒮.N - 1
-        fill!(𝒟, mdp, 𝒮.π, baseline = 𝒮.baseline, max_steps = 𝒮.max_steps, rng = 𝒮.rng) # Sample episodes
-        !isnothing(𝒮.baseline) && train!(𝒮.baseline, 𝒟) # train baseline
-        loss, grad = train!(𝒮.π, () -> vpg_loss(𝒮.π, 𝒟), 𝒮.opt, 𝒮.device) # train vpg
-        log(𝒮.log, 𝒮.i, mdp, 𝒮.π, data = [logloss(loss, grad)], rng = 𝒮.rng, last_i = 𝒮.i-ΔN)
+    for 𝒮.i = range(𝒮.i, stop = 𝒮.i + 𝒮.N - 𝒮.ΔN, step = 𝒮.ΔN)
+        # Sample transitions
+        push!(𝒟, steps!(s, Nsteps = 𝒮.ΔN, baseline = 𝒮.baseline, γ = γ, reset = true))
+        
+        # Train the baseline
+        train!(𝒮.baseline, 𝒟)
+        
+        # Train the policy (using batches)
+        losses, grads = train!(𝒮.π, (D) -> vpg_loss(𝒮.π, D), 𝒟, 𝒮.batch_size, 𝒮.opt, 𝒮.device, rng = 𝒮.rng)
+        
+        # Log the results
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_discounted_return(mdp, 𝒮.π, 𝒮.rng), 
+                                        log_loss(losses),
+                                        log_gradient(grads))
     end
+    𝒮.i += 𝒮.ΔN
 end
 

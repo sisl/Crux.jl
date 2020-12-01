@@ -32,7 +32,7 @@ savefig("trained_separately.pdf")
 𝒮_joint = DQNSolver(π = DQNPolicy(Q(), as), sdim = input_dim, N = N, batch_size = 96, log = LoggerParams(dir = "log/joint"))
 solve(𝒮_joint, tasks)
 
-plot_learning_curves(fill("log/joint/", 3), values = [Symbol("discounted_return/T1"), Symbol("discounted_return/T2"), Symbol("discounted_return/T3") ])
+plot_learning_curves(fill("log/joint/", 3), values = [Symbol("undiscounted_return/T1"), Symbol("undiscounted_return/T2"), Symbol("undiscounted_return/T3") ])
 savefig("trained_jointly.pdf")
 
 
@@ -43,7 +43,7 @@ seq_tasks = repeat(tasks, Ncycles)
                   log = LoggerParams(dir = "log/continual"))
 sequential_learning(seq_tasks, tasks, 𝒮_seq)
 
-p = plot_learning_curves(fill("log/continual/", 3), values = [Symbol("discounted_return/T1"), Symbol("discounted_return/T2"), Symbol("discounted_return/T3")], vertical_lines = [i*Nsteps_per_cycle for i=1:length(seq_tasks)], thick_every = 3, vline_range = (-0.5, 0.85))
+p = plot_learning_curves(fill("log/continual/", 3), values = [Symbol("undiscounted_return/T1"), Symbol("undiscounted_return/T2"), Symbol("undiscounted_return/T3")], vertical_lines = [i*Nsteps_per_cycle for i=1:length(seq_tasks)], thick_every = 3, vline_range = (-0.5, 0.85))
 savefig("trained_sequentially.pdf")
 
 ## Continual Learning with experience Replay
@@ -52,7 +52,7 @@ savefig("trained_sequentially.pdf")
                   log = LoggerParams(dir = "log/er"))
 experience_replay(seq_tasks, tasks, 𝒮_er, experience_buffer = ExperienceBuffer(𝒮_er.sdim, 𝒮_er.adim, 2000), steps_per_task = 1000)
 
-p = plot_learning_curves(fill("log/er/", 3), values = [Symbol("discounted_return/T1"), Symbol("discounted_return/T2"), Symbol("discounted_return/T3")], vertical_lines = [i*Nsteps_per_cycle for i=1:length(seq_tasks)], thick_every = 3, vline_range = (-0.5, 0.85))
+p = plot_learning_curves(fill("log/er/", 3), values = [Symbol("undiscounted_return/T1"), Symbol("undiscounted_return/T2"), Symbol("undiscounted_return/T3")], vertical_lines = [i*Nsteps_per_cycle for i=1:length(seq_tasks)], thick_every = 3, vline_range = (-0.5, 0.85))
 savefig("trained_sequentially_with_replay.pdf")
 
 

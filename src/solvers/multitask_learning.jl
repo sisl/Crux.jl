@@ -13,17 +13,19 @@ function MultitaskDecaySchedule(steps::Int, task_ids; start = 1.0, stop = 0.1)
 end
 
 function sequential_learning(solve_tasks, eval_tasks, solver)
-    push!(solver.log.extras, log_discounted_return(eval_tasks, solver.π, solver.rng))
+    samplers = [Sampler(t, solver.π, solver.sdim, solver.adim, rng = solver.rng) for t in eval_tasks]
+    push!(solver.log.extras, log_undiscounted_return(samplers))
     for t in solve_tasks
         solve(solver, t)
     end
 end
 
 function experience_replay(solve_tasks, eval_tasks, solver; experience_buffer, steps_per_task, sampler_exploration_policy = nothing)
-    push!(solver.log.extras, log_discounted_return(eval_tasks, solver.π, solver.rng))
+    samplers = [Sampler(t, solver.π, solver.sdim, solver.adim, rng = solver.rng) for t in eval_tasks]
+    push!(solver.log.extras, log_undiscounted_return(samplers))
     for t in solve_tasks
         solve(solver, t, experience_buffer)
-        sampler = Sampler(mdp = t, π = RandomPolicy(t), exploration_policy = sampler_exploration_policy)
+        sampler = Sampler(t, RandomPolicy(t), solver.sdim, solver.adim, rng = solver.rng,  exploration_policy = sampler_exploration_policy)
         push!(experience_buffer, steps!(sampler, Nsteps = steps_per_task))
     end
 end

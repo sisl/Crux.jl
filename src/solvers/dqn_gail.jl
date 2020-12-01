@@ -33,15 +33,15 @@ function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_
 end
 
 function POMDPs.solve(𝒮::DQNGAILSolver, mdp)
-    # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(mdp, 𝒮.π, 𝒮.rng))
-    
     # Initialize minibatch buffers and sampler
     𝒟_π = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.batch_size, device = 𝒮.device)
     𝒟_expert = deepcopy(𝒟_π)
     𝒟_nda = isnothing(𝒮.nda_buffer) ? nothing : deepcopy(𝒟_π)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    
+    # Log the pre-train performance
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(s))
     
     # Fill the buffer as needed
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i = 𝒮.i)
@@ -67,7 +67,7 @@ function POMDPs.solve(𝒮::DQNGAILSolver, mdp)
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && begin copyto!(𝒮.π.Q⁻, 𝒮.π.Q); copyto!(𝒮.D.Q⁻, 𝒮.D.Q) end
         
         # Log results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_discounted_return(mdp, 𝒮.π, 𝒮.rng), 
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_discounted_return(s), 
                                             log_loss(lossG, suffix = "G"),
                                             log_loss(lossD, suffix = "D"),
                                             log_gradient(gradG, suffix = "G"),

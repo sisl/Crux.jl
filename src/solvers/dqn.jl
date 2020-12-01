@@ -19,21 +19,21 @@
 end
 
 function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
-    # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(mdp, 𝒮.π, 𝒮.rng))
-    
     # Initialize minibatch buffer and sampler
     𝒟 = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.batch_size, device = 𝒮.device)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    
+    # Log the pre-train performance
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s))
     
     # Fill the buffer as needed
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i = 𝒮.i)
     
     for 𝒮.i = range(𝒮.i, stop = 𝒮.i + 𝒮.N - 𝒮.Δtrain, step = 𝒮.Δtrain)
         # Take Δtrain steps in the environment
-        push!(𝒮.buffer, steps!(s, i = 𝒮.i, Nsteps = 𝒮.Δtrain))
-        
+        push!(𝒮.buffer, steps!(s, explore = true, i = 𝒮.i, Nsteps = 𝒮.Δtrain))
+       
         # Sample a minibatch
         rand!(𝒮.rng, 𝒟, 𝒮.buffer, extra_buffers..., i = 𝒮.i)
         
@@ -46,7 +46,7 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)
         
         # Log results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_discounted_return(mdp, 𝒮.π, 𝒮.rng), 
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_undiscounted_return(s), 
                                             log_loss(loss),
                                             log_gradient(grad),
                                             log_exploration(𝒮.exploration_policy, 𝒮.i))

@@ -15,9 +15,10 @@ function Flux.Optimise.train!(π::Policy, loss::Function, opt, device)
     θ = Flux.params(π, device)
     l, back = Flux.pullback(loss, θ)
     grad = back(1f0)
+    gnorm = norm(grad, p=Inf)
     Flux.update!(opt, θ, grad)
     sync!(π, device)
-    l, grad
+    l, gnorm
 end
 
 function Flux.Optimise.train!(π::Policy, loss::Function, 𝒟::ExperienceBuffer, B, opt, device; rng::AbstractRNG = Random.GLOBAL_RNG)

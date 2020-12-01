@@ -17,5 +17,4 @@ function Base.copyto!(Cto::Chain, Cfrom::Chain)
 end
 
 ## Flux stuff
-LinearAlgebra.norm(grads::Flux.Zygote.Grads, p::Real = 2) = norm([norm(grads[θ] |> cpu, p) for θ in grads.params], p)
-
+LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2) = norm([norm(grads[θ] |> cpu, p) for θ in grads.params], p)

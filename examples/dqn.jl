@@ -1,4 +1,4 @@
-using Shard, Flux
+using Crux, Flux
 include("mdps/gridworld.jl")
 
 g = SimpleGridWorld(size = (10,10), tprob = .7)

@@ -1,4 +1,4 @@
-using Shard
+using Crux
 using POMDPModels
 using Test
 using DataStructures
@@ -120,9 +120,9 @@ b_gpu = b |> gpu
 @test capacity(b_gpu) == 100
 
 @test prioritized(bpriority)
-@test Shard.device(b) == cpu
-@test Shard.device(bpriority) == cpu
-@test Shard.device(b_gpu) == gpu
+@test Crux.device(b) == cpu
+@test Crux.device(bpriority) == cpu
+@test Crux.device(b_gpu) == gpu
 
 ## push!
 #push dictionary with one element

@@ -1,4 +1,4 @@
-using Shard, Flux
+using Crux, Flux
 include("mdps/gridworld.jl")
 
 ## Discrete VPG

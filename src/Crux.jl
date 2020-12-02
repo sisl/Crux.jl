@@ -1,4 +1,4 @@
-module Shard
+module Crux
     using Random
     using Distributions
     using POMDPs

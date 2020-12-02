@@ -29,12 +29,12 @@ end
                         #t, solver.max_steps, nt[1], avg100_reward, loss_val, grad_val, scores_eval)
 
 # Built-in functions for logging common training things
-log_performance(s::AbstractVector, name, fn) = Dict("$(name)/T$i" => fn(s[i]) for i=1:length(s))
-log_performance(s::Sampler, name, fn) = Dict(name => fn(s))
+log_performance(s::AbstractVector, name, fn; kwargs...) = Dict("$(name)/T$i" => fn(s[i]; kwargs...) for i=1:length(s))
+log_performance(s::Sampler, name, fn; kwargs...) = Dict(name => fn(s; kwargs...))
 
-log_discounted_return(s) = () -> log_performance(s, "discounted_return", discounted_return)
-log_undiscounted_return(s) = () -> log_performance(s, "undiscounted_return", undiscounted_return)
-log_failure(s) = () -> log_performance(s, "failure_rate", failure)
+log_discounted_return(s; kwargs...) = () -> log_performance(s, "discounted_return", discounted_return; kwargs...)
+log_undiscounted_return(s; kwargs...) = () -> log_performance(s, "undiscounted_return", undiscounted_return; kwargs...)
+log_failure(s; kwargs...) = () -> log_performance(s, "failure_rate", failure; kwargs...)
 
 log_val(val; name, suffix = "") = () -> Dict(string(name, suffix) => val)
 log_val(val::T; name, suffix = "") where T <: AbstractArray = () -> Dict(string(name, suffix) => mean(val))

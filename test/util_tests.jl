@@ -1,4 +1,4 @@
-using Shard
+using Crux
 using Test
 using POMDPModels
 using Flux
@@ -12,10 +12,10 @@ mdp = SimpleGridWorld()
 
 ## Gpu stuff
 vcpu = zeros(Float32, 10, 10)
-@test Shard.device(vcpu) == cpu
+@test Crux.device(vcpu) == cpu
 
 vgpu = todevice(vcpu, gpu)
-@test Shard.device(vgpu) == gpu
+@test Crux.device(vgpu) == gpu
 
 @test isnothing(todevice(vcpu, cpu))
 

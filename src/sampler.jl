@@ -20,7 +20,12 @@ end
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))
-    sampler.svec = convert_s(AbstractArray, sampler.s, sampler.mdp)
+    if sampler.mdp isa POMDP
+        o = rand(observation(sampler.mdp, sampler.s))
+    else
+        o = sampler.s
+    end
+    sampler.svec = convert_s(AbstractArray, o, sampler.mdp)
     sampler.episode_length = 0
 end
 

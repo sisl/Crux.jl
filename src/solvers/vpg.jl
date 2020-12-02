@@ -7,6 +7,7 @@
     ΔN::Int = 1000
     batch_size::Int = 32
     max_steps::Int64 = 100
+    eval_eps::Int = 100
     opt = ADAM(1e-3)
     device = device(π)
     rng::AbstractRNG = Random.GLOBAL_RNG
@@ -23,7 +24,7 @@ function POMDPs.solve(𝒮::VPGSolver, mdp)
     s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, rng = 𝒮.rng)
     
     # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_discounted_return(s))
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))
     
     for 𝒮.i = range(𝒮.i, stop = 𝒮.i + 𝒮.N - 𝒮.ΔN, step = 𝒮.ΔN)
         # Sample transitions
@@ -36,7 +37,7 @@ function POMDPs.solve(𝒮::VPGSolver, mdp)
         losses, grads = train!(𝒮.π, (D) -> vpg_loss(𝒮.π, D), 𝒟, 𝒮.batch_size, 𝒮.opt, 𝒮.device, rng = 𝒮.rng)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_discounted_return(s), 
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 
                                         log_loss(losses),
                                         log_gradient(grads))
     end

@@ -1,4 +1,4 @@
-# Shard.jl
+# Crux.jl
 
 Deep RL library with concise implementations of popular algorithms
 

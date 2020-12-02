@@ -1,4 +1,4 @@
-using Shard, Flux, POMDPPolicies
+using Crux, Flux, POMDPPolicies
 include("mdps/lavaworld.jl")
 using Plots
 

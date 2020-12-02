@@ -8,7 +8,8 @@
     L::Function = Flux.Losses.huber_loss
     opt = ADAM(1e-3)
     batch_size::Int = 32
-    max_steps::Int = 100 
+    max_steps::Int = 100
+    eval_eps::Int = 100
     Δtrain::Int = 4 
     Δtarget_update::Int = 2000
     buffer_init::Int = max(batch_size, 200)
@@ -25,7 +26,7 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
     s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
     
     # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s))
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))
     
     # Fill the buffer as needed
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i = 𝒮.i)
@@ -46,7 +47,7 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)
         
         # Log results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_undiscounted_return(s), 
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 
                                             log_loss(loss),
                                             log_gradient(grad),
                                             log_exploration(𝒮.exploration_policy, 𝒮.i))

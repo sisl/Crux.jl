@@ -89,7 +89,7 @@ function steps!(samplers::Vector{Sampler}; Nsteps = 1, explore = false, i = 0, b
     data
 end
 
-function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, γ::Float32 = 0f0, return_episodes = false)
+function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, return_episodes = false)
     reset_sampler!(sampler)
     data = mdp_data(sampler.sdim, sampler.adim, Neps*sampler.max_steps, gae = !isnothing(baseline))
     episode_starts = zeros(Int, Neps)
@@ -99,7 +99,7 @@ function episodes!(sampler::Sampler; Neps = 1, i = 0, baseline = nothing, γ::Fl
         episode_starts[k] = j+1
         while true
             j = j+1
-            step!(data, j, sampler, i = i + (i-1), baseline = baseline, γ = γ)
+            step!(data, j, sampler, explore = explore, i = i + (i-1), baseline = baseline, γ = γ)
             if sampler.episode_length == 0
                 episode_ends[k] = j
                 sampler.episode_checker(data, episode_starts[k], j) ? (k = k+1) : (j = episode_starts[k])

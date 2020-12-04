@@ -16,6 +16,7 @@
     log::Union{Nothing, LoggerParams} = LoggerParams(dir = "log/dqn", period = 500)
     device = device(π)
     buffer::ExperienceBuffer = ExperienceBuffer(sdim, adim, 1000)
+    regularizer::Function = (θ) -> 0
     i::Int = 0
 end
 
@@ -41,7 +42,7 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         # Compute target, td_error and td_loss for backprop
         y = target(𝒮.π.Q⁻, 𝒟, γ)
         prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, td_error(𝒮.π, 𝒟, y))
-        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L), 𝒮.opt, 𝒮.device)
+        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L), 𝒮.opt, 𝒮.device, regularizer = 𝒮.regularizer)
         
         # Update target network
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)

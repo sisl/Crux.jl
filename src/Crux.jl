@@ -35,8 +35,11 @@ module Crux
            log_exploration, smooth, readtb, plot_learning_curves
     include("logging.jl")
     
-    export MultitaskDecaySchedule, sequential_learning, experience_replay
-    include("solvers/multitask_learning.jl")
+    export init_fisher_diagonal, add_fisher_information_diagonal!, update_fisher_diagonal!
+    include("extras/fisher_information.jl")
+    
+    export MultitaskDecaySchedule, sequential_learning, experience_replay, ewc
+    include("extras/multitask_learning.jl")
     
     export weighted_mean, target, q_predicted, td_loss, td_error
     include("solvers/value_common.jl")

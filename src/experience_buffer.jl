@@ -100,6 +100,9 @@ prioritized(b::ExperienceBuffer) = !isnothing(b.priorities)
 device(b::ExperienceBuffer{CuArray{Float32, 2}}) = gpu
 device(b::ExperienceBuffer{Array{Float32, 2}}) = cpu
 
+sdim(b::ExperienceBuffer) = size(b[:s], 1)
+adim(b::ExperienceBuffer) = size(b[:a], 1)
+
 # Note: data can be a dictionary or an experience buffer
 function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids

@@ -26,11 +26,14 @@ end
 
 const LBCE = Flux.Losses.logitbinarycrossentropy
 
-dqngail_target(Q, D, 𝒟, γ::Float32) = q_predicted(D, 𝒟) .+ γ .* (1.f0 .- 𝒟[:done]) .* maximum(Q(𝒟[:sp]), dims=1)
+dqngail_target(Q, D, 𝒟, γ::Float32) = sigmoid.(q_predicted(D, 𝒟)) .+ γ .* (1.f0 .- 𝒟[:done]) .* maximum(Q(𝒟[:sp]), dims=1)
 
-function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_nda::Union{Nothing, ExperienceBuffer}, λ_nda::Float32)
-    L_e, L_π = LBCE(q_predicted(D, 𝒟_expert), 1.f0), LBCE(q_predicted(D, 𝒟_π), 0.f0)
-    isnothing(𝒟_nda) ? L_e + L_π : L_e + λ_nda*L_π + (1.f0 - λ_nda)*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
+function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer)
+    LBCE(q_predicted(D, 𝒟_expert), 1.f0) + LBCE(q_predicted(D, 𝒟_π), 0.f0)
+end
+
+function Lᴰ_nda(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_nda::ExperienceBuffer, λ_nda::Float32)
+    LBCE(q_predicted(D, 𝒟_expert), 1.f0) +  LBCE(q_predicted(D, 𝒟_π), 0.f0) + λ_nda*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
 end
 
 function POMDPs.solve(𝒮::DQNGAILSolver, mdp)
@@ -57,12 +60,28 @@ function POMDPs.solve(𝒮::DQNGAILSolver, mdp)
         !isnothing(𝒮.nda_buffer) && rand!(𝒮.rng, 𝒟_nda, 𝒮.nda_buffer, i = 𝒮.i)
         
         # train the discrimnator
-        lossD, gradD = train!(𝒮.D, () -> Lᴰ(𝒮.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮.λ_nda), 𝒮.optD, 𝒮.device)
+        if isnothing(𝒮.nda_buffer)
+            lossD, gradD = train!(𝒮.D, () -> Lᴰ(𝒮.D, 𝒟_expert, 𝒟_π), 𝒮.optD, 𝒮.device)
+        else
+            lossD, gradD = train!(𝒮.D, () -> Lᴰ_nda(𝒮.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮.λ_nda), 𝒮.optD, 𝒮.device)
+        end
         
         # Compute target, update priorities, and train the generator.
         y = dqngail_target(𝒮.π.Q⁻, 𝒮.D.Q⁻, 𝒟_π, γ)
-        prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟_π.indices, td_error(𝒮.π, 𝒟_π, y))
+        # prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟_π.indices, td_error(𝒮.π, 𝒟_π, y))
         lossG, gradG = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟_π, y, 𝒮.L), 𝒮.opt, 𝒮.device)
+        
+        # if !isnothing(𝒮.nda_buffer)
+        #     y_nda = dqngail_target(𝒮.π.Q⁻, 𝒮.D.Q⁻, 𝒟_nda, γ)
+        #     y_expert =  dqngail_target(𝒮.π.Q⁻, 𝒮.D.Q⁻, 𝒟_expert, γ)
+        #     y = dqngail_target(𝒮.π.Q⁻, 𝒮.D.Q⁻, 𝒟_π, γ)
+        #     lossG, gradG = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟_π, y, 𝒮.L) + td_loss(𝒮.π, 𝒟_nda, y_nda, 𝒮.L) +  td_loss(𝒮.π, 𝒟_expert, y_expert, 𝒮.L), 𝒮.opt, 𝒮.device)
+        # else
+        #     y = dqngail_target(𝒮.π.Q⁻, 𝒮.D.Q⁻, 𝒟_π, γ)
+        #     # prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟_π.indices, td_error(𝒮.π, 𝒟_π, y))
+        #     lossG, gradG = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟_π, y, 𝒮.L), 𝒮.opt, 𝒮.device)
+        # end
+            
         
         # Update target network
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && begin copyto!(𝒮.π.Q⁻, 𝒮.π.Q); copyto!(𝒮.D.Q⁻, 𝒮.D.Q) end

@@ -11,9 +11,9 @@ function sync!(π::Policy, device)
     end
 end
 
-function Flux.Optimise.train!(π::Policy, loss::Function, opt, device)
+function Flux.Optimise.train!(π::Policy, loss::Function, opt, device; regularizer = (θ) -> 0)
     θ = Flux.params(π, device)
-    l, back = Flux.pullback(loss, θ)
+    l, back = Flux.pullback(() -> loss() + regularizer(θ), θ)
     grad = back(1f0)
     gnorm = norm(grad, p=Inf)
     Flux.update!(opt, θ, grad)

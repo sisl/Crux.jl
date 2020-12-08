@@ -9,4 +9,8 @@ supports CPU and GPU computation and implements the following algorithms
 * Vanilla Policy Gradient
 * DQN-GAIL
 
+## Installation
+
+Install by opening julia and running `]add git@github.com:ancorso/Crux.git`
+
 Maintained by Anthony Corso (acorso@stanford.edu)

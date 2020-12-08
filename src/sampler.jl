@@ -21,7 +21,7 @@ end
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))
     if sampler.mdp isa POMDP
-        o = rand(observation(sampler.mdp, sampler.s))
+        o = rand(sampler.rng, initialobs(sampler.mdp, sampler.s))
     else
         o = sampler.s
     end

@@ -12,5 +12,6 @@ supports CPU and GPU computation and implements the following algorithms
 ## Installation
 
 Install by opening julia and running `]add git@github.com:ancorso/Crux.git`
+To edit or contribute use `]dev Crux` and the repo will be cloned to `~/.julia/dev/Crux`
 
 Maintained by Anthony Corso (acorso@stanford.edu)

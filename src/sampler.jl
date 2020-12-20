@@ -54,10 +54,9 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline 
     done = isterminal(sampler.mdp, sp)
 
     # Save the tuple
-    nd = ndims(spvec) + 1
-    selectdim(data[:s], nd, j) .= sampler.svec
+    bslice(data[:s], j) .= sampler.svec
     data[:a][:, j] .= (a isa AbstractArray) ?  a : Flux.onehot(a, actions(sampler.mdp))
-    selectdim(data[:sp], nd, j) .= spvec
+    bslice(data[:sp], j) .= spvec
     data[:r][1, j] = r
     data[:done][1, j] = done
     
@@ -157,8 +156,8 @@ function fill_gae!(data, episode_range, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
     nd = ndims(data[:s])
     for i in reverse(episode_range)
-        Vsp = V(selectdim(data[:sp], nd, i))
-        Vs = V(selectdim(data[:s], nd, i))
+        Vsp = V(bslice(data[:sp], i))
+        Vs = V(bslice(data[:s], i))
         @assert length(Vs) == 1
         A = c*A + data[:r][1,i] + (1.f0 - data[:done][1,i])*γ*Vsp[1] - Vs[1]
         @assert !isnan(A)
@@ -177,7 +176,7 @@ end
 # Utils
 function trim!(data::Dict{Symbol, Array}, N)
     for k in keys(data)
-        data[k] = selectdim(data[k], ndims(data[k]), 1:N)
+        data[k] = bslice(data[k], 1:N)
     end
     data
 end

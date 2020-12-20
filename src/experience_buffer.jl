@@ -87,9 +87,9 @@ function Flux.cpu(b::ExperienceBuffer)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
-minibatch(b::ExperienceBuffer, indices) = Dict(k => selectdim(b.data[k], ndims(b.data[k]), indices) for k in keys(b))
+minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
 
-Base.getindex(b::ExperienceBuffer, key::Symbol) = selectdim(b.data[key], ndims(b.data[key]), 1:b.elements)
+Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
 
@@ -111,8 +111,7 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     N, C = length(ids), capacity(b)
     I = circular_indices(b.next_ind, N, C)
     for k in keys(data)
-        v = data[k]
-        copyto!(selectdim(b.data[k], ndims(v), I), collect(selectdim(v, ndims(v), ids)))
+        copyto!(bslice(b.data[k], I), collect(bslice(data[k], ids)))
     end
     prioritized(b) && update_priorities!(b, I, b.max_priority*ones(N))
         

@@ -3,12 +3,12 @@ include("mdps/gridworld.jl")
 
 g = SimpleGridWorld(size = (10,10), tprob = .7)
 
-N = 1000
+N = 100000
 Q = Chain(x -> (x .- 5.f0 ) ./ 5.f0, Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 4))
 
 ## DQN
 𝒮 = DQNSolver(π = DQNPolicy(deepcopy(Q), actions(g)), sdim = 2, N=N, rng = MersenneTwister(0))
-@profiler p = solve(𝒮, g)
+p = solve(𝒮, g)
 
 𝒮_gpu = DQNSolver(π = DQNPolicy(deepcopy(Q), actions(g), device = gpu), sdim = 2, N=N, rng = MersenneTwister(0))
 p = solve(𝒮_gpu, g)

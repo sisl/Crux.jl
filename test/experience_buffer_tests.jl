@@ -74,7 +74,7 @@ h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)
 ## mdp_data
 d1 = mdp_data(3, 4, 100)
 d2 = mdp_data(3, 4, 100, gae = true)
-d3 = mdp_data(3, 4, 100, Atype = CuArray{Float32, 2})
+d3 = mdp_data(3, 4, 100, ArrayType = CuArray)
 
 @test size(d1[:s]) == (3, 100) && size(d2[:s]) == (3, 100) && size(d3[:s]) == (3, 100)
 @test size(d1[:sp]) == (3, 100) && size(d2[:sp]) == (3, 100) && size(d3[:sp]) == (3, 100)
@@ -97,8 +97,8 @@ b = ExperienceBuffer(2, 4, 100, gae = true)
 bpriority = ExperienceBuffer(2, 4, 50, prioritized = true, gae = true)
 b_gpu = b |> gpu
 
-@test b isa ExperienceBuffer{Array{Float32, 2}}
-@test b_gpu isa ExperienceBuffer{CuArray{Float32, 2}}
+@test b isa ExperienceBuffer{Array}
+@test b_gpu isa ExperienceBuffer{CuArray}
 
 @test length(keys(b.data)) == length(keys(b_gpu.data))
 @test :s in keys(b_gpu.data)
@@ -136,11 +136,11 @@ push!(b, d)
 @test b[:done] == zeros(1,1)
 
 # push dictionary with more than one element
-d = Dict(:s => 3*ones(2,3), :a => 4*ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
+d = Dict(:s => 3*ones(2,3), :a => ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 @test length(b) == 4
 @test b[:s][:,2:end] ==  3*ones(2,3)
-@test b[:a][:,2:end] == 4*ones(4,3)
+@test b[:a][:,2:end] == ones(4,3)
 @test b[:sp][:,2:end] == 5*ones(2,3)
 @test b[:r][:,2:end] == 6*ones(1,3)
 @test b[:done][:,2:end] == ones(1,3)
@@ -238,4 +238,13 @@ relerr = abs.(freqs .- probs) ./ probs
 # @test length(bmerge) == 200
 # @test capacity(bmerge) == 300
 # @test bmerge[:s][:, 1:100] == bmerge[:s][:, 101:200] 
+
+## Multi-D states
+b2d = ExperienceBuffer((2,2), 4, 100; S = UInt8)
+@test ndims(b2d[:s]) == 3
+
+d = Dict(:s => 3*ones(2,2,1), :a => ones(4,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
+push!(b2d, d)
+
+@test all(b2d[:s] .== 3)
 

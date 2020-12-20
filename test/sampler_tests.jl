@@ -67,7 +67,7 @@ end
 
 ## fillto!
 b = ExperienceBuffer(2, 4, 100, gae = true)
-d = Dict(:s => 3*ones(2,3), :a => 4*ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
+d = Dict(:s => 3*ones(2,3), :a => ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 
 @test fillto!(b, s1, 3) == 0

@@ -7,7 +7,7 @@
     exploration_policy::Union{ExplorationPolicy, Nothing} = nothing
     rng::AbstractRNG = Random.GLOBAL_RNG
     s = rand(rng, initialstate(mdp))
-    svec::AbstractArray = convert_s(AbstractArray, s, mdp)
+    svec::AbstractArray = initial_observation(mdp, s, rng)
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
@@ -20,13 +20,16 @@ end
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))
-    if sampler.mdp isa POMDP
-        o = rand(sampler.rng, initialobs(sampler.mdp, sampler.s))
-    else
-        o = sampler.s
-    end
-    sampler.svec = convert_s(AbstractArray, o, sampler.mdp)
+    sampler.svec = initial_observation(sampler.mdp, sampler.s, sampler.rng)
     sampler.episode_length = 0
+end
+
+function initial_observation(mdp, s, rng)
+    if mdp isa POMDP
+        return convert_o(AbstractArray, rand(rng, initialobs(mdp, s)), mdp)
+    else
+        return convert_s(AbstractArray, s, mdp)
+    end
 end
 
 function terminate_episode!(sampler::Sampler, data, j; baseline = nothing, γ::Float32 = 0f0)
@@ -43,17 +46,18 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline 
     a = explore ? action(sampler.exploration_policy, sampler.π, i, sampler.svec) : action(sampler.π, sampler.svec)    
     if sampler.mdp isa POMDP
         sp, o, r = gen(sampler.mdp, sampler.s, a, sampler.rng)
+        spvec = convert_o(AbstractArray, o, sampler.mdp)
     else
         sp, r = gen(sampler.mdp, sampler.s, a, sampler.rng)
-        o = sp
+        spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
     done = isterminal(sampler.mdp, sp)
 
     # Save the tuple
-    spvec = convert_s(AbstractArray, o, sampler.mdp)
-    data[:s][:, j] .= sampler.svec
+    nd = ndims(spvec) + 1
+    selectdim(data[:s], nd, j) .= sampler.svec
     data[:a][:, j] .= (a isa AbstractArray) ?  a : Flux.onehot(a, actions(sampler.mdp))
-    data[:sp][:, j] .= spvec
+    selectdim(data[:sp], nd, j) .= spvec
     data[:r][1, j] = r
     data[:done][1, j] = done
     
@@ -151,9 +155,10 @@ end
 ## Generalized Advantage Estimation
 function fill_gae!(data, episode_range, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
+    nd = ndims(data[:s])
     for i in reverse(episode_range)
-        Vsp = V(data[:sp][:,i])
-        Vs = V(data[:s][:,i])
+        Vsp = V(selectdim(data[:sp], nd, i))
+        Vs = V(selectdim(data[:s], nd, i))
         @assert length(Vs) == 1
         A = c*A + data[:r][1,i] + (1.f0 - data[:done][1,i])*γ*Vsp[1] - Vs[1]
         @assert !isnan(A)
@@ -170,9 +175,9 @@ function fill_returns!(data, episode_range, γ::Float32)
 end
 
 # Utils
-function trim!(data::Dict{Symbol, Array{Float32, 2}}, N)
+function trim!(data::Dict{Symbol, Array}, N)
     for k in keys(data)
-        data[k] = data[k][:, 1:N]
+        data[k] = selectdim(data[k], ndims(data[k]), 1:N)
     end
     data
 end

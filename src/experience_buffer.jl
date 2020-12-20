@@ -18,19 +18,19 @@ Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
 DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
 
 # construction of common mdp data
-function mdp_data(sdim::Int, adim::Int, size::Int; Atype = Array{Float32,2}, gae = false)
-    data = Dict(
-        :s => Atype(undef, sdim, size), 
-        :a => Atype(undef, adim, size), 
-        :sp => Atype(undef, sdim, size), 
-        :r => Atype(undef, 1, size), 
-        :done => Atype(undef, 1, size),
-        :weight => Atype(undef, 1, size),
+function mdp_data(sdim, adim, size::Int; ArrayType = Array, S = Float32, A = Bool, R = Float32, D = Bool, W = Float32, gae = false)
+    data = Dict{Symbol, ArrayType}(
+        :s => ArrayType{S}(undef, sdim..., size), 
+        :a => ArrayType{A}(undef, adim..., size), 
+        :sp => ArrayType{S}(undef, sdim..., size), 
+        :r => ArrayType{R}(undef, 1, size), 
+        :done => ArrayType{D}(undef, 1, size),
+        :weight => ArrayType{W}(undef, 1, size),
         )
     copyto!(data[:weight], ones(1, size))
     if gae
-        data[:return] = Atype(undef, 1, size)
-        data[:advantage] = Atype(undef, 1, size)
+        data[:return] = ArrayType{R}(undef, 1, size)
+        data[:advantage] = ArrayType{R}(undef, 1, size)
     end
     data
 end
@@ -61,9 +61,11 @@ function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
     ExperienceBuffer(data = data, elements = elements)
 end
 
-function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae = false, prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0)
-    Atype = device == gpu ? CuArray{Float32,2} : Array{Float32,2}
-    data = mdp_data(sdim, adim, capacity, Atype = Atype, gae = gae)
+function ExperienceBuffer(sdim, adim, capacity::Int; device = cpu, gae = false, 
+                          prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0,
+                          S = Float32, A = Bool, R = Float32, D = Bool, W = Float32)
+    Atype = device == gpu ? CuArray : Array
+    data = mdp_data(sdim, adim, capacity, ArrayType = Atype, gae = gae, S = S, A = A, R = R, D = D, W = W)
     b = ExperienceBuffer(data = data)
     if prioritized
         b.minsort_priorities = MinHeap(fill(Inf32, capacity))
@@ -76,18 +78,18 @@ function ExperienceBuffer(sdim::Int, adim::Int, capacity::Int; device = cpu, gae
 end
 
 function Flux.gpu(b::ExperienceBuffer)
-    data = Dict(k => v |> gpu for (k,v) in b.data)
+    data = Dict{Symbol, CuArray}(k => v |> gpu for (k,v) in b.data)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
 function Flux.cpu(b::ExperienceBuffer)
-    data = Dict(k => v |> cpu for (k,v) in b.data)
+    data = Dict{Symbol, Array}(k => v |> cpu for (k,v) in b.data)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
-minibatch(b::ExperienceBuffer, indices) = Dict(k => view(b.data[k], :, indices) for k in keys(b))
+minibatch(b::ExperienceBuffer, indices) = Dict(k => selectdim(b.data[k], ndims(b.data[k]), indices) for k in keys(b))
 
-Base.getindex(b::ExperienceBuffer, key::Symbol) = view(b.data[key], :, 1:b.elements)
+Base.getindex(b::ExperienceBuffer, key::Symbol) = selectdim(b.data[key], ndims(b.data[key]), 1:b.elements)
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
 
@@ -97,8 +99,8 @@ DataStructures.capacity(b::ExperienceBuffer) = size(first(b.data)[2], 2)
 
 prioritized(b::ExperienceBuffer) = !isnothing(b.priorities)
 
-device(b::ExperienceBuffer{CuArray{Float32, 2}}) = gpu
-device(b::ExperienceBuffer{Array{Float32, 2}}) = cpu
+device(b::ExperienceBuffer{CuArray}) = gpu
+device(b::ExperienceBuffer{Array}) = cpu
 
 sdim(b::ExperienceBuffer) = size(b[:s], 1)
 adim(b::ExperienceBuffer) = size(b[:a], 1)
@@ -109,7 +111,8 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     N, C = length(ids), capacity(b)
     I = circular_indices(b.next_ind, N, C)
     for k in keys(data)
-        copyto!(view(b.data[k], :, I), data[k][:, ids])
+        v = data[k]
+        copyto!(selectdim(b.data[k], ndims(v), I), collect(selectdim(v, ndims(v), ids)))
     end
     prioritized(b) && update_priorities!(b, I, b.max_priority*ones(N))
         

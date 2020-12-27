@@ -4,4 +4,7 @@ include("sampler_tests.jl")
 include("policy_tests.jl")
 include("logging_tests.jl")
 include("multitask_learning_tests.jl")
+include("solver_tests/dqn_tests.jl")
+include("solver_tests/vpg_tests.jl")
+include("solver_tests/gail_tests.jl")
 

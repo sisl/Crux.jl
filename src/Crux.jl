@@ -1,8 +1,9 @@
 module Crux
     using Random
-    using Distributions
+    import Distributions:Categorical, MvNormal, logpdf
     using POMDPs
     using POMDPPolicies
+    using POMDPModelTools
     using Parameters
     using TensorBoardLogger
     using Flux
@@ -13,17 +14,20 @@ module Crux
     using DataStructures
     using Plots
     using ColorSchemes
+    using Images
     using Base.Iterators: partition
     
-    export sdim, adim, device, todevice
+    CUDA.allowscalar(false)
+    
+    export type, dim, useonehot, state_space, ContinuousSpace, DiscreteSpace, AbstractSpace, device, mdcall, bslice, cpucall, gpucall
     include("utils.jl")
     
-    export MinHeap, inverse_query, mdp_data, circular_indices, ExperienceBuffer, 
+    export MinHeap, inverse_query, mdp_data, ExperienceBuffer,
            minibatch, prioritized, update_priorities!, uniform_sample!, prioritized_sample!
     include("experience_buffer.jl")
     
-    export sync!, Baseline, network, logits, 
-           DQNPolicy, CategoricalPolicy, GaussianPolicy
+    export sync!, Baseline, network, logits, action_space,
+           DQNPolicy, CategoricalPolicy, GaussianPolicy, logpdf
     include("policies.jl")
     
     export Sampler, explore, terminate_episode!, step!, steps!, episodes!, fillto!, 
@@ -32,7 +36,8 @@ module Crux
     
     export elapsed, LoggerParams, log_perforamnce, log_discounted_return, 
            log_undiscounted_return, log_failure, log_val, log_loss, log_gradient, 
-           log_exploration, smooth, readtb, plot_learning_curves
+           log_exploration, smooth, readtb, plot_learning, episode_frames,
+           gif
     include("logging.jl")
     
     export init_fisher_diagonal, add_fisher_information_diagonal!, update_fisher_diagonal!

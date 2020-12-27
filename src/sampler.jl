@@ -1,21 +1,22 @@
-@with_kw mutable struct Sampler
-    mdp
+@with_kw mutable struct Sampler{P, V, T1 <: AbstractSpace, T2 <: AbstractSpace}
+    mdp::P
     π::Policy
-    sdim
-    adim
+    S::T1 # State space
+    A::T2 # Action space
     max_steps::Int = 100
     exploration_policy::Union{ExplorationPolicy, Nothing} = nothing
     rng::AbstractRNG = Random.GLOBAL_RNG
-    s = rand(rng, initialstate(mdp))
+    s::V = rand(rng, initialstate(mdp))
     svec::AbstractArray = initial_observation(mdp, s, rng)
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π::Policy, sdim, adim; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) = Sampler(mdp = mdp, π = π, sdim = sdim, adim = adim, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng)
+Sampler(mdp, π::Policy, S::T1, A::T2; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) where {T1 <: AbstractSpace, T2 <: AbstractSpace} = 
+    Sampler(mdp = mdp, π = π, S = S, A = A, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng)
 
-function Sampler(mdps::AbstractVector, π::Policy, sdim, adim; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG)
-    [Sampler(mdp = mdps[i], π = π, sdim = sdim, adim = adim, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng) for i in 1:length(mdps)]
+function Sampler(mdps::AbstractVector, π::Policy, S::T1, A::T2; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
+    [Sampler(mdp = mdps[i], π = π, S = S, A = A, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng) for i in 1:length(mdps)]
 end
 
 function reset_sampler!(sampler::Sampler)
@@ -43,7 +44,7 @@ end
     
 
 function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0)
-    a = explore ? action(sampler.exploration_policy, sampler.π, i, sampler.svec) : action(sampler.π, sampler.svec)    
+    a = explore ? action(sampler.exploration_policy, sampler.π, i, sampler.svec) : action(sampler.π, sampler.svec)
     if sampler.mdp isa POMDP
         sp, o, r = gen(sampler.mdp, sampler.s, a, sampler.rng)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
@@ -54,9 +55,9 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline 
     done = isterminal(sampler.mdp, sp)
 
     # Save the tuple
-    bslice(data[:s], j) .= sampler.svec
-    data[:a][:, j] .= (a isa AbstractArray) ?  a : Flux.onehot(a, actions(sampler.mdp))
-    bslice(data[:sp], j) .= spvec
+    bslice(data[:s], j) .= reshape(sampler.svec, dim(sampler.S)...)
+    data[:a][:, j] .= useonehot(sampler.A) ? Flux.onehot(a, actions(sampler.mdp)) : a
+    bslice(data[:sp], j) .= reshape(spvec, dim(sampler.S)...)
     data[:r][1, j] = r
     data[:done][1, j] = done
     
@@ -71,7 +72,7 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline 
 end
 
 function steps!(sampler::Sampler; Nsteps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, reset = false)
-    data = mdp_data(sampler.sdim, sampler.adim, Nsteps, gae = !isnothing(baseline))
+    data = mdp_data(sampler.S, sampler.A, Nsteps, gae = !isnothing(baseline))
     for j=1:Nsteps
         step!(data, j, sampler, explore = explore, i = i + (j-1), baseline = baseline, γ = γ)
     end
@@ -79,8 +80,8 @@ function steps!(sampler::Sampler; Nsteps = 1, explore = false, i = 0, baseline =
     data
 end
 
-function steps!(samplers::Vector{Sampler}; Nsteps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, reset = false)
-    data = mdp_data(samplers[1].sdim, samplers[1].adim, Nsteps*length(samplers), gae = !isnothing(baseline))
+function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, reset = false) where {T<:Sampler}
+    data = mdp_data(samplers[1].S, samplers[1].A, Nsteps*length(samplers), gae = !isnothing(baseline))
     j = 1
     for s=1:Nsteps
         for sampler in samplers
@@ -94,7 +95,7 @@ end
 
 function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, return_episodes = false)
     reset_sampler!(sampler)
-    data = mdp_data(sampler.sdim, sampler.adim, Neps*sampler.max_steps, gae = !isnothing(baseline))
+    data = mdp_data(sampler.S, sampler.A, Neps*sampler.max_steps, gae = !isnothing(baseline))
     episode_starts = zeros(Int, Neps)
     episode_ends = zeros(Int, Neps)
     j, k = 0, 1

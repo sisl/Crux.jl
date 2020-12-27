@@ -1,5 +1,5 @@
-using Crux, Flux
-include("mdps/gridworld.jl")
+using Crux, Flux, POMDPGym
+using Test
 
 ## Discrete VPG
 mdp = SimpleGridWorld(size = (10,10), tprob = .7)

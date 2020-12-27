@@ -4,10 +4,15 @@ using POMDPs
 using POMDPPolicies
 using Random
 using Flux
-include("../examples/mdps/gridworld.jl")
+using POMDPModels
+using POMDPGym
 
-mdp = SimpleGridWorld()
+mdp = GridWorldMDP()
 pomdp = TigerPOMDP()
+
+
+s = rand(initialstate(pomdp))
+o = rand(initialobs(pomdp, s))
 
 function POMDPs.gen(pomdp::TigerPOMDP, s, a, rng = Random.GLOBAL_RNG)
     sp = rand(rng, transition(pomdp, s, a ))
@@ -18,9 +23,10 @@ end
 
 exploration_policy = EpsGreedyPolicy(LinearDecaySchedule(start=1., stop=0.1, steps=100/2), Random.GLOBAL_RNG, actions(mdp))
 
-s1 = Sampler(mdp, FunctionPolicy((s) -> :up), 2, 4, max_steps = 500)
-s2 = Sampler(mdp, FunctionPolicy((s) -> :up), 2, 4, max_steps = 50, exploration_policy = exploration_policy)
-s3 = Sampler(pomdp, FunctionPolicy((s)-> 0), sdim(pomdp), adim(pomdp))
+s1 = Sampler(mdp, FunctionPolicy((s) -> :up), ContinuousSpace(2), DiscreteSpace(4), max_steps = 500)
+s2 = Sampler(mdp, FunctionPolicy((s) -> :up), ContinuousSpace(2), DiscreteSpace(4), max_steps = 50, exploration_policy = exploration_policy)
+s3 = Sampler(pomdp, FunctionPolicy((s)-> 0), state_space(pomdp), DiscreteSpace(length(actions(pomdp))))
+
 
 ## Steps! function
 data = steps!(s1, Nsteps = 10)
@@ -66,7 +72,7 @@ end
 @test failure(s1) < 1.
 
 ## fillto!
-b = ExperienceBuffer(2, 4, 100, gae = true)
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100, gae = true)
 d = Dict(:s => 3*ones(2,3), :a => ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 
@@ -76,14 +82,14 @@ push!(b, d)
 
 ## Generalized Advantage Estimation
 #TODO: For policy gradient
-baseline = Baseline(Chain(Dense(2,32, relu), Dense(32, 1)))
+baseline = Baseline(V = Chain(Dense(2,32, relu), Dense(32, 1)))
 fill_gae!(b, 1:5, baseline.V, 0.9f0, 0.7f0)
 fill_returns!(b, 1:5, 0.7f0)
 
 ## Test sampling with a vector of mdps
 mdps = [mdp, mdp, mdp]
 
-samplers = Sampler(mdps, FunctionPolicy((s) -> :up), 2, 4)
+samplers = Sampler(mdps, FunctionPolicy((s) -> :up), ContinuousSpace(2), DiscreteSpace(4))
 @test length(samplers) == 3
 
 data = steps!(samplers, Nsteps = 5)

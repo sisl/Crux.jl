@@ -1,8 +1,8 @@
 const MinHeap = MutableBinaryHeap{Float32, DataStructures.FasterForward}
 
 # Efficient inverse query for fenwick tree : adapted from https://codeforces.com/blog/entry/61364
-function inverse_query(t::FenwickTree, v)
-    tot, pos, N = 0, 0, length(t)
+function inverse_query(t::FenwickTree, v, N = length(t))
+    tot, pos = 0, 0
     for i=floor(Int, log2(N)):-1:0
         new_pos = pos + 1 << i
         if new_pos <= N && tot + t.bi_tree[new_pos] < v
@@ -18,28 +18,20 @@ Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
 DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
 
 # construction of common mdp data
-function mdp_data(sdim, adim, size::Int; ArrayType = Array, S = Float32, A = Bool, R = Float32, D = Bool, W = Float32, gae = false)
+function mdp_data(S::T1, A::T2, capacity::Int; ArrayType = Array, R = Float32, D = Bool, W = Float32, gae = false) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
     data = Dict{Symbol, ArrayType}(
-        :s => ArrayType{S}(undef, sdim..., size), 
-        :a => ArrayType{A}(undef, adim..., size), 
-        :sp => ArrayType{S}(undef, sdim..., size), 
-        :r => ArrayType{R}(undef, 1, size), 
-        :done => ArrayType{D}(undef, 1, size),
-        :weight => ArrayType{W}(undef, 1, size),
+        :s => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
+        :a => ArrayType(fill(zero(type(A)), dim(A)..., capacity)), 
+        :sp => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
+        :r => ArrayType(fill(zero(R), 1, capacity)), 
+        :done => ArrayType(fill(zero(D), 1, capacity)),
+        :weight => ArrayType(fill(one(W), 1, capacity)),
         )
-    copyto!(data[:weight], ones(1, size))
     if gae
-        data[:return] = ArrayType{R}(undef, 1, size)
-        data[:advantage] = ArrayType{R}(undef, 1, size)
+        data[:return] = ArrayType(fill(zero(R), 1, capacity))
+        data[:advantage] = ArrayType(fill(zero(R), 1, capacity))
     end
     data
-end
-
-# Function to comput index ranges on a circular buffer
-function circular_indices(start, Nsteps, l)
-    stop = mod1(start+Nsteps-1, l)
-    Nsteps > l && (start = stop+1) # Handle overlap
-    (stop >= start) ? collect(start:stop) : [start:l..., 1:stop...]
 end
     
 ## Experience Buffer stuff
@@ -61,11 +53,11 @@ function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
     ExperienceBuffer(data = data, elements = elements)
 end
 
-function ExperienceBuffer(sdim, adim, capacity::Int; device = cpu, gae = false, 
+function ExperienceBuffer(S::T1, A::T2, capacity::Int; device = cpu, gae = false, 
                           prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0,
-                          S = Float32, A = Bool, R = Float32, D = Bool, W = Float32)
+                          R = Float32, D = Bool, W = Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
     Atype = device == gpu ? CuArray : Array
-    data = mdp_data(sdim, adim, capacity, ArrayType = Atype, gae = gae, S = S, A = A, R = R, D = D, W = W)
+    data = mdp_data(S, A, capacity, ArrayType = Atype, gae = gae,  R = R, D = D, W = W)
     b = ExperienceBuffer(data = data)
     if prioritized
         b.minsort_priorities = MinHeap(fill(Inf32, capacity))
@@ -102,14 +94,13 @@ prioritized(b::ExperienceBuffer) = !isnothing(b.priorities)
 device(b::ExperienceBuffer{CuArray}) = gpu
 device(b::ExperienceBuffer{Array}) = cpu
 
-sdim(b::ExperienceBuffer) = size(b[:s], 1)
-adim(b::ExperienceBuffer) = size(b[:a], 1)
+dim(b::ExperienceBuffer, s::Symbol) = size(b[s], 1)
 
 # Note: data can be a dictionary or an experience buffer
 function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids
     N, C = length(ids), capacity(b)
-    I = circular_indices(b.next_ind, N, C)
+    I = mod1.(b.next_ind:b.next_ind + N - 1, C)
     for k in keys(data)
         copyto!(bslice(b.data[k], I), collect(bslice(data[k], ids)))
     end
@@ -149,7 +140,8 @@ function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer,
     N = length(source)
     ptot = prefixsum(source.priorities, N)
     Δp = ptot / B
-    target.indices = [inverse_query(source.priorities, (j + rand(rng) - 1) * Δp) for j=1:B]
+    target.indices = [inverse_query(source.priorities, (j + rand(rng) - 1) * Δp, N-1) for j=1:B]
+    target.indices = max.(target.indices, )
     pmin = first(source.minsort_priorities) / ptot
     max_w = (pmin*N)^(-source.β(i))
     source[:weight][1, target.indices] .= [(N * source.priorities[id] / ptot)^source.β(i) for id in target.indices] ./ max_w

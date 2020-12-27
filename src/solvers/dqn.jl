@@ -1,30 +1,30 @@
 @with_kw mutable struct DQNSolver <: Solver 
     π::DQNPolicy
-    sdim::Int
-    adim::Int = length(π.actions)
+    S::AbstractSpace
+    A::AbstractSpace = action_space(π)
     N::Int = 1000
     rng::AbstractRNG = Random.GLOBAL_RNG
     exploration_policy::ExplorationPolicy = EpsGreedyPolicy(LinearDecaySchedule(start=1., stop=0.1, steps=N/2), rng, π.actions)
     L::Function = Flux.Losses.huber_loss
+    regularizer::Function = (θ) -> 0
     opt = ADAM(1e-3)
     batch_size::Int = 32
     max_steps::Int = 100
     eval_eps::Int = 100
     Δtrain::Int = 4 
     Δtarget_update::Int = 2000
+    buffer::ExperienceBuffer = ExperienceBuffer(S, A, 1000)
     buffer_init::Int = max(batch_size, 200)
     log::Union{Nothing, LoggerParams} = LoggerParams(dir = "log/dqn", period = 500)
     device = device(π)
-    buffer::ExperienceBuffer = ExperienceBuffer(sdim, adim, 1000)
-    regularizer::Function = (θ) -> 0
     i::Int = 0
 end
 
 function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
     # Initialize minibatch buffer and sampler
-    𝒟 = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.batch_size, device = 𝒮.device)
+    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.batch_size, device = 𝒮.device)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
     
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))
@@ -41,7 +41,7 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         
         # Compute target, td_error and td_loss for backprop
         y = target(𝒮.π.Q⁻, 𝒟, γ)
-        prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, td_error(𝒮.π, 𝒟, y))
+        prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
         loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L), 𝒮.opt, 𝒮.device, regularizer = 𝒮.regularizer)
         
         # Update target network

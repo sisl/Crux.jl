@@ -1,13 +1,9 @@
-@with_kw mutable struct DQNGAILSolver <: Solver 
+@with_kw mutable struct DQNGAILSolver <: Solver
     π::DQNPolicy
     D::DQNPolicy
-    sdim::Int
-    adim::Int = length(π.actions)
+    S::AbstractSpace
+    A::AbstractSpace = action_space(π)
     N::Int = 1000
-    buffer::ExperienceBuffer = ExperienceBuffer(sdim, adim, 1000)
-    expert_buffer::ExperienceBuffer
-    nda_buffer::Union{Nothing, ExperienceBuffer} = nothing
-    λ_nda::Float32 = 0.5f0
     rng::AbstractRNG = Random.GLOBAL_RNG
     exploration_policy::ExplorationPolicy = EpsGreedyPolicy(LinearDecaySchedule(start=1., stop=0.1, steps=N/2), rng, π.actions)
     L::Function = Flux.Losses.huber_loss
@@ -16,9 +12,13 @@
     batch_size::Int = 32
     max_steps::Int = 100 
     eval_eps::Int = 100
-    buffer_init::Int = max(batch_size, 200)
-    Δtarget_update::Int = 500
     Δtrain::Int = 4 
+    Δtarget_update::Int = 500
+    buffer::ExperienceBuffer = ExperienceBuffer(S, A, 1000)
+    buffer_init::Int = max(batch_size, 200)
+    expert_buffer::ExperienceBuffer
+    nda_buffer::Union{Nothing, ExperienceBuffer} = nothing
+    λ_nda::Float32 = 0.5f0
     log = LoggerParams(dir = "log/gail", period = 10)
     device = device(π)
     i::Int64 = 0
@@ -38,11 +38,11 @@ end
 
 function POMDPs.solve(𝒮::DQNGAILSolver, mdp)
     # Initialize minibatch buffers and sampler
-    𝒟_π = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.batch_size, device = 𝒮.device)
+    𝒟_π = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.batch_size, device = 𝒮.device)
     𝒟_expert = deepcopy(𝒟_π)
     𝒟_nda = isnothing(𝒮.nda_buffer) ? nothing : deepcopy(𝒟_π)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
     
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))

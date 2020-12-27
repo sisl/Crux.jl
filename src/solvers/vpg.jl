@@ -1,7 +1,7 @@
 @with_kw mutable struct VPGSolver <: Solver 
     π::Policy
-    sdim::Int
-    adim::Int
+    S::AbstractSpace
+    A::AbstractSpace = action_space(π)
     baseline::Baseline
     N::Int64 = 1000
     ΔN::Int = 1000
@@ -9,9 +9,9 @@
     max_steps::Int64 = 100
     eval_eps::Int = 100
     opt = ADAM(1e-3)
-    device = device(π)
     rng::AbstractRNG = Random.GLOBAL_RNG
     log = LoggerParams(dir = "log/vpg", period = 500)
+    device = device(π)
     i::Int64 = 0
 end
 
@@ -19,9 +19,9 @@ vpg_loss(π, 𝒟) = -mean(logpdf(π, 𝒟[:s], 𝒟[:a]) .* 𝒟[:advantage])
 
 function POMDPs.solve(𝒮::VPGSolver, mdp)
     # Construct the experience buffer and sampler
-    𝒟 = ExperienceBuffer(𝒮.sdim, 𝒮.adim, 𝒮.ΔN, device = 𝒮.device, gae = true)
+    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.ΔN, device = 𝒮.device, gae = true)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.sdim, 𝒮.adim, max_steps = 𝒮.max_steps, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps = 𝒮.max_steps, rng = 𝒮.rng)
     
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))
@@ -42,5 +42,6 @@ function POMDPs.solve(𝒮::VPGSolver, mdp)
                                         log_gradient(grads))
     end
     𝒮.i += 𝒮.ΔN
+    𝒮.π
 end
 

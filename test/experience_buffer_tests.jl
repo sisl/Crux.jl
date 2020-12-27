@@ -27,13 +27,42 @@ t2pow = FenwickTree(v)
 @test inverse_query(t, 10) == 10
 @test inverse_query(t, 11) == 11
 
+# Search up to a given range (used due to some numerical problems when searching the full range)
+priorities = FenwickTree(zeros(Float32, 100000))
+N = 13500
+for i=1:N
+    update!(priorities, i, rand(Float32))
+end
+ptot = prefixsum(priorities, 100000)
+B = 320
+Δp = ptot / B
+inverse_query(priorities, B*Δp)
+inverse_query(priorities, ptot)
+@test inverse_query(priorities, B*Δp, N) <= N+1
+inverse_query(priorities, ptot, N-1)
+
+
+
+for i = 1:1000
+    rns = [rand() for _=1:B]
+    indices = [inverse_query(priorities, (j + rns[j] - 1) * Δp) for j=1:B]
+    if !all(indices .<= 13500)
+        println("rn: ", rns)
+    end
+end
+
+
+ptot
+(B-1 + 0.9995799680)*Δp
+
+
 # power of 2 arrays
 for i=1:1000
-    r = 5*rand()
-    ind = inverse_query(t2pow, r)
+    rval = 5*rand()
+    ind = inverse_query(t2pow, rval)
 
-    @test prefixsum(t2pow, ind) ≥ r
-    @test prefixsum(t2pow, ind-1) < r
+    @test prefixsum(t2pow, ind) ≥ rval
+    @test prefixsum(t2pow, ind-1) < rval
 end
 @test inverse_query(t2pow, prefixsum(t2pow, 16)) == 16
 
@@ -72,9 +101,9 @@ h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)
 
 
 ## mdp_data
-d1 = mdp_data(3, 4, 100)
-d2 = mdp_data(3, 4, 100, gae = true)
-d3 = mdp_data(3, 4, 100, ArrayType = CuArray)
+d1 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100)
+d2 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, gae = true)
+d3 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, ArrayType = CuArray)
 
 @test size(d1[:s]) == (3, 100) && size(d2[:s]) == (3, 100) && size(d3[:s]) == (3, 100)
 @test size(d1[:sp]) == (3, 100) && size(d2[:sp]) == (3, 100) && size(d3[:sp]) == (3, 100)
@@ -86,15 +115,16 @@ d3 = mdp_data(3, 4, 100, ArrayType = CuArray)
 @test d3[:s] isa CuArray
 
 ## circular_indices
-@test circular_indices(4, 60, 100) == [4:63 ...]
-@test circular_indices(1, 100, 100) == [1:100 ...]
-@test circular_indices(1, 101, 100) == [2:100 ..., 1]
-@test circular_indices(1, 120, 100) == [21:100 ..., 1:20 ...]
-@test circular_indices(90, 20, 100) == [90:100 ..., 1:9 ...]
+circ_inds(start, Nsteps, l) = mod1.(start:start + Nsteps - 1, l)
+@test circ_inds(4, 60, 100) == [4:63 ...]
+@test circ_inds(1, 100, 100) == [1:100 ...]
+@test circ_inds(1, 101, 100) == [1:100 ..., 1]
+@test circ_inds(1, 120, 100) == [1:100 ..., 1:20 ...]
+@test circ_inds(90, 20, 100) == [90:100 ..., 1:9 ...]
 
 ## Construction
-b = ExperienceBuffer(2, 4, 100, gae = true)
-bpriority = ExperienceBuffer(2, 4, 50, prioritized = true, gae = true)
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100, gae = true)
+bpriority = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 50, prioritized = true, gae = true)
 b_gpu = b |> gpu
 
 @test b isa ExperienceBuffer{Array}
@@ -181,10 +211,10 @@ end
 ## sampling
 
 # uniform sample
-t = ExperienceBuffer(2, 4, 10, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10, gae = true)
 rand!(Random.GLOBAL_RNG, t, b)
 
-t = ExperienceBuffer(2, 4, 3, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3, gae = true)
 rng = MersenneTwister(0)
 ids = rand(rng, 1:length(b), 3)
 rand!(MersenneTwister(0), t, b)
@@ -194,19 +224,19 @@ for k in keys(t)
 end
 
 # Test the multi-buffer sampling
-t1 = ExperienceBuffer(2, 4, 10)
+t1 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 d = Dict(:s => ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t1, d)
 
-t2 = ExperienceBuffer(2, 4, 10)
+t2 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 d = Dict(:s => 2*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t2, d)
 
-t3 = ExperienceBuffer(2, 4, 10)
+t3 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 d = Dict(:s => 3*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t3, d)
 
-t = ExperienceBuffer(2, 4, 10, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10, gae = true)
 rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
 
 @test all(t[:s][:, 1:4] .== 1.0)
@@ -218,7 +248,7 @@ rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
 # Priority samples
 bpriority[:s] .= rand(Float32, 2, 6)
 update_priorities!(bpriority, [1:6...], [1.:6. ...])
-t = ExperienceBuffer(2, 4, 1000, gae=true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 1000, gae=true)
 priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
 
 rand!(rng, t, bpriority)
@@ -240,8 +270,9 @@ relerr = abs.(freqs .- probs) ./ probs
 # @test bmerge[:s][:, 1:100] == bmerge[:s][:, 101:200] 
 
 ## Multi-D states
-b2d = ExperienceBuffer((2,2), 4, 100; S = UInt8)
+b2d = ExperienceBuffer(ContinuousSpace((2,2), UInt8), DiscreteSpace(4), 100;)
 @test ndims(b2d[:s]) == 3
+b2d[:s]
 
 d = Dict(:s => 3*ones(2,2,1), :a => ones(4,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(b2d, d)

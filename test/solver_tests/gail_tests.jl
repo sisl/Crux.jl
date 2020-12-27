@@ -1,6 +1,5 @@
-using Crux, Flux
-include("mdps/lavaworld.jl")
-
+using Crux, Flux, POMDPGym
+using Test
 
 # Setup the problem parameters
 sz = (7,5)

@@ -66,29 +66,70 @@ function readtb(logdir, key)
     h.iterations, h.values
 end
 
-function plot_learning_curves(dirs; 
-        ylabel = "Discounted Reward",  
+function plot_learning(input; 
+        title = "",
+        ylabel = "Undiscounted Return",  
         xlabel = "Training Steps", 
-        values = fill(:undiscounted_return, length(dirs)), 
+        values = :undiscounted_return, 
+        labels = :default,
+        legend = :bottomright,
+        font = :palatino,
         p = plot(), 
-        rng = MersenneTwister(5), 
-        colors = [get(colorschemes[:rainbow], rand(rng)) for i=1:length(values)],
+        colors = (i) -> get(colorschemes[:rainbow], rand(MersenneTwister(5),i)[end]),
         vertical_lines = [],
         vline_range = (0, 1), 
         thick_every = 1
     )
+    # Get the directories we care about
+    dirs = []
+    input isa Array && all([input[i] isa Solver for i=1:length(input)]) && (dirs = [input[i].log.logger.logdir for i=1:length(input)])
+    input isa Solver && (dirs = [input.log.logger.logdir])
+    input isa String && (dirs = [input])
+    
+    N = length(dirs)
+    values isa Symbol && (values = fill(values, N))
+    if labels == :default
+        labels = N == 1 ? [""] : ["Task $i" for i=1:N]
+    end 
+    
     # Plot the vertical lines (usually for multitask learning or to designate a point on the curve)
     for i = 1:length(vertical_lines)
         plot!(p, [vertical_lines[i], vertical_lines[i]], [vline_range...], color = :black, linewidth = i % thick_every == 0 ? 3 : 1, label = "")
     end
     
     # Plot the learning curves
-    plot!(p, ylabel = ylabel, legend = :bottomright)
+    plot!(p, ylabel = ylabel, xlabel = xlabel, legend = legend, title = title, fontfamily = font)
     for i in 1:length(dirs)
         x, y = readtb(dirs[i], values[i])
-        plot!(p, x, y, alpha = 0.3, color = colors[i], label = "")
-        plot!(p, x, smooth(y), color = colors[i], label = "Task $i", linewidth =2 )
+        plot!(p, x, y, alpha = 0.3, color = colors(i), label = "")
+        plot!(p, x, smooth(y), color = colors(i), label = labels[i], linewidth =2 )
     end
     p
 end
 
+function episode_frames(mdp, policy, rng::AbstractRNG = Random.GLOBAL_RNG; Neps = 1, max_steps = 1000)
+    frames = []
+    for i = 1:Neps
+        s = rand(initialstate(mdp))
+        o = mdp isa POMDP ? rand(initialobs(mdp, s)) : convert_s(AbstractArray, s, mdp)
+        step = 0
+        while !isterminal(mdp, s) && step < max_steps
+            step += 1
+            a = action(policy, o)
+            if mdp isa POMDP
+                s, o, _ = gen(mdp, s, a, rng)
+            else
+                s, _ = gen(mdp, s, a, rng)
+                o = convert_s(AbstractArray, s, mdp)
+            end
+            push!(frames, render(mdp, s, a))
+        end
+    end
+    frames
+end
+
+gif(mdp, policy, filename; rng::AbstractRNG = Random.GLOBAL_RNG, fps = 15, Neps = 1, max_steps = 1000) = gif(episode_frames(mdp, policy, rng, Neps = Neps, max_steps = max_steps), filename, fps = fps)
+
+function gif(frames, filename; fps = 15)
+    Images.save(filename, cat(frames..., dims = 3), fps = fps)
+end

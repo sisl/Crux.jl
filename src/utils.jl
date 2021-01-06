@@ -38,7 +38,10 @@ device(v::T) where T <: CuArray = gpu
 device(v::T) where T <: AbstractArray = cpu
 device(v::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = gpu
 device(v::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = cpu
-device(c) = Flux.params(c)[1] isa CuArray ? gpu : cpu
+function device(c) 
+    p = Flux.params(c)
+    length(p) > 0 && p[1] isa CuArray ? gpu : cpu
+end 
 
 function Base.copyto!(Cto::Chain, Cfrom::Chain)
     for i = 1:length(Flux.params(Cto).order.data)
@@ -51,7 +54,7 @@ gpucall(F, x::CuArray) = F(x)
 gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = F(x)
 
 gpucall(F, x::Array) = cpu(F(gpu(x)))
-gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = cpu(F(gpu(x)))
+gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = cpu(F(gpu(collect(x))))
 
 cpucall(F, x::Array) = F(x)
 cpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = F(x)
@@ -75,4 +78,11 @@ mdcall(F, x, device) = device == gpu ? gpucall(F,x) : cpucall(F, x)
 end
 
 ## Flux stuff
-LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2) = norm([norm(grads[θ] |> cpu, p) for θ in grads.params], p)
+function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
+    v = []
+    for θ in grads.params
+        !isnothing(grads[θ]) && push!(v, norm(grads[θ] |> cpu, p))
+    end
+    norm(v, p)
+end
+

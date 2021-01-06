@@ -7,6 +7,7 @@ module Crux
     using Parameters
     using TensorBoardLogger
     using Flux
+    using Zygote
     using Flux.Optimise: train!
     using CUDA
     using LinearAlgebra
@@ -14,19 +15,17 @@ module Crux
     using DataStructures
     using Plots
     using ColorSchemes
-    using Images
+    import Images: save
     using Base.Iterators: partition
-    
-    CUDA.allowscalar(false)
     
     export type, dim, useonehot, state_space, ContinuousSpace, DiscreteSpace, AbstractSpace, device, mdcall, bslice, cpucall, gpucall
     include("utils.jl")
     
-    export MinHeap, inverse_query, mdp_data, ExperienceBuffer,
+    export MinHeap, inverse_query, mdp_data, ExperienceBuffer, episodes, shuffle!,
            minibatch, prioritized, update_priorities!, uniform_sample!, prioritized_sample!
     include("experience_buffer.jl")
     
-    export sync!, Baseline, network, logits, action_space,
+    export sync!, control_features, network, logits, action_space, ActorCritic,
            DQNPolicy, CategoricalPolicy, GaussianPolicy, logpdf
     include("policies.jl")
     
@@ -52,10 +51,11 @@ module Crux
     export DQNSolver
     include("solvers/dqn.jl")
     
-    export VPGSolver
-    include("solvers/vpg.jl")
-    
     export DQNGAILSolver
     include("solvers/dqn_gail.jl")
+    
+    export PGSolver, ppo, reinforce, a2c
+    include("solvers/actor_critic.jl")
+    
 end
 

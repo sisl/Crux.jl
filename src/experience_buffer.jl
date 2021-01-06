@@ -18,18 +18,24 @@ Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
 DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
 
 # construction of common mdp data
-function mdp_data(S::T1, A::T2, capacity::Int; ArrayType = Array, R = Float32, D = Bool, W = Float32, gae = false) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
+function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[]; ArrayType = Array, R = Float32, D = Bool, W = Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
     data = Dict{Symbol, ArrayType}(
         :s => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
         :a => ArrayType(fill(zero(type(A)), dim(A)..., capacity)), 
         :sp => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
         :r => ArrayType(fill(zero(R), 1, capacity)), 
-        :done => ArrayType(fill(zero(D), 1, capacity)),
-        :weight => ArrayType(fill(one(W), 1, capacity)),
+        :done => ArrayType(fill(zero(D), 1, capacity))
         )
-    if gae
-        data[:return] = ArrayType(fill(zero(R), 1, capacity))
-        data[:advantage] = ArrayType(fill(zero(R), 1, capacity))
+    for k in extras
+        if k in [:t, :return, :logprob, :advantage]
+            data[k] = ArrayType(fill(zero(R), 1, capacity))
+        elseif k in [:weight]
+            data[k] = ArrayType(fill(one(R), 1, capacity))
+        elseif k in [:episode_end]
+            data[k] = ArrayType(fill(false, 1, capacity))
+        else
+            error("Unrecognized key: ", k)
+        end
     end
     data
 end
@@ -53,12 +59,12 @@ function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
     ExperienceBuffer(data = data, elements = elements)
 end
 
-function ExperienceBuffer(S::T1, A::T2, capacity::Int; device = cpu, gae = false, 
+function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[]; device = cpu, 
                           prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0,
                           R = Float32, D = Bool, W = Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
     Atype = device == gpu ? CuArray : Array
-    data = mdp_data(S, A, capacity, ArrayType = Atype, gae = gae,  R = R, D = D, W = W)
-    b = ExperienceBuffer(data = data)
+    prioritized && !(:weight in extras) && push!(extras, :weight)
+    b = ExperienceBuffer(data = mdp_data(S, A, capacity, extras, ArrayType = Atype,  R = R, D = D, W = W))
     if prioritized
         b.minsort_priorities = MinHeap(fill(Inf32, capacity))
         b.priorities = FenwickTree(fill(0f0, capacity))
@@ -79,11 +85,20 @@ function Flux.cpu(b::ExperienceBuffer)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
+function Random.shuffle!(rng::AbstractRNG, b::ExperienceBuffer)
+    new_i = shuffle(rng, 1:length(b))
+    for k in keys(b)
+        b[k] .= bslice(b[k], new_i)
+    end
+end
+
 minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
 
 Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
+
+Base.haskey(b::ExperienceBuffer, k) = haskey(b.data, k)
 
 Base.length(b::ExperienceBuffer) = b.elements
 
@@ -95,6 +110,13 @@ device(b::ExperienceBuffer{CuArray}) = gpu
 device(b::ExperienceBuffer{Array}) = cpu
 
 dim(b::ExperienceBuffer, s::Symbol) = size(b[s], 1)
+
+function episodes(b::ExperienceBuffer)
+    @assert haskey(b, :episode_end)
+    ep_ends = findall(b[:episode_end][1,:])
+    ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
+    zip(ep_starts, ep_ends)
+end
 
 # Note: data can be a dictionary or an experience buffer
 function Base.push!(b::ExperienceBuffer, data; ids = nothing)
@@ -137,6 +159,7 @@ end
 
 # With guidance from https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
 function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; i = 1, B = capacity(target))
+    @assert haskey(source, :weight) 
     N = length(source)
     ptot = prefixsum(source.priorities, N)
     Δp = ptot / B

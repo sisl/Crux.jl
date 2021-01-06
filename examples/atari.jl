@@ -14,7 +14,7 @@ policy = DQNPolicy(Q = Q, actions = as)
 
 
 buffer = ExperienceBuffer(s_dim, a_dim, 100000, S = UInt8, prioritized = true)
-𝒮 = DQNSolver(π = policy, sdim = s_dim, N=5000000, buffer = buffer, eval_eps = 1, max_steps = 1000, Δtarget_update = 10000, buffer_init = 5000)
+𝒮 = DQNSolver(π = policy, sdim = s_dim, N=5000000, buffer = buffer, eval_eps = 1, max_steps = 1000, Δtarget_update = 10000, buffer_init = 5000, opt = Flux.Optimiser(ClipValue(1f0), ADAM(1f-3)))
 solve(𝒮, mdp)
 
 # episode_gif(mdp, policy, "out.gif", render = (s) -> plot(torgb(s)))

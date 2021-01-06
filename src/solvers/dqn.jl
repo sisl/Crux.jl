@@ -13,7 +13,8 @@
     eval_eps::Int = 100
     Δtrain::Int = 4 
     Δtarget_update::Int = 2000
-    buffer::ExperienceBuffer = ExperienceBuffer(S, A, 1000)
+    buffer_size = 1000
+    buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size)
     buffer_init::Int = max(batch_size, 200)
     log::Union{Nothing, LoggerParams} = LoggerParams(dir = "log/dqn", period = 500)
     device = device(π)
@@ -21,10 +22,13 @@
 end
 
 function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
+    isprioritized = prioritized(𝒮.buffer)
+    required_columns = isprioritized ? [:weight] : Symbol[]
+    
     # Initialize minibatch buffer and sampler
-    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.batch_size, device = 𝒮.device)
+    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.batch_size, required_columns, device = 𝒮.device)
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
+    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, required_columns = required_columns, max_steps = 𝒮.max_steps, exploration_policy = 𝒮.exploration_policy, rng = 𝒮.rng)
     
     # Log the pre-train performance
     𝒮.i == 0 && log(𝒮.log, 𝒮.i, log_undiscounted_return(s, Neps = 𝒮.eval_eps))
@@ -41,8 +45,8 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         
         # Compute target, td_error and td_loss for backprop
         y = target(𝒮.π.Q⁻, 𝒟, γ)
-        prioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
-        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L), 𝒮.opt, 𝒮.device, regularizer = 𝒮.regularizer)
+        isprioritized && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
+        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L, isprioritized), 𝒮.opt, 𝒮.device, regularizer = 𝒮.regularizer)
         
         # Update target network
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)

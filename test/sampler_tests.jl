@@ -10,7 +10,6 @@ using POMDPGym
 mdp = GridWorldMDP()
 pomdp = TigerPOMDP()
 
-
 s = rand(initialstate(pomdp))
 o = rand(initialobs(pomdp, s))
 
@@ -72,7 +71,7 @@ end
 @test failure(s1) < 1.
 
 ## fillto!
-b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100, gae = true)
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100, [:advantage, :return])
 d = Dict(:s => 3*ones(2,3), :a => ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 
@@ -82,8 +81,7 @@ push!(b, d)
 
 ## Generalized Advantage Estimation
 #TODO: For policy gradient
-baseline = Baseline(V = Chain(Dense(2,32, relu), Dense(32, 1)))
-fill_gae!(b, 1:5, baseline.V, 0.9f0, 0.7f0)
+fill_gae!(b, 1:5, Chain((s)->zeros(1, size(s, 2))), 0.9f0, 0.7f0)
 fill_returns!(b, 1:5, 0.7f0)
 
 ## Test sampling with a vector of mdps
@@ -95,4 +93,13 @@ samplers = Sampler(mdps, FunctionPolicy((s) -> :up), ContinuousSpace(2), Discret
 data = steps!(samplers, Nsteps = 5)
 data[:s]
 @test size(data[:s],2) == 15
+
+## Test episodes
+mdp = GridWorldMDP()
+s1 = Sampler(mdp, FunctionPolicy((s) -> :up), ContinuousSpace(2), DiscreteSpace(4), required_columns =[:episode_end], max_steps = 500,)
+data, eps = episodes!(s1, Neps = 10, return_episodes = true,)
+buffer = ExperienceBuffer(data)
+eps2 = Crux.episodes(buffer)
+
+@test all(eps .== eps2)
 

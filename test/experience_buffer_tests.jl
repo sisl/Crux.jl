@@ -102,16 +102,17 @@ h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)
 
 ## mdp_data
 d1 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100)
-d2 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, gae = true)
+d2 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:weight, :t, :advantage, :return, :logprob])
+@test_throws ErrorException  mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:bad_key])
 d3 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, ArrayType = CuArray)
 
-@test size(d1[:s]) == (3, 100) && size(d2[:s]) == (3, 100) && size(d3[:s]) == (3, 100)
-@test size(d1[:sp]) == (3, 100) && size(d2[:sp]) == (3, 100) && size(d3[:sp]) == (3, 100)
-@test size(d1[:a]) == (4, 100) && size(d2[:a]) == (4, 100) && size(d3[:a]) == (4, 100)
-@test size(d1[:r]) == (1, 100) && size(d2[:r]) == (1, 100) && size(d3[:r]) == (1, 100)
-@test size(d1[:done]) == (1, 100) && size(d2[:done]) == (1, 100) && size(d3[:done]) == (1, 100)
-@test size(d2[:return]) == (1, 100) && size(d2[:advantage]) == (1, 100)
-@test !haskey(d1, :return) && !haskey(d1, :advantage)
+@test d1[:s] == zeros(Float32, 3, 100) && d2[:s] == zeros(Float32, 3, 100) && d3[:s] == zeros(Float32, 3, 100)
+@test d1[:sp] == zeros(Float32, 3, 100) && d2[:sp] == zeros(Float32, 3, 100) && d3[:sp] == zeros(Float32, 3, 100)
+@test d1[:a] == zeros(Bool, 4, 100) && size(d2[:a]) == (4, 100) && size(d3[:a]) == (4, 100)
+@test d1[:r] == zeros(Float32, 1, 100) && size(d2[:r]) == (1, 100) && size(d3[:r]) == (1, 100)
+@test d1[:done] == zeros(Bool, 1, 100) && size(d2[:done]) == (1, 100) && size(d3[:done]) == (1, 100)
+@test d2[:return] == zeros(1, 100) && d2[:advantage] == zeros(1, 100) && d2[:logprob] == zeros(1, 100) && d2[:t] == zeros(1, 100) && d2[:weight] == ones(1, 100)
+@test !haskey(d1, :return) && !haskey(d1, :advantage) && !haskey(d1, :logprob) && !haskey(d1, :t) && !haskey(d1, :weight)
 @test d3[:s] isa CuArray
 
 ## circular_indices
@@ -123,8 +124,8 @@ circ_inds(start, Nsteps, l) = mod1.(start:start + Nsteps - 1, l)
 @test circ_inds(90, 20, 100) == [90:100 ..., 1:9 ...]
 
 ## Construction
-b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100, gae = true)
-bpriority = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 50, prioritized = true, gae = true)
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100,)
+bpriority = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 50, prioritized = true)
 b_gpu = b |> gpu
 
 @test b isa ExperienceBuffer{Array}
@@ -136,7 +137,7 @@ b_gpu = b |> gpu
 @test :sp in keys(b_gpu.data)
 @test :r in keys(b_gpu.data)
 @test :done in keys(b_gpu.data)
-@test :weight in keys(b_gpu.data)
+@test haskey(bpriority, :weight)
 
 ## Base functions 
 @test keys(b) == keys(b.data)
@@ -211,10 +212,10 @@ end
 ## sampling
 
 # uniform sample
-t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 rand!(Random.GLOBAL_RNG, t, b)
 
-t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3)
 rng = MersenneTwister(0)
 ids = rand(rng, 1:length(b), 3)
 rand!(MersenneTwister(0), t, b)
@@ -236,7 +237,7 @@ t3 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 d = Dict(:s => 3*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t3, d)
 
-t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10, gae = true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
 
 @test all(t[:s][:, 1:4] .== 1.0)
@@ -248,8 +249,9 @@ rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
 # Priority samples
 bpriority[:s] .= rand(Float32, 2, 6)
 update_priorities!(bpriority, [1:6...], [1.:6. ...])
-t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 1000, gae=true)
+t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 1000, [:weight])
 priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
+
 
 rand!(rng, t, bpriority)
 

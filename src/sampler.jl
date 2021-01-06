@@ -4,20 +4,20 @@
     S::T1 # State space
     A::T2 # Action space
     max_steps::Int = 100
+    required_columns::Array{Symbol} = []
+    γ::Float32 = discount(mdp)
+    λ::Float32 = NaN32
     exploration_policy::Union{ExplorationPolicy, Nothing} = nothing
     rng::AbstractRNG = Random.GLOBAL_RNG
-    s::V = rand(rng, initialstate(mdp))
-    svec::AbstractArray = initial_observation(mdp, s, rng)
+    s::V = rand(rng, initialstate(mdp)) # Current State
+    svec::AbstractArray = initial_observation(mdp, s, rng) # Current observation
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π::Policy, S::T1, A::T2; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) where {T1 <: AbstractSpace, T2 <: AbstractSpace} = 
-    Sampler(mdp = mdp, π = π, S = S, A = A, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng)
+Sampler(mdp, π::Policy, S, A; kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
 
-function Sampler(mdps::AbstractVector, π::Policy, S::T1, A::T2; max_steps = 100, exploration_policy = nothing, rng = Random.GLOBAL_RNG) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
-    [Sampler(mdp = mdps[i], π = π, S = S, A = A, max_steps = max_steps, exploration_policy = exploration_policy, rng = rng) for i in 1:length(mdps)]
-end
+Sampler(mdps::AbstractVector, π::Policy, S, A; kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))
@@ -33,17 +33,15 @@ function initial_observation(mdp, s, rng)
     end
 end
 
-function terminate_episode!(sampler::Sampler, data, j; baseline = nothing, γ::Float32 = 0f0)
-    if !isnothing(baseline)
-        eprange = j - sampler.episode_length + 1: j
-        fill_gae!(data, eprange, baseline.V, baseline.λ, γ)
-        fill_returns!(data, eprange, γ)
-    end
+function terminate_episode!(sampler::Sampler, data, j)
+    haskey(data, :episode_end) && (data[:episode_end][1,j] = true)
+    ep = j - sampler.episode_length + 1 : j
+    haskey(data, :advantage) && fill_gae!(data, ep, sampler.π, sampler.λ, sampler.γ)
+    haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
     reset_sampler!(sampler)
 end
     
-
-function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0)
+function step!(data, j::Int, sampler::Sampler; explore = false, i = 0)
     a = explore ? action(sampler.exploration_policy, sampler.π, i, sampler.svec) : action(sampler.π, sampler.svec)
     if sampler.mdp isa POMDP
         sp, o, r = gen(sampler.mdp, sampler.s, a, sampler.rng)
@@ -56,46 +54,50 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0, baseline 
 
     # Save the tuple
     bslice(data[:s], j) .= reshape(sampler.svec, dim(sampler.S)...)
-    data[:a][:, j] .= useonehot(sampler.A) ? Flux.onehot(a, actions(sampler.mdp)) : a
+    data[:a][:, j] .= useonehot(sampler.A) ? Flux.onehot(a, actions(sampler.mdp)) : a  
     bslice(data[:sp], j) .= reshape(spvec, dim(sampler.S)...)
     data[:r][1, j] = r
     data[:done][1, j] = done
     
+    # Handle optional data storage
+    haskey(data, :logprob) && (data[:logprob][1, j] = logpdf(sampler.π, bslice(data[:s], j), data[:a][:, j])[1])  
+    haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
+    
     # Cut the episode short if needed
     sampler.episode_length += 1
     if done || sampler.episode_length >= sampler.max_steps 
-        terminate_episode!(sampler, data, j, baseline = baseline, γ = γ)
+        terminate_episode!(sampler, data, j)
     else
         sampler.s = sp
         sampler.svec = spvec
     end
 end
 
-function steps!(sampler::Sampler; Nsteps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, reset = false)
-    data = mdp_data(sampler.S, sampler.A, Nsteps, gae = !isnothing(baseline))
+function steps!(sampler::Sampler; Nsteps = 1, explore = false, i = 0, reset = false)
+    data = mdp_data(sampler.S, sampler.A, Nsteps, sampler.required_columns)
     for j=1:Nsteps
-        step!(data, j, sampler, explore = explore, i = i + (j-1), baseline = baseline, γ = γ)
+        step!(data, j, sampler, explore = explore, i = i + (j-1))
     end
-    reset && terminate_episode!(sampler, data, Nsteps, baseline = baseline, γ = γ)
+    reset && terminate_episode!(sampler, data, Nsteps)
     data
 end
 
-function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, reset = false) where {T<:Sampler}
-    data = mdp_data(samplers[1].S, samplers[1].A, Nsteps*length(samplers), gae = !isnothing(baseline))
+function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, reset = false) where {T<:Sampler}
+    data = mdp_data(samplers[1].S, samplers[1].A, Nsteps*length(samplers), samplers[1].required_columns)
     j = 1
     for s=1:Nsteps
         for sampler in samplers
-            step!(data, j, sampler, explore = explore, i = i + (j-1), baseline = baseline, γ = γ)
+            step!(data, j, sampler, explore = explore, i = i + (j-1))
             j += 1
         end
     end
-    reset && terminate_episode!(sampler, data, Nsteps, baseline = baseline, γ = γ)
+    reset && terminate_episode!(sampler, data, Nsteps)
     data
 end
 
-function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, baseline = nothing, γ::Float32 = 0f0, return_episodes = false)
+function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, return_episodes = false)
     reset_sampler!(sampler)
-    data = mdp_data(sampler.S, sampler.A, Neps*sampler.max_steps, gae = !isnothing(baseline))
+    data = mdp_data(sampler.S, sampler.A, Neps*sampler.max_steps, sampler.required_columns)
     episode_starts = zeros(Int, Neps)
     episode_ends = zeros(Int, Neps)
     j, k = 0, 1
@@ -103,7 +105,7 @@ function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, baseline 
         episode_starts[k] = j+1
         while true
             j = j+1
-            step!(data, j, sampler, explore = explore, i = i + (i-1), baseline = baseline, γ = γ)
+            step!(data, j, sampler, explore = explore, i = i + (i-1))
             if sampler.episode_length == 0
                 episode_ends[k] = j
                 sampler.episode_checker(data, episode_starts[k], j) ? (k = k+1) : (j = episode_starts[k])
@@ -153,16 +155,23 @@ end
     
     
 ## Generalized Advantage Estimation
-function fill_gae!(data, episode_range, V, λ::Float32, γ::Float32)
+function fill_gae!(d::ExperienceBuffer, V, λ::Float32, γ::Float32)
+    eps = episodes(d)
+    for ep in eps
+        fill_gae!(d, ep, V, λ, γ)
+    end
+end
+
+function fill_gae!(d, episode_range, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
-    nd = ndims(data[:s])
+    nd = ndims(d[:s])
     for i in reverse(episode_range)
-        Vsp = V(bslice(data[:sp], i))
-        Vs = V(bslice(data[:s], i))
+        Vsp = value(V, bslice(d[:sp], i))
+        Vs = value(V, bslice(d[:s], i))
         @assert length(Vs) == 1
-        A = c*A + data[:r][1,i] + (1.f0 - data[:done][1,i])*γ*Vsp[1] - Vs[1]
+        A = c*A + d[:r][1,i] + (1.f0 - d[:done][1,i])*γ*Vsp[1] - Vs[1]
         @assert !isnan(A)
-        data[:advantage][:, i] .= A
+        d[:advantage][:, i] .= A
     end
 end
 

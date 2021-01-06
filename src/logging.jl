@@ -131,5 +131,5 @@ end
 gif(mdp, policy, filename; rng::AbstractRNG = Random.GLOBAL_RNG, fps = 15, Neps = 1, max_steps = 1000) = gif(episode_frames(mdp, policy, rng, Neps = Neps, max_steps = max_steps), filename, fps = fps)
 
 function gif(frames, filename; fps = 15)
-    Images.save(filename, cat(frames..., dims = 3), fps = fps)
+    save(filename, cat(frames..., dims = 3), fps = fps)
 end

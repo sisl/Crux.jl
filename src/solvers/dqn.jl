@@ -6,11 +6,11 @@
     rng::AbstractRNG = Random.GLOBAL_RNG
     exploration_policy::ExplorationPolicy = EpsGreedyPolicy(LinearDecaySchedule(start=1., stop=0.1, steps=N/2), rng, π.actions)
     L::Function = Flux.Losses.huber_loss
-    regularizer::Function = (θ) -> 0
+    regularizer = (θ) -> 0
     opt = ADAM(1e-3)
     batch_size::Int = 32
     max_steps::Int = 100
-    eval_eps::Int = 100
+    eval_eps::Int = 10
     Δtrain::Int = 4 
     Δtarget_update::Int = 2000
     buffer_size = 1000

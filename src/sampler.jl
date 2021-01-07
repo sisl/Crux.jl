@@ -117,7 +117,7 @@ function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, return_ep
     return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
-function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{Sampler}}, N::Int; i = 1)
+function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{T}}, N::Int; i = 1) where {T <: Sampler}
     Nfill = max(0, N - length(b))
     Nfill > 0 && push!(b, steps!(s, i = i, Nsteps = Nfill))
     Nfill

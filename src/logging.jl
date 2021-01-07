@@ -81,7 +81,7 @@ function plot_learning(input;
         thick_every = 1
     )
     # Get the directories we care about
-    dirs = []
+    dirs = input
     input isa Array && all([input[i] isa Solver for i=1:length(input)]) && (dirs = [input[i].log.logger.logdir for i=1:length(input)])
     input isa Solver && (dirs = [input.log.logger.logdir])
     input isa String && (dirs = [input])
@@ -101,6 +101,7 @@ function plot_learning(input;
     plot!(p, ylabel = ylabel, xlabel = xlabel, legend = legend, title = title, fontfamily = font)
     for i in 1:length(dirs)
         x, y = readtb(dirs[i], values[i])
+        println("length of x: ", length(x), " length of y: ", length(y))
         plot!(p, x, y, alpha = 0.3, color = colors(i), label = "")
         plot!(p, x, smooth(y), color = colors(i), label = labels[i], linewidth =2 )
     end

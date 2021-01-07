@@ -39,7 +39,7 @@ module Crux
            gif
     include("logging.jl")
     
-    export init_fisher_diagonal, add_fisher_information_diagonal!, update_fisher_diagonal!
+    export DiagonalFisherRegularizer, add_fisher_information_diagonal!, update_fisher!
     include("extras/fisher_information.jl")
     
     export MultitaskDecaySchedule, sequential_learning, experience_replay, ewc

@@ -51,11 +51,10 @@ module Crux
     export DQNSolver
     include("solvers/dqn.jl")
     
-    export DQNGAILSolver
-    include("solvers/dqn_gail.jl")
-    
     export PGSolver, ppo, reinforce, a2c
     include("solvers/actor_critic.jl")
     
+    export GAILSolver
+    include("solvers/gail.jl")
 end
 

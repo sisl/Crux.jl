@@ -1,3 +1,5 @@
+using CUDA
+CUDA.allowscalar(false)
 include("util_tests.jl")
 include("experience_buffer_tests.jl")
 include("sampler_tests.jl")

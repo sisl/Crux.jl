@@ -106,8 +106,8 @@ d2 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:weight, :t, :advant
 @test_throws ErrorException  mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:bad_key])
 d3 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, ArrayType = CuArray)
 
-@test d1[:s] == zeros(Float32, 3, 100) && d2[:s] == zeros(Float32, 3, 100) && d3[:s] == zeros(Float32, 3, 100)
-@test d1[:sp] == zeros(Float32, 3, 100) && d2[:sp] == zeros(Float32, 3, 100) && d3[:sp] == zeros(Float32, 3, 100)
+@test d1[:s] == zeros(Float32, 3, 100) && d2[:s] == zeros(Float32, 3, 100) && size(d3[:s]) == (3, 100)
+@test d1[:sp] == zeros(Float32, 3, 100) && d2[:sp] == zeros(Float32, 3, 100) && size(d3[:sp]) == (3, 100)
 @test d1[:a] == zeros(Bool, 4, 100) && size(d2[:a]) == (4, 100) && size(d3[:a]) == (4, 100)
 @test d1[:r] == zeros(Float32, 1, 100) && size(d2[:r]) == (1, 100) && size(d3[:r]) == (1, 100)
 @test d1[:done] == zeros(Bool, 1, 100) && size(d2[:done]) == (1, 100) && size(d3[:done]) == (1, 100)

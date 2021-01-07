@@ -60,7 +60,7 @@ function POMDPs.solve(𝒮::PGSolver, mdp)
         push!(𝒟, steps!(s, Nsteps = 𝒮.ΔN, reset = true))
         
         # Train the policy (using batches)
-        losses, grads = train!(𝒮.π, (D) -> 𝒮.loss(𝒮.π, D), 𝒟, 𝒮.batch_size, 𝒮.opt, 𝒮.device, epochs = 𝒮.epochs, rng = 𝒮.rng)
+        losses, grads = train!(𝒮.π, (D) -> 𝒮.loss(𝒮.π, D), 𝒮.batch_size, 𝒮.opt, 𝒟, epochs = 𝒮.epochs, rng = 𝒮.rng)
         
         # Log the results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 

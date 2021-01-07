@@ -1,6 +1,6 @@
 ## General GPU support for policies
 
-function Flux.Optimise.train!(π::Policy, loss::Function, opt, device; regularizer = (θ) -> 0)
+function Flux.Optimise.train!(π, loss::Function, opt; regularizer = (θ) -> 0)
     θ = Flux.params(π)
     l, back = Flux.pullback(() -> loss() + regularizer(θ), θ)
     grad = back(1f0)
@@ -11,13 +11,20 @@ function Flux.Optimise.train!(π::Policy, loss::Function, opt, device; regulariz
 end
 
 # Train with minibatches and epochs
-function Flux.Optimise.train!(π::Policy, loss::Function, 𝒟::ExperienceBuffer, B, opt, device; epochs = 1, rng::AbstractRNG = Random.GLOBAL_RNG)
+function Flux.Optimise.train!(π, loss::Function, B, opt, 𝒟::ExperienceBuffer...; epochs = 1, rng::AbstractRNG = Random.GLOBAL_RNG)
     losses, grads = [], []
     for epoch in 1:epochs
-        shuffle!(rng, 𝒟)
-        for i in partition(1:length(𝒟), B)
-            mb = minibatch(𝒟, i)
-            l, g = train!(π, ()->loss(mb), opt, device)
+        
+        # Shuffle the experience buffers
+        for D in 𝒟
+            shuffle!(rng, D)
+        end
+        
+        # Call train for each minibatch
+        partitions = [partition(1:length(D), B) for D in 𝒟]
+        for indices in zip(partitions...)
+            mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
+            l, g = train!(π, ()->loss(mbs...), opt)
             push!(losses, l)
             push!(grads, g)
         end
@@ -119,7 +126,7 @@ end
 
 entropy(π::GaussianPolicy, s::AbstractArray) = 1.4189385332046727f0 .+ π.logΣ # 1.4189385332046727 = 0.5 + 0.5 * log(2π)
 
-action_space(π::GaussianPolicy) = ContinuousSpace((length(π.logΣ),), typeof(π.logΣ[1]))
+action_space(π::GaussianPolicy) = ContinuousSpace((length(π.logΣ),), typeof(cpu(π.logΣ)[1]))
 
 ## Linear Policy - Archived for now
 # @with_kw mutable struct LinearBaseline <: Baseline

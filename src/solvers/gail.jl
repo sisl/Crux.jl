@@ -10,11 +10,11 @@ end
 ## Discriminator stuff
 const LBCE = Flux.Losses.logitbinarycrossentropy
 
-function Lᴰ(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer)
+function Lᴰ(D, 𝒟_expert, 𝒟_π)
     LBCE(q_predicted(D, 𝒟_expert), 1.f0) + LBCE(q_predicted(D, 𝒟_π), 0.f0)
 end
 
-function Lᴰ_nda(D, 𝒟_expert::ExperienceBuffer, 𝒟_π::ExperienceBuffer, 𝒟_nda::ExperienceBuffer, λ_nda::Float32)
+function Lᴰ_nda(D, 𝒟_expert, 𝒟_π, 𝒟_nda, λ_nda::Float32)
     LBCE(q_predicted(D, 𝒟_expert), 1.f0) +  LBCE(q_predicted(D, 𝒟_π), 0.f0) + λ_nda*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
 end
 
@@ -90,7 +90,7 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{PGSolver}, mdp)
         push!(𝒟, steps!(s, Nsteps = 𝒮.ΔN, reset = true))
         
         # Train the discriminator (using batches)
-        if isnothing(𝒮.nda_buffer)
+        if isnothing(𝒮GAIL.nda_buffer)
             lossD, gradD = train!(𝒮GAIL.D, 
                                   (Dexp, Dπ) -> Lᴰ(𝒮GAIL.D, Dexp, Dπ), 
                                   𝒮.batch_size, 𝒮GAIL.optD, 

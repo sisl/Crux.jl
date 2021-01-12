@@ -10,11 +10,11 @@ end
 ## Discriminator stuff
 const LBCE = Flux.Losses.logitbinarycrossentropy
 
-function Lᴰ(D, 𝒟_expert, 𝒟_π)
+function dqn_Lᴰ(D, 𝒟_expert, 𝒟_π)
     LBCE(q_predicted(D, 𝒟_expert), 1.f0) + LBCE(q_predicted(D, 𝒟_π), 0.f0)
 end
 
-function Lᴰ_nda(D, 𝒟_expert, 𝒟_π, 𝒟_nda, λ_nda::Float32)
+function dqn_Lᴰ_nda(D, 𝒟_expert, 𝒟_π, 𝒟_nda, λ_nda::Float32)
     LBCE(q_predicted(D, 𝒟_expert), 1.f0) +  LBCE(q_predicted(D, 𝒟_π), 0.f0) + λ_nda*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
 end
 
@@ -48,9 +48,9 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{DQNSolver}, mdp)
         
         # train the discrimnator
         if isnothing(𝒮GAIL.nda_buffer)
-            lossD, gradD = train!(𝒮GAIL.D, () -> Lᴰ(𝒮GAIL.D, 𝒟_expert, 𝒟_π), 𝒮GAIL.optD)
+            lossD, gradD = train!(𝒮GAIL.D, () -> dqn_Lᴰ(𝒮GAIL.D, 𝒟_expert, 𝒟_π), 𝒮GAIL.optD)
         else
-            lossD, gradD = train!(𝒮GAIL.D, () -> Lᴰ_nda(𝒮GAIL.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮GAIL.λ_nda), 𝒮GAIL.optD)
+            lossD, gradD = train!(𝒮GAIL.D, () -> dqn_Lᴰ_nda(𝒮GAIL.D, 𝒟_expert, 𝒟_π, 𝒟_nda, 𝒮GAIL.λ_nda), 𝒮GAIL.optD)
         end
         
         # Compute target, update priorities, and train the generator.
@@ -74,6 +74,14 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{DQNSolver}, mdp)
 end
 
 ## PG-GAIL stuff
+function pg_Lᴰ(D, 𝒟_expert, 𝒟_π)
+    LBCE(value(D, vcat(𝒟_expert[:s], 𝒟_expert[:a])), 1.f0) + LBCE(value(D, vcat(𝒟_π[:s], 𝒟_π[:a])), 0.f0)
+end
+
+# function pg_Lᴰ_nda(D, 𝒟_expert, 𝒟_π, 𝒟_nda, λ_nda::Float32)
+#     LBCE(q_predicted(D, 𝒟_expert), 1.f0) +  LBCE(q_predicted(D, 𝒟_π), 0.f0) + λ_nda*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
+# end
+
 function POMDPs.solve(𝒮GAIL::GAILSolver{PGSolver}, mdp)
     𝒮 = 𝒮GAIL.G # pull out the main solver
     
@@ -92,25 +100,31 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{PGSolver}, mdp)
         # Train the discriminator (using batches)
         if isnothing(𝒮GAIL.nda_buffer)
             lossD, gradD = train!(𝒮GAIL.D, 
-                                  (Dexp, Dπ) -> Lᴰ(𝒮GAIL.D, Dexp, Dπ), 
+                                  (Dexp, Dπ) -> pg_Lᴰ(𝒮GAIL.D, Dexp, Dπ), 
                                   𝒮.batch_size, 𝒮GAIL.optD, 
                                   𝒮GAIL.expert_buffer, 𝒟,
                                   epochs = 𝒮.epochs, rng = 𝒮.rng)
         else
-            lossD, gradD = train!(𝒮GAIL.D, 
-                                  (Dexp, Dπ, Dnda) -> Lᴰ_nda(𝒮GAIL.D, Dexp, Dπ, Dnda, 𝒮GAIL.λ_nda), 
-                                  𝒮.batch_size, 𝒮GAIL.optD, 
-                                  𝒮GAIL.expert_buffer, 𝒟, 𝒮GAIL.nda_buffer, 
-                                  epochs = 𝒮.epochs, rng = 𝒮.rng)
+            error("not implemented")
+            # lossD, gradD = train!(𝒮GAIL.D, 
+                                  # (Dexp, Dπ, Dnda) -> Lᴰ_nda(𝒮GAIL.D, Dexp, Dπ, Dnda, 𝒮GAIL.λ_nda), 
+                                  # 𝒮.batch_size, 𝒮GAIL.optD, 
+                                  # 𝒮GAIL.expert_buffer, 𝒟, 𝒮GAIL.nda_buffer, 
+                                  # epochs = 𝒮.epochs, rng = 𝒮.rng)
         end
+        
+        𝒟[:advantage] .= value(𝒮GAIL.D, vcat(𝒟[:s], 𝒟[:a]))
+            
         
         # Train the policy (using batches)
         losses, grads = train!(𝒮.π, (D) -> 𝒮.loss(𝒮.π, D), 𝒮.batch_size, 𝒮.opt, 𝒟, epochs = 𝒮.epochs, rng = 𝒮.rng)
         
         # Log the results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 
-                                        log_loss(losses),
-                                        log_gradient(grads))
+                                        log_loss(losses, suffix = "G"),
+                                        log_gradient(grads, suffix = "G"),
+                                        log_loss(lossD, suffix = "D"),
+                                        log_gradient(gradD, suffix = "D"),)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

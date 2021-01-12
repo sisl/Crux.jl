@@ -8,7 +8,8 @@ as = actions(mdp)
 S = state_space(mdp)
 
 Q() = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as)))
-D() = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as), sigmoid))
+D_PG() = Chain(Dense(dim(S)[1] + length(as), 64, relu), Dense(64, 64, relu), Dense(64, 1, sigmoid))
+D_DQN() = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as), sigmoid))
 V() = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1))
 A() = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as)), softmax)
 
@@ -22,7 +23,7 @@ sum(expert_trajectories[:r])
 
 
 # Solve with DQN-GAIL
-𝒮_gail = GAILSolver(D =D(), 
+𝒮_gail = GAILSolver(D =D_DQN(), 
                     G = DQNSolver(π = DQNPolicy(Q = Q(), actions = as), S = S, N=10000),
                     expert_buffer = expert_trajectories)
 solve(𝒮_gail, mdp)
@@ -30,7 +31,7 @@ solve(𝒮_gail, mdp)
 # Solve with PPO-GAIL
 𝒮_ppo = PGSolver(π = ActorCritic(CategoricalPolicy(A = A(), actions = as), V()), 
                 S = S, N=10000, ΔN = 500, loss = ppo())
-𝒮_gail = GAILSolver(D = D(), 
+𝒮_gail = GAILSolver(D = D_PG(), 
                     G = 𝒮_ppo,
                     expert_buffer = expert_trajectories)
 solve(𝒮_gail, mdp)

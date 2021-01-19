@@ -1,44 +1,3 @@
-## General GPU support for policies
-
-function Flux.Optimise.train!(π, loss::Function, opt; regularizer = (θ) -> 0)
-    θ = Flux.params(π)
-    l, back = Flux.pullback(() -> loss() + regularizer(θ), θ)
-    grad = back(1f0)
-    gnorm = norm(grad, p=Inf)
-    @assert !isnan(gnorm)
-    Flux.update!(opt, θ, grad)
-    l, gnorm
-end
-
-# Train with minibatches and epochs
-function Flux.Optimise.train!(π, loss::Function, B, opt, 𝒟::ExperienceBuffer...; epochs = 1, rng::AbstractRNG = Random.GLOBAL_RNG)
-    losses, grads = [], []
-    for epoch in 1:epochs
-        
-        # Shuffle the experience buffers
-        for D in 𝒟
-            shuffle!(rng, D)
-        end
-        
-        # Call train for each minibatch
-        partitions = [partition(1:length(D), B) for D in 𝒟]
-        for indices in zip(partitions...)
-            mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
-            l, g = train!(π, ()->loss(mbs...), opt)
-            push!(losses, l)
-            push!(grads, g)
-        end
-    end
-    losses, grads
-end
-
-
-
-
-## helpers
-POMDPs.value(c::Chain, s::AbstractArray) = mdcall(c, s, device(c))
-
-
 ## Deep Q-network Policy
 @with_kw mutable struct DQNPolicy <: Policy
     Q
@@ -112,16 +71,15 @@ Flux.trainable(π::GaussianPolicy) = (Flux.trainable(π.μ)..., π.logΣ)
 
 function POMDPs.action(π::GaussianPolicy, s::AbstractArray)
     μ, logΣ = mdcall(π.μ, s, π.device), device(s)(π.logΣ)
-    d = MvNormal(μ, diagm(0=>exp.(logΣ).^2))
+    d = MvNormal(μ, exp.(logΣ))
     a = rand(π.rng, d)
 end
 
 function logpdf(π::GaussianPolicy, s::AbstractArray, a::AbstractArray)
     μ = mdcall(π.μ, s, π.device)
     logΣ = device(s)(π.logΣ)
-    σ = exp.(logΣ)
-    σ² = σ.^2
-    sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.4594692666f0 .- log.(σ), dims = 1) # 0.4594692666f0 = 0.5*log.(sqrt(2π))
+    σ² = exp.(logΣ).^2
+    sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.9189385332046727f0 .- logΣ, dims = 1) # 0.9189385332046727f0 = log.(sqrt(2π))
 end
 
 entropy(π::GaussianPolicy, s::AbstractArray) = 1.4189385332046727f0 .+ π.logΣ # 1.4189385332046727 = 0.5 + 0.5 * log(2π)

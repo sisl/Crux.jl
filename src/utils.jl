@@ -77,7 +77,12 @@ mdcall(F, x, device) = device == gpu ? gpucall(F,x) : cpucall(F, x)
     end
 end
 
+## generic call for a chain 
+POMDPs.value(c::Chain, s::AbstractArray) = mdcall(c, s, device(c))
+
 ## Flux stuff
+whiten(v::AbstractArray) = (v .- mean(v)) ./ std(v)
+    
 function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
     v = []
     for θ in grads.params

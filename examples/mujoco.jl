@@ -1,24 +1,31 @@
-using Crux, Flux, POMDPs, POMDPGym
+using Crux, Flux, POMDPs, POMDPGym, Distributions
 init_mujoco_render()
 
 mdp = GymPOMDP(:HalfCheetah, version = :v3)
 S = state_space(mdp)
-adim = length(actions(mdp)[1])
+adim = length(POMDPs.actions(mdp)[1])
 
-μ() = Chain(Dense(S.dims[1], 100, relu), Dense(100, 50, relu), Dense(50, 25, relu), Dense(25, adim))
-V() = Chain(Dense(S.dims[1], 100, relu), Dense(100, 50, relu), Dense(50, 25, relu), Dense(25, 1))
-log_std() = zeros(Float32, adim)
+Winit(out, in) = rand(Uniform(Float32(-sqrt(1/in)), Float32(sqrt(1/in))), out, in)
+binit(in) = (out) -> rand(Uniform(Float32(-sqrt(1/in)), Float32(sqrt(1/in))), out)
 
+μ() = Chain(Dense(S.dims[1], 64, tanh, initW = Winit, initb = binit(S.dims[1])), Dense(64, 32, tanh, initW = Winit, initb = binit(64)), Dense(32, adim, initW = Winit, initb = binit(32)))
+V() = Chain(Dense(S.dims[1], 64, tanh, initW = Winit, initb = binit(S.dims[1])), Dense(64, 32, tanh, initW = Winit, initb = binit(64)), Dense(32, 1, initW = Winit, initb = binit(32)))
+log_std() = -0.5*ones(Float32, adim)
 
 # Solve with ppo
 𝒮_ppo = PGSolver(π = ActorCritic(GaussianPolicy(μ = μ(), logΣ = log_std()), V()), 
                  S = S, 
-                 max_steps = 500, 
+                 max_steps = 1000, 
                  loss = ppo(λₑ = 0f0),
-                 ΔN = 2048,
-                 epochs = 10,
-                 N = 1200000, 
-                 opt = Flux.Optimiser(ClipNorm(1f0), ADAM(1e-4)))
+                 ΔN = 4000,
+                 λ_gae = 0.97,
+                 batch_size = 4000,
+                 epochs = 80,
+                 early_stopping = (info) -> info[:kl] > 0.015,
+                 N = 3000000, 
+                 opt = ADAM(3e-4),
+                 opt_v = ADAM(1e-3)
+                 )
 solve(𝒮_ppo, mdp)
 
 p = plot_learning(𝒮_ppo, title = "HalfCheetah Training Curves")

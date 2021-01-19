@@ -46,15 +46,14 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         # Compute target, td_error and td_loss for backprop
         y = target(𝒮.π.Q⁻, 𝒟, γ)
         isprioritized && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
-        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L, isprioritized), 𝒮.opt, regularizer = 𝒮.regularizer)
+        info = train!(𝒮.π, (;kwargs...) -> td_loss(𝒮.π, 𝒟, y, 𝒮.L, isprioritized; kwargs...), 𝒮.opt, regularizer = 𝒮.regularizer)
         
         # Update target network
         elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)
         
         # Log results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 
-                                            log_loss(loss),
-                                            log_gradient(grad),
+                                            info,
                                             log_exploration(𝒮.exploration_policy, 𝒮.i))
     end
     𝒮.i += 𝒮.Δtrain

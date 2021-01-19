@@ -17,9 +17,9 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     i = i[end]
     p.verbose && print("Step: $i")
     for dict in [data..., p.extras...]
-        d = dict()
+        d = dict isa Function ? dict() : dict
         for (k,v) in d
-            log_value(p.logger, k, v, step = i)
+            log_value(p.logger, string(k), v, step = i)
             p.verbose && print(", ", k, ": ", v)
         end
     end
@@ -27,6 +27,10 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
 end
 # @printf("%5d / %5d eps %0.3f |  avgR %1.3f | Loss %2.3e | Grad %2.3e | EvalR %1.3f \n",
                         #t, solver.max_steps, nt[1], avg100_reward, loss_val, grad_val, scores_eval)
+                        
+function aggregate_info(infos)
+    res = Dict(k => mean([info[k] for info in infos]) for k in keys(infos[1]))
+end
 
 # Built-in functions for logging common training things
 log_performance(s::AbstractVector, name, fn; kwargs...) = Dict("$(name)/T$i" => fn(s[i]; kwargs...) for i=1:length(s))
@@ -108,7 +112,7 @@ function plot_learning(input;
     p
 end
 
-function episode_frames(mdp, policy, rng::AbstractRNG = Random.GLOBAL_RNG; Neps = 1, max_steps = 1000)
+function episode_frames(mdp, policy, rng::AbstractRNG = Random.GLOBAL_RNG; Neps = 1, max_steps = 1000, use_obs = false)
     frames = []
     for i = 1:Neps
         s = rand(initialstate(mdp))
@@ -123,13 +127,13 @@ function episode_frames(mdp, policy, rng::AbstractRNG = Random.GLOBAL_RNG; Neps 
                 s, _ = gen(mdp, s, a, rng)
                 o = convert_s(AbstractArray, s, mdp)
             end
-            push!(frames, render(mdp, s, a))
+            use_obs ? push!(frames, o') : push!(frames, render(mdp, s, a))
         end
     end
     frames
 end
 
-gif(mdp, policy, filename; rng::AbstractRNG = Random.GLOBAL_RNG, fps = 15, Neps = 1, max_steps = 1000) = gif(episode_frames(mdp, policy, rng, Neps = Neps, max_steps = max_steps), filename, fps = fps)
+gif(mdp, policy, filename; rng::AbstractRNG = Random.GLOBAL_RNG, fps = 15, Neps = 1, max_steps = 1000, use_obs = false) = gif(episode_frames(mdp, policy, rng, Neps = Neps, max_steps = max_steps, use_obs = use_obs), filename, fps = fps)
 
 function gif(frames, filename; fps = 15)
     save(filename, cat(frames..., dims = 3), fps = fps)

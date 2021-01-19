@@ -15,9 +15,9 @@
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π::Policy, S, A; kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
+Sampler(mdp, π::Policy, S, A = action_space(π); kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
 
-Sampler(mdps::AbstractVector, π::Policy, S, A; kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, π::Policy, S, A = action_space(π); kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))

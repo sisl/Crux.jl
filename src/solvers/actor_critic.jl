@@ -94,7 +94,7 @@ function POMDPs.solve(𝒮::PGSolver, mdp)
         𝒮.normalize_advantage && (𝒟[:advantage] .= whiten(𝒟[:advantage]))
         
         # Train the policy (using batches)
-        info_π = train!(𝒮.π, 𝒮.loss, 𝒮.batch_size, 𝒮.opt, 𝒟, 
+        info = train!(𝒮.π, 𝒮.loss, 𝒮.batch_size, 𝒮.opt, 𝒟, 
                         epochs = 𝒮.epochs, 
                         rng = 𝒮.rng, 
                         regularizer = 𝒮.regularizer, 
@@ -110,10 +110,11 @@ function POMDPs.solve(𝒮::PGSolver, mdp)
                             regularizer = 𝒮.regularizer,
                             loss_sym = :value_loss, 
                             grad_sym = :value_grad_norm)
+            merge!(info, info_v)
         end
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_undiscounted_return(s, Neps = 𝒮.eval_eps), info_π, info_v)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, log_undiscounted_return(s, Neps = 𝒮.eval_eps), info)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

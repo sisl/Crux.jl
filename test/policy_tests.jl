@@ -6,7 +6,7 @@ using POMDPGym
 using POMDPPolicies
 using Random
 using Statistics
-
+using Distributions
 
 
 ## DQN Policy
@@ -41,12 +41,11 @@ d = MvNormal(μ()(rand(17)), exp.(log_std()))
 std(rand(d, 10000))
 
 s = rand(17)
-meanval, logΣval = mdcall(p.μ, s, p.device), device(s)(p.logΣ)
+meanval, logΣval = mdcall(p.μ, s, p.device), Crux.device(s)(p.logΣ)
 d = MvNormal(meanval, exp.(logΣval))
 
-a = [POMDPs.action(p, rand(Normal(0, 1), 17))[1] for i=1:10000]
+a = [POMDPs.action(p, rand(Normal(0, .1), 17))[1] for i=1:100000]
 
-std(a)
 @test abs(std(a) .- exp(-0.5)) < 1e-2
 @test abs(mean(a)) < 1e-2
 
@@ -54,7 +53,7 @@ std(a)
 
 V() = Chain(Dense(S.dims[1], 64, tanh), Dense(64, 32, tanh), Dense(32, 1))
 p = ActorCritic(GaussianPolicy(μ = μ(), logΣ = log_std()), V())
-a = [POMDPs.action(p, rand(Normal(), 5))[1] for i=1:100000]
+a = [POMDPs.action(p, rand(Normal(0, 0.1), 17))[1] for i=1:100000]
 @test abs(std(a) .- exp(-0.5)) < 1e-2
 @test abs(mean(a)) < 1e-2
 

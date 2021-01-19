@@ -105,7 +105,6 @@ function plot_learning(input;
     plot!(p, ylabel = ylabel, xlabel = xlabel, legend = legend, title = title, fontfamily = font)
     for i in 1:length(dirs)
         x, y = readtb(dirs[i], values[i])
-        println("length of x: ", length(x), " length of y: ", length(y))
         plot!(p, x, y, alpha = 0.3, color = colors(i), label = "")
         plot!(p, x, smooth(y), color = colors(i), label = labels[i], linewidth =2 )
     end

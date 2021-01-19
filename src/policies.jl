@@ -6,6 +6,8 @@
     Q⁻ = deepcopy(Q)
 end
 
+DQNPolicy(Q, actions::Vector; kwargs...) = DQNPolicy(Q = Q, actions = actions; kwargs...)
+
 Flux.trainable(π::DQNPolicy) = Flux.trainable(π.Q)
 
 POMDPs.action(π::DQNPolicy, s::S) where S <: AbstractArray = π.actions[argmax(value(π, s))]
@@ -41,6 +43,8 @@ entropy(π::ActorCritic, s::AbstractArray) = entropy(π.A, s)
     rng::AbstractRNG = Random.GLOBAL_RNG
 end
 
+CategoricalPolicy(A, actions::Vector; kwargs...) = CategoricalPolicy(A = A, actions = actions; kwargs...)
+
 Flux.trainable(π::CategoricalPolicy) = Flux.trainable(π.A)
 
 POMDPs.action(π::CategoricalPolicy, s::AbstractArray) = π.actions[rand(π.rng, Categorical(logits(π, s)[:]))]
@@ -66,6 +70,8 @@ action_space(π::CategoricalPolicy) = DiscreteSpace(length(π.actions))
     device = device(μ)
     rng::AbstractRNG = Random.GLOBAL_RNG
 end
+
+GaussianPolicy(μ, logΣ; kwargs...) = GaussianPolicy(μ = μ, logΣ = logΣ; kwargs...)
 
 Flux.trainable(π::GaussianPolicy) = (Flux.trainable(π.μ)..., π.logΣ)
 

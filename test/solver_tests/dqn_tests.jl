@@ -9,11 +9,11 @@ N = 1000
 Qnet = Chain(x -> (x .- 5.f0 ) ./ 5.f0, Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 4))
 
 ## cpu
-𝒮 = DQNSolver(π = DQNPolicy(Q = deepcopy(Qnet), actions = as), S = S, N=N, rng = MersenneTwister(0))
+𝒮 = DQNSolver(π = DQNPolicy(deepcopy(Qnet), as), S = S, N=N, rng = MersenneTwister(0))
 p = solve(𝒮, mdp)
 
 ## gpu
-𝒮_gpu = DQNSolver(π = DQNPolicy(Q = deepcopy(Qnet) |> gpu, actions = as), S = S, N=N, rng = MersenneTwister(0))
+𝒮_gpu = DQNSolver(π = DQNPolicy(deepcopy(Qnet) |> gpu, as), S = S, N=N, rng = MersenneTwister(0))
 p = solve(𝒮_gpu, mdp)
 
 s = rand(2, 100)
@@ -23,6 +23,6 @@ V2 = value(𝒮_gpu.π, s)
 
 ## cpu - prioritized
 buffer = ExperienceBuffer(S, DiscreteSpace(4), 1000, prioritized = true)
-𝒮_prio =  DQNSolver(π = DQNPolicy(Q = deepcopy(Qnet), actions = as), S = S, N=N, buffer = buffer)
+𝒮_prio =  DQNSolver(π = DQNPolicy(deepcopy(Qnet), as), S = S, N=N, buffer = buffer)
 p = solve(𝒮_prio, mdp)
 

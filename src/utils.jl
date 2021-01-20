@@ -43,9 +43,9 @@ function device(c)
     length(p) > 0 && p[1] isa CuArray ? gpu : cpu
 end 
 
-function Base.copyto!(Cto::Chain, Cfrom::Chain)
+function Base.copyto!(Cto::Chain, Cfrom::Chain, τ=1)
     for i = 1:length(Flux.params(Cto).order.data)
-        copyto!(Flux.params(Cto).order.data[i], Flux.params(Cfrom).order.data[i])
+        copyto!(Flux.params(Cto).order.data[i], τ*Flux.params(Cfrom).order.data[i] + (1-τ)*Flux.params(Cto).order.data[i])
     end
 end
 

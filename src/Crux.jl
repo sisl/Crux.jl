@@ -26,7 +26,7 @@ module Crux
     include("experience_buffer.jl")
     
     export sync!, control_features, network, logits, action_space, ActorCritic,
-           DQNPolicy, CategoricalPolicy, GaussianPolicy, logpdf
+           DQNPolicy, CategoricalPolicy, GaussianPolicy, GaussianNoiseExplorationPolicy, logpdf
     include("policies.jl")
     
     export Sampler, explore, terminate_episode!, step!, steps!, episodes!, fillto!, 
@@ -56,5 +56,8 @@ module Crux
     
     export GAILSolver
     include("solvers/gail.jl")
+
+    export DDPGSolver
+    include("solvers/ddpg.jl")
 end
 

@@ -32,11 +32,14 @@ function Flux.Optimise.train!(π, loss::Function, B, opt, 𝒟::ExperienceBuffer
     losses, grads
 end
 
-
+## Neural network policy (i.e. Chain)
+action_space(π::Chain) = ContinuousSpace(size(last(π.layers).b), eltype(last(π.layers).b))
+POMDPs.action(π::Chain, s) = π(s)
 
 
 ## helpers
 POMDPs.value(c::Chain, s::AbstractArray) = mdcall(c, s, device(c))
+POMDPs.value(c::Chain, s::AbstractArray, a::AbstractArray) = mdcall(c, vcat(s,a), device(c))
 
 
 ## Deep Q-network Policy
@@ -64,6 +67,7 @@ end
 Flux.trainable(π::ActorCritic) = (Flux.trainable(π.A)..., Flux.trainable(π.C)...)
 
 POMDPs.value(π::ActorCritic, s; kwargs...) = value(π.C, s; kwargs...)
+POMDPs.value(π::ActorCritic, s, a; kwargs...) = value(π.C, s, a; kwargs...)
 
 POMDPs.action(π::ActorCritic, s::AbstractArray) = action(π.A, s)
     
@@ -127,6 +131,19 @@ end
 entropy(π::GaussianPolicy, s::AbstractArray) = 1.4189385332046727f0 .+ π.logΣ # 1.4189385332046727 = 0.5 + 0.5 * log(2π)
 
 action_space(π::GaussianPolicy) = ContinuousSpace((length(π.logΣ),), typeof(cpu(π.logΣ)[1]))
+
+
+## Exploration policy with Gaussian noise
+@with_kw mutable struct GaussianNoiseExplorationPolicy <: ExplorationPolicy
+    σ = 0.01
+end
+
+function POMDPs.action(π::GaussianNoiseExplorationPolicy, on_policy::Union{Policy, Chain}, k, s::AbstractArray)
+    a = action(on_policy, s)
+    ϵ = randn(length(a))*π.σ
+    return a + ϵ
+end
+
 
 ## Linear Policy - Archived for now
 # @with_kw mutable struct LinearBaseline <: Baseline

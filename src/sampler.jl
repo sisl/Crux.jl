@@ -1,6 +1,6 @@
 @with_kw mutable struct Sampler{P, V, T1 <: AbstractSpace, T2 <: AbstractSpace}
     mdp::P
-    π::Union{Policy, Chain}
+    π::Policy
     S::T1 # State space
     A::T2 # Action space
     max_steps::Int = 100
@@ -15,9 +15,9 @@
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π::Union{Policy, Chain}, S, A; kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
+Sampler(mdp, π::Policy, S, A = action_space(π); kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
 
-Sampler(mdps::AbstractVector, π::Union{Policy, Chain}, S, A; kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, π::Policy, S, A = action_space(π); kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(sampler.rng, initialstate(sampler.mdp))

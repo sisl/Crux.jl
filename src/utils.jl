@@ -43,9 +43,16 @@ function device(c)
     length(p) > 0 && p[1] isa CuArray ? gpu : cpu
 end 
 
-function Base.copyto!(Cto::Chain, Cfrom::Chain, τ=1)
-    for i = 1:length(Flux.params(Cto).order.data)
-        copyto!(Flux.params(Cto).order.data[i], τ*Flux.params(Cfrom).order.data[i] + (1-τ)*Flux.params(Cto).order.data[i])
+function polyak_average!(Cto::Chain, Cfrom::Chain, τ=1f0)
+    to_data = Flux.params(Cto).order.data
+    from_data, from_device = Flux.params(Cfrom).order.data, device(Cfrom)
+    device_match = from_device == device(Cto)
+    for i = 1:length(to_data)
+        if device_match
+            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*to_data[i])
+        else
+            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*from_device(to_data[i]))
+        end            
     end
 end
 
@@ -78,6 +85,8 @@ mdcall(F, x, device) = device == gpu ? gpucall(F,x) : cpucall(F, x)
 end
 
 ## Flux stuff
+whiten(v::AbstractArray) = (v .- mean(v)) ./ std(v)
+    
 function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
     v = []
     for θ in grads.params

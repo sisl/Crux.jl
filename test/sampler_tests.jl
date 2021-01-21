@@ -81,7 +81,7 @@ push!(b, d)
 
 ## Generalized Advantage Estimation
 #TODO: For policy gradient
-fill_gae!(b, 1:5, Chain((s)->zeros(1, size(s, 2))), 0.9f0, 0.7f0)
+fill_gae!(b, 1:5, DeterministicNetwork(Chain((s)->zeros(1, size(s, 2))), 1), 0.9f0, 0.7f0)
 fill_returns!(b, 1:5, 0.7f0)
 
 ## Test sampling with a vector of mdps

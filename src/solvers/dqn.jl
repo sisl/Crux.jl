@@ -11,7 +11,8 @@
     batch_size::Int = 32
     max_steps::Int = 100
     eval_eps::Int = 10
-    Δtrain::Int = 4 
+    Δtrain::Int = 4
+    epochs::Int = Δtrain
     Δtarget_update::Int = 2000
     buffer_size = 1000
     buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size)
@@ -20,6 +21,8 @@
     device = device(π)
     i::Int = 0
 end
+
+DQN_target(π, 𝒟, γ::Float32) = 𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* maximum(target_value(π, 𝒟[:sp]), dims=1) # DQN
 
 function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
     isprioritized = prioritized(𝒮.buffer)
@@ -40,21 +43,24 @@ function POMDPs.solve(𝒮::DQNSolver, mdp, extra_buffers...)
         # Take Δtrain steps in the environment
         push!(𝒮.buffer, steps!(s, explore = true, i = 𝒮.i, Nsteps = 𝒮.Δtrain))
        
-        # Sample a minibatch
-        rand!(𝒮.rng, 𝒟, 𝒮.buffer, extra_buffers..., i = 𝒮.i)
-        
-        # Compute target, td_error and td_loss for backprop
-        y = target(𝒮.π.Q⁻, 𝒟, γ)
-        isprioritized && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
-        loss, grad = train!(𝒮.π, () -> td_loss(𝒮.π, 𝒟, y, 𝒮.L, isprioritized), 𝒮.opt, regularizer = 𝒮.regularizer)
+        infos = []
+        for _ in 1:𝒮.epochs
+            # Sample a minibatch
+            rand!(𝒮.rng, 𝒟, 𝒮.buffer, extra_buffers..., i = 𝒮.i)
+            
+            # Compute target, td_error and td_loss for backprop
+            y = DQN_target(𝒮.π, 𝒟, γ)
+            isprioritized && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
+            info = train!(𝒮.π, (;kwargs...) -> td_loss(𝒮.π, 𝒟, y, 𝒮.L, isprioritized; kwargs...), 𝒮.opt, regularizer = 𝒮.regularizer)
+            push!(infos, info)
+        end
         
         # Update target network
-        elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && copyto!(𝒮.π.Q⁻, 𝒮.π.Q)
+        elapsed(𝒮.i + 1:𝒮.i + 𝒮.Δtrain, 𝒮.Δtarget_update) && update_target!(𝒮.π)
         
         # Log results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.Δtrain, log_undiscounted_return(s, Neps = 𝒮.eval_eps), 
-                                            log_loss(loss),
-                                            log_gradient(grad),
+                                            aggregate_info(infos),
                                             log_exploration(𝒮.exploration_policy, 𝒮.i))
     end
     𝒮.i += 𝒮.Δtrain

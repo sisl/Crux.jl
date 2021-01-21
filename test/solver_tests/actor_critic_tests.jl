@@ -3,7 +3,7 @@ using Test
 
 ## Discete Tests
 mdp = GridWorldMDP(size = (10,10), tprob = .7)
-as = actions(mdp)
+as = [actions(mdp)...]
 S = state_space(mdp)
 
 Vnet = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1))
@@ -11,17 +11,17 @@ Anet = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(a
 
 # CPU
 rng = MersenneTwister(0)
-π1 = CategoricalPolicy(A = deepcopy(Anet), actions = as, rng = rng)
+π1 = CategoricalPolicy(deepcopy(Anet), as, rng = rng)
 solve(PGSolver(π = π1, S = S, loss = reinforce(), rng = rng), mdp) # REINFORCE
-solve(PGSolver(π = ActorCritic(CategoricalPolicy(A = deepcopy(Anet), actions = as), deepcopy(Vnet)), S = S, loss = a2c()), mdp) # A2C
-solve(PGSolver(π = ActorCritic(CategoricalPolicy(A = deepcopy(Anet), actions = as), deepcopy(Vnet)), S = S, loss = ppo()), mdp) # PPO
+solve(PGSolver(π = ActorCritic(CategoricalPolicy(deepcopy(Anet),  as), deepcopy(Vnet)), S = S, loss = a2c()), mdp) # A2C
+solve(PGSolver(π = ActorCritic(CategoricalPolicy(deepcopy(Anet), as), deepcopy(Vnet)), S = S, loss = ppo()), mdp) # PPO
 
 # GPU
 rng = MersenneTwister(0)
-π2 = CategoricalPolicy(A = deepcopy(Anet) |> gpu, actions = as, rng = rng)
+π2 = CategoricalPolicy(deepcopy(Anet) |> gpu, as, rng = rng)
 solve(PGSolver(π = π2, S = S, loss = reinforce(), rng = rng), mdp) # REINFORCE
-solve(PGSolver(π = ActorCritic(CategoricalPolicy(A = deepcopy(Anet) |> gpu, actions = as), deepcopy(Vnet) |> gpu), S = S, loss = a2c()), mdp) # A2C
-solve(PGSolver(π = ActorCritic(CategoricalPolicy(A = deepcopy(Anet) |> gpu, actions = as), deepcopy(Vnet) |> gpu), S = S, loss = ppo()), mdp) # PPO
+solve(PGSolver(π = ActorCritic(CategoricalPolicy(deepcopy(Anet) |> gpu, as), deepcopy(Vnet) |> gpu), S = S, loss = a2c()), mdp) # A2C
+solve(PGSolver(π = ActorCritic(CategoricalPolicy(deepcopy(Anet) |> gpu, as), deepcopy(Vnet) |> gpu), S = S, loss = ppo()), mdp) # PPO
 
 s = rand(2, 100)
 @test all(logits(π1, s) .≈ logits(π2, s))
@@ -37,16 +37,16 @@ V() = Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1))
 
 μ1 = μ()
 rng = MersenneTwister(0)
-π1 = GaussianPolicy(μ = deepcopy(μ1), logΣ = zeros(Float32, 1), rng = rng)
+π1 = GaussianPolicy(deepcopy(μ1), zeros(Float32, 1), rng = rng)
 solve(PGSolver(π = π1, S = S, loss = reinforce(), rng = rng), mdp) # REINFORCE
-solve(PGSolver(π = ActorCritic(GaussianPolicy(μ = μ(), logΣ = zeros(Float32, 1)), V()), S = S, loss = a2c()), mdp) # A2C
-solve(PGSolver(π = ActorCritic(GaussianPolicy(μ = μ(), logΣ = zeros(Float32, 1)), V()), S = S, loss = ppo()), mdp) # PPO
+solve(PGSolver(π = ActorCritic(GaussianPolicy(μ(), zeros(Float32, 1)), V()), S = S, loss = a2c()), mdp) # A2C
+solve(PGSolver(π = ActorCritic(GaussianPolicy(μ(), zeros(Float32, 1)), V()), S = S, loss = ppo()), mdp) # PPO
 
 rng = MersenneTwister(0)
-π2 = GaussianPolicy(μ = deepcopy(μ1) |> gpu, logΣ = zeros(Float32, 1) |> gpu, rng = rng)
+π2 = GaussianPolicy(deepcopy(μ1) |> gpu, zeros(Float32, 1) |> gpu, rng = rng)
 solve(PGSolver(π = π2, S = S, loss = reinforce(), rng = rng), mdp) # REINFORCE
-solve(PGSolver(π = ActorCritic(GaussianPolicy(μ = μ() |> gpu, logΣ = zeros(Float32, 1) |> gpu), V() |> gpu), S = S, loss = a2c(), epochs = 1), mdp) # A2C
-solve(PGSolver(π = ActorCritic(GaussianPolicy(μ = μ() |> gpu, logΣ = zeros(Float32, 1) |> gpu), V() |> gpu), S = S, loss = ppo()), mdp) # PPO
+solve(PGSolver(π = ActorCritic(GaussianPolicy(μ() |> gpu, zeros(Float32, 1) |> gpu), V() |> gpu), S = S, loss = a2c(), epochs = 1), mdp) # A2C
+solve(PGSolver(π = ActorCritic(GaussianPolicy(μ() |> gpu, zeros(Float32, 1) |> gpu), V() |> gpu), S = S, loss = ppo()), mdp) # PPO
 
 
 s = rand(2, 100)

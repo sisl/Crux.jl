@@ -24,7 +24,7 @@ function experience_replay(solve_tasks, eval_tasks, solver; experience_buffer, s
     samplers = [Sampler(t, solver.π, solver.S, solver.A, rng = solver.rng) for t in eval_tasks]
     push!(solver.log.extras, log_undiscounted_return(samplers))
     for t in solve_tasks
-        solve(solver, t, experience_buffer)
+        length(experience_buffer) > 0 ? solve(solver, t, experience_buffer) : solve(solver, t)
         sampler = Sampler(t, RandomPolicy(t), solver.S, solver.A, rng = solver.rng,  exploration_policy = sampler_exploration_policy)
         push!(experience_buffer, steps!(sampler, Nsteps = steps_per_task))
     end

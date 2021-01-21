@@ -50,11 +50,11 @@ c2 = Chain(Dense(5, 5, relu))
 c3 = Chain(Dense(5, 5, relu)) |> gpu
 
 @test c1[1].W != c2[1].W
-copyto!(c1, c2)
+polyak_average!(c1, c2)
 
 @test c1[1].W == c2[1].W
 
-copyto!(c3, c2)
+polyak_average!(c3, c2, 1f0)
 @test c3[1].W isa CuArray
 @test cpu(c3[1].W) == c2[1].W
 

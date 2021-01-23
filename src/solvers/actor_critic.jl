@@ -39,7 +39,7 @@ function reinforce(π, s, a, G, old_probs, info = Dict())
     -mean(new_probs .* G)
 end
 
-# A2C Loss
+# A2C loss
 a2c(;λₚ::Float32 = 1f0, λₑ::Float32 = 0.1f0) = (π, 𝒟; info = Dict()) -> a2c(π, 𝒟[:s], 𝒟[:a], 𝒟[:advantage], 𝒟[:logprob], λₚ, λₑ, info)
 
 function a2c(π, s, a, A, old_probs, λₚ, λₑ, info = Dict())
@@ -56,7 +56,7 @@ function a2c(π, s, a, A, old_probs, λₚ, λₑ, info = Dict())
     λₚ*p_loss + λₑ*e_loss
 end
 
-# PPO Loss
+# PPO loss
 ppo(;ϵ::Float32 = 0.2f0, λₚ::Float32 = 1f0, λₑ::Float32 = 0.1f0) = (π, 𝒟; info = Dict()) -> ppo(π, 𝒟[:s], 𝒟[:a], 𝒟[:advantage], 𝒟[:logprob], ϵ, λₚ, λₑ, info)
 
 function ppo(π, s, a, A, old_probs, ϵ, λₚ, λₑ, info = Dict())

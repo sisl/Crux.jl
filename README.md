@@ -1,13 +1,17 @@
 # Crux.jl
 
-Deep RL library with concise implementations of popular algorithms
+Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
-supports CPU and GPU computation and implements the following algorithms
+Supports CPU and GPU computation and implements the following algorithms:
 
-* Deep Q-Learning
+* <a href="./src/solvers/dqn.jl">Deep Q-Learning</a>
   * Prioritized Experience Replay
-* Vanilla Policy Gradient
-* DQN-GAIL
+* <a href="./src/solvers/actor_critic.jl">Vanilla Policy Gradient</a>
+  * REINFORCE
+  * Proximal Policy Optimization (PPO)
+  * Advantage Actor-Critic (A2C)
+* <a href="./src/solvers/ddpg.jl">Deep Deterministic Policy Gradient (DDPG)</a>
+* <a href="./src/solvers/gail.jl">Generative Adversarial Imitation Learning (DQN-GAIL)</a>
 
 ## Installation
 

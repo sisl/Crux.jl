@@ -12,8 +12,12 @@ function MultitaskDecaySchedule(steps::Int, task_ids; start = 1.0, stop = 0.1)
     end
 end
 
+function log_multitask_performances!(𝒮, tasks, logfn = log_undiscounted_return)
+    push!(𝒮.log.extras, logfn([Sampler(t, 𝒮.π, 𝒮.S, rng = 𝒮.rng) for t in tasks]))
+end
+
 function sequential_learning(solve_tasks, eval_tasks, solver)
-    samplers = [Sampler(t, solver.π, solver.S, solver.A, rng = solver.rng) for t in eval_tasks]
+    samplers = [Sampler(t, solver.π, solver.S, rng = solver.rng) for t in eval_tasks]
     push!(solver.log.extras, log_undiscounted_return(samplers))
     for t in solve_tasks
         solve(solver, t)

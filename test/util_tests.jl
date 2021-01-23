@@ -45,19 +45,6 @@ vgpu = cu(zeros(Float32, 10, 10))
 @test Crux.device(view(vcpu,:,1)) == cpu
 @test Crux.device(view(vgpu,:,1)) == gpu
 
-c1 = Chain(Dense(5, 5, relu))
-c2 = Chain(Dense(5, 5, relu))
-c3 = Chain(Dense(5, 5, relu)) |> gpu
-
-@test c1[1].W != c2[1].W
-polyak_average!(c1, c2)
-
-@test c1[1].W == c2[1].W
-
-polyak_average!(c3, c2, 1f0)
-@test c3[1].W isa CuArray
-@test cpu(c3[1].W) == c2[1].W
-
 c_cpu = Chain(Dense(5,2))
 c_gpu = Chain(Dense(5,2)) |> gpu
 @test Crux.device(c_cpu) == cpu

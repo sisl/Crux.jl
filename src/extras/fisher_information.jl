@@ -7,7 +7,8 @@ end
 
 DiagonalFisherRegularizer(θ, λ = 1) = DiagonalFisherRegularizer([zeros(Float32, size(p)) for p in θ], 0, λ, deepcopy(θ))
 
-function (R::DiagonalFisherRegularizer)(θ)
+function (R::DiagonalFisherRegularizer)(π)
+    θ = Flux.params(π)
     R.N == 0 && return 0f0
     nparams = length(θ)
     tot = 0f0

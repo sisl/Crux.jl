@@ -143,10 +143,9 @@ end
 
 function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer...; i = 1)
     lengths = [length.(source)...]
-    # batches = floor.(Int, capacity(target) .* lengths ./ sum(lengths))
-    batches = floor.(Int, capacity(target)  ./ fill(length(source), length(source)))
+    batches = floor.(Int, capacity(target) .* lengths ./ sum(lengths))
+    # batches = floor.(Int, capacity(target)  ./ fill(length(source), length(source)))
     batches[1] += capacity(target) - sum(batches)
-    
     
     for (b, B) in zip(source, batches)
         B == 0 && continue

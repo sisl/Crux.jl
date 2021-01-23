@@ -1,10 +1,11 @@
 function Flux.Optimise.train!(π, loss::Function, opt; 
-        regularizer = (θ) -> 0, 
+        regularizer = (π) -> 0, 
         loss_sym = :loss, 
         grad_sym = :grad_norm,
         info = Dict())
     θ = Flux.params(π)
-    l, back = Flux.pullback(() -> loss(info = info) + regularizer(θ), θ)
+    l, back = Flux.pullback(() -> loss(info = info) + regularizer(π), θ)
+    typeof(l) == Float64 && @warn "Float64 loss found: computation in double precision may be slow"
     grad = back(1f0)
     gnorm = norm(grad, p=2)
     @assert !isnan(gnorm)
@@ -17,7 +18,7 @@ end
 # Train with minibatches and epochs
 function Flux.Optimise.train!(π, loss::Function, batch_size::Int, opt, 𝒟::ExperienceBuffer...; 
         epochs = 1, 
-        regularizer = (θ) -> 0,
+        regularizer = (π) -> 0, 
         early_stopping = (info) -> false,
         loss_sym = :loss, 
         grad_sym = :grad_norm,

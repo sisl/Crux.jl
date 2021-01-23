@@ -17,19 +17,19 @@ render(tasks[1])
 # render_and_save("lavaworld_tasks.pdf", tasks...)
 
 ## Define the network we are using
-Q() = Chain(x->reshape(x, input_dim, :), Dense(input_dim, 64, relu), Dense(64,64, relu), Dense(64, 4))
+Q() = DiscreteNetwork(Chain(x->reshape(x, input_dim, :), Dense(input_dim, 64, relu), Dense(64,64, relu), Dense(64, 4)), as)
 
 ## Train individually
-solve(DQNSolver(π = DQNPolicy(Q(), as), S = S, N = N, log = LoggerParams(dir = "log/ind_task1")), tasks[1])
-solve(DQNSolver(π = DQNPolicy(Q(), as), S = S, N = N, log = LoggerParams(dir = "log/ind_task2")), tasks[2])
-solve(DQNSolver(π = DQNPolicy(Q(), as), S = S, N = N, log = LoggerParams(dir = "log/ind_task3")), tasks[3])
+solve(DQNSolver(π = Q(), S = S, N = N, log = LoggerParams(dir = "log/ind_task1")), tasks[1])
+solve(DQNSolver(π = Q(), S = S, N = N, log = LoggerParams(dir = "log/ind_task2")), tasks[2])
+solve(DQNSolver(π = Q(), S = S, N = N, log = LoggerParams(dir = "log/ind_task3")), tasks[3])
 
 plot_learning(["log/ind_task1/", "log/ind_task2/", "log/ind_task3/"], title="LavaWorld Training - 3 Tasks")
 savefig("trained_separately.pdf")
 
 
 ## Train Jointly
-𝒮_joint = DQNSolver(π = DQNPolicy(Q(), as), S = S, N = N, batch_size = 96, log = LoggerParams(dir = "log/joint"))
+𝒮_joint = DQNSolver(π = Q(), S = S, N = N, batch_size = 96, log = LoggerParams(dir = "log/joint"))
 solve(𝒮_joint, tasks)
 
 
@@ -39,7 +39,7 @@ savefig("trained_jointly.pdf")
 
 ## Train Sequentially
 seq_tasks = repeat(tasks, Ncycles)
-𝒮_seq = DQNSolver(π = DQNPolicy(Q(), as), S = S, N = Nsteps_per_cycle, 
+𝒮_seq = DQNSolver(π = Q(), S = S, N = Nsteps_per_cycle, 
                   exploration_policy = EpsGreedyPolicy(MultitaskDecaySchedule(Nsteps_per_cycle, 1:length(seq_tasks)), rng, as),
                   log = LoggerParams(dir = "log/continual"))
 sequential_learning(seq_tasks, tasks, 𝒮_seq)
@@ -48,7 +48,7 @@ p = plot_learning(fill(𝒮_seq, 3), values = [Symbol("undiscounted_return/T1"),
 savefig("trained_sequentially.pdf")
 
 ## Continual Learning with experience Replay
-𝒮_er = DQNSolver(π = DQNPolicy(Q(), as), S = S, N = Nsteps_per_cycle, 
+𝒮_er = DQNSolver(π = Q(), S = S, N = Nsteps_per_cycle, 
                   exploration_policy = EpsGreedyPolicy(MultitaskDecaySchedule(Nsteps_per_cycle, 1:length(seq_tasks)), rng, as),
                   log = LoggerParams(dir = "log/er"))
 experience_replay(seq_tasks, tasks, 𝒮_er, experience_buffer = ExperienceBuffer(𝒮_er.S, 𝒮_er.A, 2000), steps_per_task = 1000)
@@ -58,7 +58,7 @@ savefig("trained_sequentially_with_replay.pdf")
 
 
 ## Continual Learning with elastic weight consolidation 
-𝒮_ewc = DQNSolver(π = DQNPolicy(Q(), as), S = S, N = Nsteps_per_cycle, 
+𝒮_ewc = DQNSolver(π = Q(), S = S, N = Nsteps_per_cycle, 
                   exploration_policy = EpsGreedyPolicy(MultitaskDecaySchedule(Nsteps_per_cycle, 1:length(seq_tasks)), rng, as),
                   log = LoggerParams(dir = "log/ewc"))
 ewc(seq_tasks, tasks, 𝒮_ewc, λ_fisher = 1f11, fisher_batch_size = 128)

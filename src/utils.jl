@@ -43,19 +43,6 @@ function device(c)
     length(p) > 0 && p[1] isa CuArray ? gpu : cpu
 end 
 
-function polyak_average!(Cto::Chain, Cfrom::Chain, τ=1f0)
-    to_data = Flux.params(Cto).order.data
-    from_data, from_device = Flux.params(Cfrom).order.data, device(Cfrom)
-    device_match = from_device == device(Cto)
-    for i = 1:length(to_data)
-        if device_match
-            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*to_data[i])
-        else
-            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*from_device(to_data[i]))
-        end            
-    end
-end
-
 # Call F with input x but ensure they are both on the device of F
 gpucall(F, x::CuArray) = F(x)
 gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = F(x)

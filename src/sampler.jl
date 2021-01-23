@@ -7,7 +7,7 @@
     required_columns::Array{Symbol} = []
     γ::Float32 = discount(mdp)
     λ::Float32 = NaN32
-    exploration_policy::Union{ExplorationPolicy, Nothing} = nothing
+    exploration_policy = nothing
     rng::AbstractRNG = Random.GLOBAL_RNG
     s::V = rand(rng, initialstate(mdp)) # Current State
     svec::AbstractArray = initial_observation(mdp, s, rng) # Current observation
@@ -60,7 +60,7 @@ function step!(data, j::Int, sampler::Sampler; explore = false, i = 0)
     data[:done][1, j] = done
     
     # Handle optional data storage
-    haskey(data, :logprob) && (data[:logprob][1, j] = logpdf(sampler.π, bslice(data[:s], j), data[:a][:, j])[1])  
+    haskey(data, :logprob) && (data[:logprob][1, j] = logpdf(sampler.π, bslice(data[:s], j:j), data[:a][:, j:j])[1])  
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     
     # Cut the episode short if needed
@@ -117,9 +117,9 @@ function episodes!(sampler::Sampler; Neps = 1, explore = false, i = 0, return_ep
     return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
-function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{T}}, N::Int; i = 1) where {T <: Sampler}
+function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{T}}, N::Int; i = 1, explore = false) where {T <: Sampler}
     Nfill = max(0, N - length(b))
-    Nfill > 0 && push!(b, steps!(s, i = i, Nsteps = Nfill))
+    Nfill > 0 && push!(b, steps!(s, i = i, Nsteps = Nfill, explore = explore))
     Nfill
 end
 
@@ -166,8 +166,8 @@ function fill_gae!(d, episode_range, V, λ::Float32, γ::Float32)
     A, c = 0f0, λ*γ
     nd = ndims(d[:s])
     for i in reverse(episode_range)
-        Vsp = value(V, bslice(d[:sp], i))
-        Vs = value(V, bslice(d[:s], i))
+        Vsp = value(V, bslice(d[:sp], i:i))
+        Vs = value(V, bslice(d[:s], i:i))
         @assert length(Vs) == 1
         A = c*A + d[:r][1,i] + (1.f0 - d[:done][1,i])*γ*Vsp[1] - Vs[1]
         @assert !isnan(A)

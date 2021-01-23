@@ -40,12 +40,13 @@ log_discounted_return(s; kwargs...) = () -> log_performance(s, "discounted_retur
 log_undiscounted_return(s; kwargs...) = () -> log_performance(s, "undiscounted_return", undiscounted_return; kwargs...)
 log_failure(s; kwargs...) = () -> log_performance(s, "failure_rate", failure; kwargs...)
 
-log_val(val; name, suffix = "") = () -> Dict(string(name, suffix) => val)
-log_val(val::T; name, suffix = "") where T <: AbstractArray = () -> Dict(string(name, suffix) => mean(val))
-log_loss(loss; name = "loss", suffix = "") = log_val(loss, name = name, suffix = suffix)
-log_gradient(grad; name = "grad_norm", suffix = "") = log_val(grad, name = name, suffix = suffix)
 log_exploration(policy::EpsGreedyPolicy, i; name = "eps") = Dict(name => policy.eps(i))
 log_exploration(policy::GaussianNoiseExplorationPolicy, i; name = "noise_std") = Dict(name => policy.σ(i))
+function log_exploration(policy::FirstExplorePolicy, i; name = "first_explore_on")
+    d = Dict{String, Any}(name => i < policy.N)
+    !isnothing(policy.after_policy) && merge!(d, log_exploration(policy.after_policy, i))
+    d
+end
 
 ## Stuff for plotting
 function smooth(v, weight = 0.6)

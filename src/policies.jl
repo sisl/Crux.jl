@@ -1,78 +1,82 @@
-## Generic deterministic network for values or policies
-@with_kw mutable struct DeterministicNetwork <: Policy
-    N
-    output_dim = size(last(N.layers).b)
-    device = device(N)
+abstract type NetworkPolicy <: Policy end
+device(π::NetworkPolicy) = π.device
+
+function polyak_average!(to, from, τ=1f0)
+    to_data = Flux.params(to).order.data
+    from_data, from_device = Flux.params(from).order.data, device(from)
+    device_match = from_device == device(to)
+    for i = 1:length(to_data)
+        if device_match
+            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*to_data[i])
+        else
+            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*from_device(to_data[i]))
+        end            
+    end
 end
 
-DeterministicNetwork(N, output_dim = size(last(N.layers).b); kwargs...) = DeterministicNetwork(N = N, output_dim = output_dim; kwargs...)
-
-Flux.trainable(π::DeterministicNetwork) = Flux.trainable(π.N)
-
-action_space(π::DeterministicNetwork) = ContinuousSpace(π.output_dim)
-POMDPs.action(π::DeterministicNetwork, s) = mdcall(π.N, s, π.device)
-
-POMDPs.value(π::DeterministicNetwork, s::AbstractArray) = mdcall(π.N, s, π.device)
-POMDPs.value(π::DeterministicNetwork, s::AbstractArray, a::AbstractArray) = mdcall(π.N, vcat(s,a), π.device)
-
-## DDPGPolicy
-@with_kw mutable struct DDPGPolicy <: Policy
-    A # actor 
-    C # critic
-    action_dim = size(last(A.layers).b)
-    A⁻ = deepcopy(A)# target actor 
-    C⁻ = deepcopy(C)# target critic
-    device = device(A)
+function Base.copyto!(to, from)
+    for i = 1:length(Flux.params(to).order.data)
+        copyto!(Flux.params(to).order.data[i], Flux.params(from).order.data[i])
+    end
 end
 
-DDPGPolicy(A, C; kwargs...) = DDPGPolicy(A=A, C=C; kwargs...)
-
-Flux.trainable(π::DDPGPolicy) = (Flux.trainable(π.A)..., Flux.trainable(π.C)...)
-
-POMDPs.value(π::DDPGPolicy, s, a) = mdcall(π.C, vcat(s,a), π.device)
-target_value(π::DDPGPolicy, s, a) = mdcall(π.C⁻, vcat(s,a), π.device)
-
-POMDPs.action(π::DDPGPolicy, s::AbstractArray) = mdcall(π.A, s, π.device)
-target_action(π::DDPGPolicy, s::AbstractArray) = mdcall(π.A⁻, s, π.device)
-
-action_space(π::DDPGPolicy) = ContinuousSpace(π.action_dim)
-
-function update_target!(π::DDPGPolicy, τ = 1f0)
-    polyak_average!(π.A⁻, π.A, τ)
-    polyak_average!(π.C⁻, π.C, τ)
+## Network for representing continous functions (value or policy)
+@with_kw mutable struct ContinuousNetwork <: NetworkPolicy
+    network
+    output_dim = size(last(network.layers).b)
+    device = device(network)
 end
 
-## Deep Q-network Policy
-@with_kw mutable struct DQNPolicy <: Policy
-    Q
-    actions::Vector
-    device = device(Q)
-    Q⁻ = deepcopy(Q)
+ContinuousNetwork(network, output_dim = size(last(network.layers).b)) = ContinuousNetwork(network = network, output_dim = output_dim)
+
+Flux.trainable(π::ContinuousNetwork) = Flux.trainable(π.network)
+
+POMDPs.action(π::ContinuousNetwork, s) = value(π, s)
+
+POMDPs.value(π::ContinuousNetwork, s::AbstractArray) = mdcall(π.network, s, π.device)
+POMDPs.value(π::ContinuousNetwork, s::AbstractArray, a::AbstractArray) = mdcall(π.network, vcat(s,a), π.device)
+
+action_space(π::ContinuousNetwork) = ContinuousSpace(π.output_dim)
+
+
+## Network for representing a discrete set of outputs (value or policy)
+@with_kw mutable struct DiscreteNetwork <: NetworkPolicy
+    network
+    outputs::Vector
+    device = device(network)
+    rng::AbstractRNG = Random.GLOBAL_RNG
 end
 
-DQNPolicy(Q, actions::Vector; kwargs...) = DQNPolicy(Q = Q, actions = actions; kwargs...)
+DiscreteNetwork(network, outputs::Vector; kwargs...) = DiscreteNetwork(network = network, outputs = outputs; kwargs...)
+Flux.trainable(π::DiscreteNetwork) = Flux.trainable(π.network)
 
-Flux.trainable(π::DQNPolicy) = Flux.trainable(π.Q)
+POMDPs.action(π::DiscreteNetwork, s::S) where S <: AbstractArray = π.outputs[argmax(value(π, s))] # Deterministic
+POMDPs.action(π::DiscreteNetwork, on_policy::Policy, k, s::AbstractArray) = π.outputs[rand(π.rng, Categorical(value(π, s)[:]))] # Stochastic
 
-POMDPs.action(π::DQNPolicy, s::S) where S <: AbstractArray = π.actions[argmax(value(π, s))]
+POMDPs.value(π::DiscreteNetwork, s::S) where S <: AbstractArray = mdcall(π.network, s, π.device)
+POMDPs.value(π::DiscreteNetwork, s::AbstractArray, a::AbstractArray) = sum(value(π, s) .* a, dims = 1)
 
-POMDPs.value(π::DQNPolicy, s::S) where S <: AbstractArray = mdcall(π.Q, s, π.device)
-POMDPs.value(π::DQNPolicy, s::AbstractArray, a::AbstractArray) = sum(value(π, s) .* a, dims = 1)
 
-target_value(π::DQNPolicy, s::S) where S <: AbstractArray = mdcall(π.Q⁻, s, π.device)
-target_value(π::DQNPolicy, s::AbstractArray, a::AbstractArray) = sum(target_vale(Q, s) .* a, dims = 1)
+action_space(π::DiscreteNetwork) = DiscreteSpace(length(π.outputs))
 
-action_space(π::DQNPolicy) = DiscreteSpace(length(π.actions))
+function logpdf(π::DiscreteNetwork, s::AbstractArray, a::AbstractArray)
+    log.(sum(value(π, s) .* a, dims = 1) .+ eps(Float32))
+end
 
-update_target!(π::DQNPolicy, τ = 1f0) = polyak_average!(π.Q⁻, π.Q, τ)
+function entropy(π::DiscreteNetwork, s::AbstractArray)
+    aprob = value(π, s)
+    sum(aprob .* log.(aprob .+ eps(Float32)), dims=1)
+end
+
+
 
 ## Actor Critic Architecture
-@with_kw mutable struct ActorCritic <: Policy
-    A # actor 
-    C # critic
+@with_kw mutable struct ActorCritic{TA, TC} <: NetworkPolicy
+    A::TA # actor 
+    C::TC # critic
 end
 
-ActorCritic(A, C::Chain) = ActorCritic(A, DeterministicNetwork(C))
+device(π::ActorCritic) = device(π.A)
 
 Flux.trainable(π::ActorCritic) = (Flux.trainable(π.A)..., Flux.trainable(π.C)...)
 
@@ -80,6 +84,7 @@ POMDPs.value(π::ActorCritic, s) = value(π.C, s)
 POMDPs.value(π::ActorCritic, s, a) = value(π.C, s, a)
 
 POMDPs.action(π::ActorCritic, s::AbstractArray) = action(π.A, s)
+POMDPs.action(π::ActorCritic, on_policy::Policy, k, s::AbstractArray) = action(π.A, on_policy, k, s)
     
 logpdf(π::ActorCritic, s::AbstractArray, a::AbstractArray) = logpdf(π.A, s, a)
 
@@ -88,38 +93,10 @@ action_space(π::ActorCritic) = action_space(π.A)
 entropy(π::ActorCritic, s::AbstractArray) = entropy(π.A, s)
 
 
-## Categorical Policy
-@with_kw mutable struct CategoricalPolicy <: Policy
-    A
-    actions
-    device = device(A)
-    rng::AbstractRNG = Random.GLOBAL_RNG
-end
-
-CategoricalPolicy(A, actions::Vector; kwargs...) = CategoricalPolicy(A = A, actions = actions; kwargs...)
-
-Flux.trainable(π::CategoricalPolicy) = Flux.trainable(π.A)
-
-POMDPs.action(π::CategoricalPolicy, s::AbstractArray) = π.actions[rand(π.rng, Categorical(logits(π, s)[:]))]
-
-logits(π::CategoricalPolicy, s::AbstractArray) = mdcall(π.A, s, π.device)
-    
-function logpdf(π::CategoricalPolicy, s::AbstractArray, a::AbstractArray)
-    log.(sum(logits(π, s) .* a, dims = 1) .+ eps(Float32))
-end
-
-function entropy(π::CategoricalPolicy, s::AbstractArray)
-    aprob = logits(π, s)
-    sum(aprob .* log.(aprob .+ eps(Float32)), dims=1)
-end
-
-action_space(π::CategoricalPolicy) = DiscreteSpace(length(π.actions))
-
-
 ## Gaussian Policy
-@with_kw mutable struct GaussianPolicy <: Policy
-    μ
-    logΣ
+@with_kw mutable struct GaussianPolicy <: NetworkPolicy
+    μ::ContinuousNetwork
+    logΣ::AbstractArray
     device = device(μ)
     rng::AbstractRNG = Random.GLOBAL_RNG
 end
@@ -128,39 +105,61 @@ GaussianPolicy(μ, logΣ; kwargs...) = GaussianPolicy(μ = μ, logΣ = logΣ; kw
 
 Flux.trainable(π::GaussianPolicy) = (Flux.trainable(π.μ)..., π.logΣ)
 
-function POMDPs.action(π::GaussianPolicy, s::AbstractArray)
-    μ, logΣ = mdcall(π.μ, s, π.device), device(s)(π.logΣ)
+POMDPs.action(π::GaussianPolicy, s::AbstractArray) = action(π.μ, s)
+
+function POMDPs.action(π::GaussianPolicy, on_policy::Policy, k, s::AbstractArray) 
+    μ, logΣ = action(π, s), device(s)(π.logΣ)
     d = MvNormal(μ, exp.(logΣ))
     a = rand(π.rng, d)
 end
 
 function logpdf(π::GaussianPolicy, s::AbstractArray, a::AbstractArray)
-    μ = mdcall(π.μ, s, π.device)
-    logΣ = device(s)(π.logΣ)
+    μ, logΣ = action(π, s), device(s)(π.logΣ)
     σ² = exp.(logΣ).^2
     sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.9189385332046727f0 .- logΣ, dims = 1) # 0.9189385332046727f0 = log.(sqrt(2π))
 end
 
 entropy(π::GaussianPolicy, s::AbstractArray) = 1.4189385332046727f0 .+ π.logΣ # 1.4189385332046727 = 0.5 + 0.5 * log(2π)
 
-action_space(π::GaussianPolicy) = ContinuousSpace((length(π.logΣ),), typeof(cpu(π.logΣ)[1]))
+action_space(π::GaussianPolicy) = action_space(π.μ)
 
 
 ## Exploration policy with Gaussian noise
 @with_kw mutable struct GaussianNoiseExplorationPolicy <: ExplorationPolicy
     σ::Function = (i) -> 0.01f0
+    clip_min::Vector{Float32} = [-Inf32]
+    clip_max::Vector{Float32} = [Inf32]
     rng::AbstractRNG = Random.GLOBAL_RNG
 end
 
-GaussianNoiseExplorationPolicy(σ::Real, rng::AbstractRNG = Random.GLOBAL_RNG) = GaussianNoiseExplorationPolicy((i) -> σ, rng)
+GaussianNoiseExplorationPolicy(σ::Real; kwargs...) = GaussianNoiseExplorationPolicy(σ = (i) -> σ; kwargs...)
 GaussianNoiseExplorationPolicy(σ::Function; kwargs...) = GaussianNoiseExplorationPolicy(σ = (i) -> σ; kwargs...)
 
-function POMDPs.action(π::GaussianNoiseExplorationPolicy, on_policy::Union{Policy, Chain}, k, s::AbstractArray)
+function POMDPs.action(π::GaussianNoiseExplorationPolicy, on_policy::Policy, k, s::AbstractArray)
     a = action(on_policy, s)
     ϵ = randn(π.rng, length(a))*π.σ(k)
-    return a + ϵ
+    return clamp.(a + ϵ, π.clip_min, π.clip_max)
 end
 
+
+## use exploration policy for first N timesteps, then revert to base policy
+@with_kw mutable struct FirstExplorePolicy <: ExplorationPolicy
+    N::Int64 # Number of steps to explore for
+    initial_policy::Policy # the policy to use for the first N steps
+    after_policy::Union{Nothing, ExplorationPolicy} = nothing # the policy to use after the first N steps. Nothing means you will use on-policy
+end
+
+FirstExplorePolicy(N::Int64, initial_policy::Policy) = FirstExplorePolicy(N, initial_policy, after_policy)
+
+function POMDPs.action(π::FirstExplorePolicy, on_policy::Policy, k, s::AbstractArray)
+    if k < π.N
+        return action(π.initial_policy, s)
+    elseif isnothing(π.after_policy)
+        return action(on_policy, s)
+    else
+        return action(π.after_policy, on_policy, k, s)
+    end
+end
 
 ## Linear Policy - Archived for now
 # @with_kw mutable struct LinearBaseline <: Baseline

@@ -68,7 +68,8 @@ Q() = ContinuousNetwork(Chain(Dense(idim, 256, relu, initW = Winit, initb = bini
 solve(𝒮_ddpg, mdp)
 
 # Plot the learning curve
-p = plot_learning([𝒮_ppo, 𝒮_ddpg], title = "HalfCheetah Training Curves", labels = ["PPO, DDPG"])
+p = plot_learning([𝒮_ppo, 𝒮_ddpg], title = "HalfCheetah Training Curves", labels = ["PPO", "DDPG"])
+Crux.savefig("half_cheetah_benchmark.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, 𝒮_ddpg.π, "mujoco.gif")

@@ -1,15 +1,16 @@
 @with_kw mutable struct DDPGSolver <: Solver
-    π::ActorCritic{ContinuousNetwork, ContinuousNetwork}
+    π::ActorCritic{ContinuousNetwork, ContinuousNetwork} # behavior policy network
+    π⁻::ActorCritic{ContinuousNetwork, ContinuousNetwork} = deepcopy(π) # target policy network
     S::AbstractSpace # state space
     A::AbstractSpace = action_space(π) # action space
     N::Int = 1000 # number of training iterations
     rng::AbstractRNG = Random.GLOBAL_RNG
-    exploration_policy::ExplorationPolicy = GaussianNoiseExplorationPolicy(0.1f0, rng = rng)
+    exploration_policy::ExplorationPolicy = GaussianNoiseExplorationPolicy(0.1f0, rng = rng) # exploration noise
     critic_loss::Function = Flux.Losses.mse # critic loss function
     regularizer_actor = (θ) -> 0
     regularizer_critic = (θ) -> 0
     opt_actor = Flux.Optimiser(ClipNorm(1f0), ADAM(1f-4)) # optimizer for the actor
-    opt_critic =Flux.Optimiser(ClipNorm(1f0), ADAM(1f-3)) # optimizer for the critic
+    opt_critic = Flux.Optimiser(ClipNorm(1f0), ADAM(1f-3)) # optimizer for the critic
     τ::Float32 = 0.005f0 # polyak averaging parameters used when updating target networks
     batch_size::Int = 100
     max_steps::Int = 100
@@ -20,7 +21,6 @@
     buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size)
     buffer_init::Int = max(batch_size, 200)
     log::Union{Nothing, LoggerParams} = LoggerParams(dir="log/ddpg", period=500)
-    π⁻::ActorCritic{ContinuousNetwork, ContinuousNetwork} = deepcopy(π) # Target network
     device = device(π)
     i::Int = 0
 end
@@ -56,7 +56,8 @@ function POMDPs.solve(𝒮::DDPGSolver, mdp)
             y = DDPG_target(𝒮.π⁻, 𝒟, γ)
             
 
-            # Update critic by minimizing the loss: ℒ = 1/𝑁 Σᵢ (yᵢ - Q(sᵢ, aᵢ, | θᶜ))²
+            # Update critic by minimizing the loss:
+            # ℒ = 1/𝑁 Σᵢ (yᵢ - Q(sᵢ, aᵢ, | θᶜ))²
             info_c = train!(𝒮.π.C, (;kwargs...) -> td_loss(𝒮.π, 𝒟, y, 𝒮.critic_loss; kwargs...), 𝒮.opt_critic, 
                             loss_sym = :critic_loss, 
                             grad_sym = :critic_grad_norm, 
@@ -87,4 +88,3 @@ function POMDPs.solve(𝒮::DDPGSolver, mdp)
     𝒮.i += 𝒮.ΔN
     𝒮.π
 end
-

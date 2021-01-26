@@ -8,7 +8,7 @@ as = actions(mdp)
 S = state_space(mdp)
 
 Q() = DiscreteNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
-D_PG() = DiscreteNetwork(Chain(Dense(dim(S)[1] + length(as), 64, relu), Dense(64, 64, relu), Dense(64, 1, sigmoid)), as)
+D_PG() = ContinuousNetwork(Chain(Dense(dim(S)[1] + length(as), 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 D_DQN() = DiscreteNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as), sigmoid)), as)
 V() = ContinuousNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 A() = DiscreteNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as)), softmax), as)

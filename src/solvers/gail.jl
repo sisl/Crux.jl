@@ -84,6 +84,10 @@ function pg_Lᴰ(D, 𝒟_expert, 𝒟_π; info = Dict())
     LBCE(value(D, vcat(𝒟_expert[:s], 𝒟_expert[:a])), 1.f0) + LBCE(value(D, vcat(𝒟_π[:s], 𝒟_π[:a])), 0.f0)
 end
 
+function pg_Lᴰ_expert_val(D, 𝒟_expert, 𝒟_π; info = Dict())
+    LBCE(value(D, vcat(𝒟_expert[:s], 𝒟_expert[:a])), 𝒟_expert[:expert_val]) + LBCE(value(D, vcat(𝒟_π[:s], 𝒟_π[:a])), 0.f0)
+end
+
 # function pg_Lᴰ_nda(D, 𝒟_expert, 𝒟_π, 𝒟_nda, λ_nda::Float32)
 #     LBCE(q_predicted(D, 𝒟_expert), 1.f0) +  LBCE(q_predicted(D, 𝒟_π), 0.f0) + λ_nda*LBCE(q_predicted(D, 𝒟_nda), 0.f0)
 # end
@@ -104,7 +108,13 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{PGSolver}, mdp)
         push!(𝒟, steps!(s, Nsteps = 𝒮.ΔN, reset = true, explore = true))
         
         # Train the discriminator (using batches)
-        if isnothing(𝒮GAIL.nda_buffer)
+        if haskey(𝒮GAIL.expert_buffer, :expert_val)
+            info_D = train!(𝒮GAIL.D, pg_Lᴰ_expert_val, 𝒮.batch_size, 𝒮GAIL.optD, 
+                                  𝒮GAIL.expert_buffer, 𝒟,
+                                  epochs = 𝒮.epochs, rng = 𝒮.rng,
+                                  loss_sym = :loss_D, grad_sym = :grad_norm_D)
+            
+        elseif isnothing(𝒮GAIL.nda_buffer)
             info_D = train!(𝒮GAIL.D, pg_Lᴰ, 𝒮.batch_size, 𝒮GAIL.optD, 
                                   𝒮GAIL.expert_buffer, 𝒟,
                                   epochs = 𝒮.epochs, rng = 𝒮.rng,
@@ -114,10 +124,7 @@ function POMDPs.solve(𝒮GAIL::GAILSolver{PGSolver}, mdp)
             error("not implemented")
         end
         
-        𝒟[:advantage] .= value(𝒮GAIL.D, vcat(𝒟[:s], 𝒟[:a]))
-        
-        # Normalize the advantage
-        𝒮.normalize_advantage && (𝒟[:advantage] .= whiten(𝒟[:advantage]))
+        𝒟[:advantage] .= whiten(value(𝒮GAIL.D, 𝒟[:s], 𝒟[:a]))
         
         # Train the policy (using batches)
         info_G = train!(𝒮.π, 𝒮.loss, 𝒮.batch_size, 𝒮.opt, 𝒟, 

@@ -77,4 +77,5 @@ solve(𝒮_gail, mdp)
                         a_opt=(batch_size=256, optimizer=ADAM(1e-5), name="actor_", regularizer=OrthogonalRegularizer(1f-4)), 
                         shared...)
                         
-@time solve(𝒮_valueDICE, mdp, mdplog)
+solve(𝒮_valueDICE, mdp, mdplog)
+

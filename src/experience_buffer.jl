@@ -60,6 +60,11 @@ end
     max_priority::Float32 = 1.0
 end
 
+function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
+    data = Dict(k=>deepcopy(device(collect(bslice(v,1:capacity)))) for (k,v) in b.data)
+    clear!(ExperienceBuffer(data))
+end        
+
 function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
     elements = size(first(data)[2], 2)
     ExperienceBuffer(data = data, elements = elements)
@@ -90,6 +95,17 @@ function Flux.cpu(b::ExperienceBuffer)
     data = Dict{Symbol, Array}(k => v |> cpu for (k,v) in b.data)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
+
+function clear!(b::ExperienceBuffer)
+    b.elements = 0
+    b.next_ind = 1
+    b.indices = []
+    if prioritized(b)
+        b.minsort_priorities = MinHeap(fill(Inf32, capacity))
+        b.priorities = FenwickTree(fill(0f0, capacity))
+    end
+    b
+end 
 
 function Random.shuffle!(b::ExperienceBuffer)
     new_i = shuffle(1:length(b))
@@ -135,7 +151,7 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids
     N, C = length(ids), capacity(b)
     I = mod1.(b.next_ind:b.next_ind + N - 1, C)
-    for k in keys(data)
+    for k in keys(b)
         copyto!(bslice(b.data[k], I), collect(bslice(data[k], ids)))
     end
     prioritized(b) && update_priorities!(b, I, b.max_priority*ones(N))

@@ -9,13 +9,12 @@ DiagonalFisherRegularizer(θ, λ = 1) = DiagonalFisherRegularizer([zeros(Float32
 
 function (R::DiagonalFisherRegularizer)(π)
     θ = Flux.params(π)
-    R.N == 0 && return 0f0
     nparams = length(θ)
     tot = 0f0
     for (p1, p2, i) in zip(θ, R.θ⁻, 1:nparams)
-        tot += R.λ*mean(R.F[i].*(p1 .- p2).^2)
+        tot += mean(R.F[i].*(p1 .- p2).^2)
     end
-    tot / nparams
+    R.λ*tot / nparams
 end 
 
 function add_fisher_information_diagonal!(R::DiagonalFisherRegularizer, neg_loss, θ)
@@ -28,11 +27,11 @@ function add_fisher_information_diagonal!(R::DiagonalFisherRegularizer, neg_loss
     end        
 end
 
-function update_fisher!(R::DiagonalFisherRegularizer, 𝒟, loss, θ, batch_size; i=0)
+function update_fisher!(R::DiagonalFisherRegularizer, 𝒟, loss, θ, batch_size)
     shuffle!(𝒟)
     for i in partition(1:length(𝒟), batch_size)
         mb = minibatch(𝒟, i)
-        add_fisher_information_diagonal!(R, () -> -loss(𝒟), θ)
+        add_fisher_information_diagonal!(R, () -> loss(𝒟), θ)
     end
     R.θ⁻ = deepcopy(θ)
     nothing

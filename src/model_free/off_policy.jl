@@ -19,7 +19,7 @@
     buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size) # The replay buffer
     buffer_init::Int = max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
     required_columns = prioritized(buffer) ? [:weight] : Symbol[] # Extra data columns to store
-    extra_buffers = () # extra buffers (i.e. for experience replay in continual learning)
+    extra_buffers = [] # extra buffers (i.e. for experience replay in continual learning)
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
 end
 

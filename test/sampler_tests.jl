@@ -71,7 +71,7 @@ end
 @test failure(s1) < 1.
 
 ## fillto!
-b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4, Symbol), 100, [:advantage, :return])
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4, Symbol), 100)
 d = Dict(:s => 3*ones(2,3), :a => fill(:up, 1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 @test fillto!(b, s1, 3) == 0
@@ -79,6 +79,10 @@ push!(b, d)
 @test length(b) == 5
 
 ## Generalized Advantage Estimation
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4, Symbol), 100, [:advantage, :return])
+d = Dict(:s => 3*ones(2,3), :a => fill(:up, 1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3), :return=>ones(1,3), :advantage=>ones(1,3))
+push!(b, d)
+push!(b, d)
 #TODO: For policy gradient
 fill_gae!(b, 1:5, ContinuousNetwork(Chain((s)->zeros(1, size(s, 2))), 1), 0.9f0, 0.7f0)
 fill_returns!(b, 1:5, 0.7f0)

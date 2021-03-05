@@ -40,11 +40,12 @@ function smooth(v, weight = 0.6)
 end
 
 ## Continual Learning Analysis
-function cumulative_rewards(input, key = :undiscounted_return)
+# Compiles the cumulative reward while learning a sequence of tasks
+function cumulative_rewards(input, key=(i) -> Symbol("undiscounted_return/T$i"))
     dirs = directories(input)
     x, y, breaks, max_iter = [], [], [], 0
-    for dir in dirs
-        hist = readtb(dir)[key]
+    for (dir, i) in zip(dirs, 1:length(dirs))
+        hist = readtb(dir)[key(i)]
         push!(y, hist.values...)
         push!(x, (hist.iterations .+ max_iter)...)
         max_iter = maximum(x)
@@ -53,41 +54,76 @@ function cumulative_rewards(input, key = :undiscounted_return)
     x, cumsum(y), breaks
 end
 
-function plot_cumulative_rewards(input; p = plot(), label = "", key = :undiscounted_return)
+# Compiles the performance on each task over time
+function single_task_performances(input, key=(i) -> Symbol("undiscounted_return/T$i"))
+    dirs = directories(input)
+    res = Dict()
+    breaks = []
+    offset = 0
+    for t=1:length(dirs) # Loop over each task
+        for i=1:t # Loop up to each task
+            try
+            x, y = readtb(dirs[t], key(i)) # read the data
+            if i==t 
+                res[i] = ([], []) # Empty data for task t 
+                push!(breaks, maximum(x))
+            end           
+
+            push!(res[i][1], offset .+ x ...)
+            push!(res[i][2], y...)
+            catch end
+        end
+        offset = maximum(res[t][1])
+    end
+    res, cumsum(breaks)
+end
+
+function plot_cumulative_rewards(input; p=plot(), key=(i)->Symbol("undiscounted_return/T$i"), show_lines=false, kwargs...)
     x, y, lines = cumulative_rewards(input, key)
 
-    plot!(p, x, y, label = label, title = "Cumulative Reward", xlabel = "Test Index", ylabel = "Return")
+    plot!(p, x, y, title="Cumulative Reward", xlabel="Training Iteration", ylabel="Return"; kwargs...)
     
-    yrange = [extrema(y)...]
-    for l in lines
-        plot!(p, [l,l], yrange, color = :black, label = "")
+    if show_lines 
+        yrange = [0.9, 1.5].*[extrema(y)...]
+        for l in lines
+            plot!(p, [l,l], yrange, color=:black, label = "")
+        end
     end
     p
 end
 
-
-
-function plot_jumpstart(input; p = plot(), key = :undiscounted_return, label = "")
+function plot_jumpstart(input; p=plot(), key=(i)->Symbol("undiscounted_return/T$i"), kwargs...)
     dirs = directories(input)
-    jumpstarts = [readtb(dir, key)[2][1] for dir in dirs]
-    plot!(p, jumpstarts, xlabel = "Task Iteration", marker = true, markersize = 3, ylabel = "Return", title = "Jumpstart Performance", label = label)
+    jumpstarts = [readtb(dir, key(i))[2][1] for (dir, i) in zip(dirs,1:length(dirs))]
+    plot!(p, jumpstarts, xlabel = "Task Iteration", marker=true, markersize=3, ylabel="Return", title="Jumpstart Performance"; kwargs...)
 end
 
-function plot_peak_performance(input; p = plot(), key = :undiscounted_return, label = "", smooth_weight = 0.6)
+function plot_peak_performance(input; p=plot(), key=(i)->Symbol("undiscounted_return/T$i"), smooth_weight=0.6, kwargs...)
     dirs = directories(input)
-    jumpstarts = [maximum(smooth(readtb(dir, key)[2], smooth_weight)) for dir in dirs]
-    plot!(p, jumpstarts, xlabel = "Task Iteration", marker = true, markersize = 3, ylabel = "Return", title = "Peak Performance", label = label)
+    jumpstarts = [maximum(smooth(readtb(dir, key(i))[2], smooth_weight)) for (dir, i) in zip(dirs,1:length(dirs))]
+    plot!(p, jumpstarts, xlabel = "Task Iteration", marker=true, markersize=3, ylabel="Return", title="Peak Performance"; kwargs...)
 end
 
-function plot_steps_to_threshold(input, thresh; p = plot(), key = :undiscounted_return, label = "", smooth_weight = 0.6)
+function plot_steps_to_threshold(input, thresh; p=plot(), key=(i)->Symbol("undiscounted_return/T$i"), smooth_weight=0.6, kwargs...)
     dirs = directories(input)
     steps = []
-    for dir in dirs    
-        iters, vals = readtb(dir, key)
+    for (dir,i) in zip(dirs, 1:length(dirs))    
+        iters, vals = readtb(dir, key(i))
         push!(steps, find_crossing(iters, smooth(vals, smooth_weight), thresh)[1])
     end
-    plot!(p, steps, xlabel = "Task Iteration", marker = true, markersize = 3, ylabel = "Iterations", title = "Steps to $thresh performance", label = label)
+    plot!(p, steps, xlabel = "Task Iteration", marker = true, markersize = 3, ylabel = "Iterations", title = "Steps to $thresh performance"; kwargs...)
 end
+
+
+function plot_forgetting(input; p=plot([plot() for _=1:length(input)]..., layout=(length(input),1)), key=(i)->Symbol("undiscounted_return/T$i"), smooth_weight=0.6, kwargs...)
+    curves, lines = single_task_performances(input)
+    for (k,v) in curves
+        plot!(p[k], v[1], smooth(v[2], smooth_weight), xlabel="Training Iteration", ylabel="Return", xlims=(0,Inf); kwargs...)
+    end
+    p
+end
+    
+    
 
 function plot_learning(input; 
         title = "",
@@ -98,7 +134,6 @@ function plot_learning(input;
         legend = :bottomright,
         font = :palatino,
         p = plot(), 
-        colors = (i) -> get(colorschemes[:rainbow], rand(MersenneTwister(5),i)[end]),
         vertical_lines = [],
         vline_range = (0, 1), 
         thick_every = 1
@@ -113,15 +148,15 @@ function plot_learning(input;
     
     # Plot the vertical lines (usually for multitask learning or to designate a point on the curve)
     for i = 1:length(vertical_lines)
-        plot!(p, [vertical_lines[i], vertical_lines[i]], [vline_range...], color = :black, linewidth = i % thick_every == 0 ? 3 : 1, label = "")
+        plot!(p, [vertical_lines[i], vertical_lines[i]], [vline_range...], color=:black, linewidth = i % thick_every == 0 ? 3 : 1, label = "")
     end
     
     # Plot the learning curves
     plot!(p, ylabel = ylabel, xlabel = xlabel, legend = legend, title = title, fontfamily = font)
     for i in 1:length(dirs)
         x, y = readtb(dirs[i], values[i])
-        plot!(p, x, y, alpha = 0.3, color = colors(i), label = "")
-        plot!(p, x, smooth(y), color = colors(i), label = labels[i], linewidth =2 )
+        plot!(p, x, y, alpha = 0.3, color=i, label = "")
+        plot!(p, x, smooth(y), color=i, label = labels[i], linewidth =2 )
     end
     p
 end

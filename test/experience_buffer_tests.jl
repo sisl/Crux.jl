@@ -136,6 +136,14 @@ b_gpu = b |> gpu
 @test :done in keys(b_gpu.data)
 @test haskey(bpriority, :weight)
 
+# Buffer_like function
+bsmall = Crux.buffer_like(b, capacity=3, device=cpu)
+@test device(bsmall) == cpu
+@test keys(bsmall) == keys(b)
+@test capacity(bsmall) == 3
+@test length(bsmall) == 0
+
+
 ## Base functions 
 @test keys(b) == keys(b.data)
 
@@ -154,7 +162,7 @@ b_gpu = b |> gpu
 
 ## push!
 #push dictionary with one element
-d = Dict(:s => 2*ones(2,1), :a => ones(Int, 1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 2*ones(2,1), :a => ones(Int, 1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1), :weight=>zeros(1,1))
 push!(b, d)
 @test length(b) == 1
 @test b[:s] == 2*ones(2,1)
@@ -164,7 +172,7 @@ push!(b, d)
 @test b[:done] == zeros(1,1)
 
 # push dictionary with more than one element
-d = Dict(:s => 3*ones(2,3), :a => ones(1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
+d = Dict(:s => 3*ones(2,3), :a => ones(1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3), :weight=>zeros(1,3))
 push!(b, d)
 @test length(b) == 4
 @test b[:s][:,2:end] ==  3*ones(2,3)
@@ -182,9 +190,9 @@ end
 
 ## minibatch
 I = [1,2,4]
-d = minibatch(b, I)
-for k in keys(d)
-    @test all(d[k] .== b[k][:, I])
+d2 = minibatch(b, I)
+for k in keys(d2)
+    @test all(d2[k] .== b[k][:, I])
 end 
 
 ## update_priorities!
@@ -196,6 +204,7 @@ update_priorities!(bpriority, [1,2,3], [1., 2., 3.])
 @test bpriority.minsort_priorities[1] ≈ 1f0^bpriority.α
 @test bpriority.minsort_priorities[2] ≈ 2f0^bpriority.α
 @test bpriority.minsort_priorities[3] ≈ 3f0^bpriority.α
+
 
 push!(bpriority, d)
 push!(bpriority, d)
@@ -213,6 +222,7 @@ t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 rand!(t, b)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3)
+Random.seed!(0)
 ids = rand(1:length(b), 3)
 Random.seed!(0)
 rand!(t, b)

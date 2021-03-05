@@ -42,7 +42,7 @@ end
 function POMDPs.solve(𝒮::ValueDICESolver, mdp, logmdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, [:t], device=device(𝒮.π))
-    𝒟_exp = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, [:t, :s0], device=device(𝒮.π))
+    𝒟_exp = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, [:t], device=device(𝒮.π))
     𝒟_exp.data[:expert_val] = ones(Float32, 1, 𝒮.c_opt.batch_size)
     
     γ = Float32(discount(mdp))

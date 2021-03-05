@@ -67,7 +67,7 @@ l = loss(x, y) # ~ 3
 θ = Flux.params(W, b)
 grads = Flux.gradient(() -> loss(x, y), θ)
 
-@test norm(grads) > 2
+@test norm(grads) > 1
 
 
 

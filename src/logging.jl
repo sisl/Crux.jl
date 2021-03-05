@@ -37,8 +37,8 @@ log_performance(s::AbstractVector, name, fn; kwargs...) = Dict("$(name)/T$i" => 
 log_performance(s::Sampler, name, fn; kwargs...) = Dict(name => fn(s; kwargs...))
 
 log_discounted_return(Neps) = (;s, kwargs...) -> log_performance(s, "discounted_return", discounted_return, Neps=Neps)
-log_undiscounted_return(Neps) = (;s, kwargs...) -> log_performance(s, "undiscounted_return", undiscounted_return, Neps=Neps)
-log_undiscounted_return(s, Neps) = (;kwargs...) -> log_performance(s, "undiscounted_return", undiscounted_return, Neps=Neps)
+log_undiscounted_return(Neps; name="undiscounted_return") = (;s, kwargs...) -> log_performance(s, name, undiscounted_return, Neps=Neps)
+log_undiscounted_return(s, Neps; name="undiscounted_return") = (;kwargs...) -> log_performance(s, name, undiscounted_return, Neps=Neps)
 log_failure(Neps) = (;s, kwargs...) -> log_performance(s, "failure_rate", failure, Neps=Neps)
 
 log_exploration(policy) = (;kwargs...) -> Dict()

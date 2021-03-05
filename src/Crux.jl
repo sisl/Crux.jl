@@ -23,8 +23,8 @@ module Crux
            state_space, device, cpucall, gpucall, mdcall, bslice, whiten
     include("utils.jl")
     
-    export MinHeap, inverse_query, mdp_data, ExperienceBuffer, minibatch,
-           prioritized, dim, episodes, update_priorities!, uniform_sample!, 
+    export MinHeap, inverse_query, mdp_data, ExperienceBuffer, buffer_like, minibatch,
+           clear!, prioritized, dim, episodes, update_priorities!, uniform_sample!, 
            prioritized_sample!, capacity, geometric_sample!
     include("experience_buffer.jl")
     
@@ -48,7 +48,8 @@ module Crux
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
-           find_crossing, plot_jumpstart, directories, plot_peak_performance, plot_learning
+           find_crossing, plot_jumpstart, directories, plot_peak_performance, 
+           plot_learning, plot_cumulative_rewards, plot_steps_to_threshold
     include("analysis.jl")
     
     export DenseSN, ConvSN
@@ -59,6 +60,9 @@ module Crux
     
     export DiagonalFisherRegularizer, add_fisher_information_diagonal!, update_fisher!
     include("extras/fisher_information.jl")
+    
+    export BCRegularizer
+    include("extras/behavioral_cloning_regularization.jl")
     
     export OrthogonalRegularizer
     include("extras/orthogonal_regularization.jl")

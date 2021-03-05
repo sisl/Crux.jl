@@ -35,21 +35,21 @@ log_std() = -0.5f0*ones(Float32, adim)
 # Networks for off-policy algorithms
 Q() = ContinuousNetwork(Chain(Dense(idim, 256, relu, initW = Winit, initb = binit(idim)), 
             Dense(256, 256, relu, initW = Winit, initb = binit(256)), 
-            Dense(256, 1, initW = Winit, initb = binit(256))) |>gpu )
+            Dense(256, 1, initW = Winit, initb = binit(256))) )
             
             
 QSN() = ContinuousNetwork(Chain(DenseSN(idim, 256, relu, initW = Winit, initb = binit(idim)), 
             DenseSN(256, 256, relu, initW = Winit, initb = binit(256)), 
-            DenseSN(256, 1, initW = Winit, initb = binit(256))) |> gpu)
+            DenseSN(256, 1, initW = Winit, initb = binit(256))))
             
 A() = ContinuousNetwork(Chain(Dense(S.dims[1], 256, relu, initW = Winit, initb = binit(idim)), 
             Dense(256, 256, relu, initW = Winit, initb = binit(256)), 
             Dense(256, 6, tanh, initW = Winit, initb = binit(256))))
 function SAC_A()
     base = Chain(Dense(S.dims[1], 256, relu, initW = Winit, initb = binit(idim)), 
-                Dense(256, 256, relu, initW = Winit, initb = binit(256))) |>gpu
-    mu = ContinuousNetwork(Chain(base..., Dense(256, 6, initW = Winit, initb = binit(256))) |>gpu)
-    logΣ = ContinuousNetwork(Chain(base..., Dense(256, 6, initW = Winit, initb = binit(256))) |>gpu)
+                Dense(256, 256, relu, initW = Winit, initb = binit(256)))
+    mu = ContinuousNetwork(Chain(base..., Dense(256, 6, initW = Winit, initb = binit(256))))
+    logΣ = ContinuousNetwork(Chain(base..., Dense(256, 6, initW = Winit, initb = binit(256))))
     SquashedGaussianPolicy(mu, logΣ)
 end
 
@@ -71,25 +71,10 @@ solve(𝒮_gail, mdp)
 𝒮_valueDICE = ValueDICE(;π=ActorCritic(SAC_A(), QSN()),
                         𝒟_expert=expert_trajectories, 
                         α=0.1,
-                        ΔN=1,
                         buffer_size=Int(1e6), 
                         buffer_init=200, 
-                        c_opt=(batch_size=256, optimizer=ADAM(1e-3), epochs=4, name="critic_"), 
+                        c_opt=(batch_size=256, optimizer=ADAM(1e-3), name="critic_"), 
                         a_opt=(batch_size=256, optimizer=ADAM(1e-5), name="actor_", regularizer=OrthogonalRegularizer(1f-4)), 
                         shared...)
                         
 @time solve(𝒮_valueDICE, mdp, mdplog)
-
-
-
-
-# using Random, TensorBoardLogger
-# 𝒮 = BSON.load("examples/il/expert_data/S_sac.bson")[:S]
-# 
-# s = Sampler(mdp, 𝒮.π, S, required_columns=[:t], max_steps=1000)
-# data = steps!(s, Nsteps=10000)
-# data[:expert_val] = ones(Float32, 1, length(data[:r]))
-# 
-# data = ExperienceBuffer(data)
-# BSON.@save "examples/il/expert_data/half_cheetah.bson" data
-# data[:t]

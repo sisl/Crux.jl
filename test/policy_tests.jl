@@ -132,9 +132,9 @@ a = rand([1,], 100)
 @test action_space(p) == action_space(p.N1)
 
 ## Actor Critic
-A = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
+Anet = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
 C = ContinuousNetwork(Chain(Dense(6,32, relu), Dense(32, 1)))
-p = ActorCritic(A, C)
+p = ActorCritic(Anet, C)
 
 @test action_space(p) == action_space(p.A)
 
@@ -154,8 +154,8 @@ a = rand(4, 100)
 @test action(p, s) == action(p.A, s)
 @test all(action(p, s) .≈ action(p_gpu, s))
 
-A = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 1)), [1,])
-p = ActorCritic(A, C)
+Anet = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 1)), [1,])
+p = ActorCritic(Anet, C)
 
 Random.seed!(1)
 e1 = exploration(p, s)
@@ -171,9 +171,9 @@ a = rand([1,], 100)
 
 
 ## Gaussian Policy
-μ = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
-logΣ = ones(Float32, 4)
-p = GaussianPolicy(μ, logΣ)
+μnet = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
+logΣnet = ones(Float32, 4)
+p = GaussianPolicy(μnet, logΣnet)
 @test Crux.device(p) == cpu
 @test all(p.logΣ .== 1)
 
@@ -219,9 +219,9 @@ a = [exploration(p, [1])[1][1] for i=1:100000]
 
 ## Squashed Gaussian Policy
 trunk = Chain(Dense(2,32, relu))
-μ = ContinuousNetwork(Chain(trunk..., Dense(32, 4)))
-logΣ = ContinuousNetwork(Chain(trunk..., Dense(32, 4)))
-p = SquashedGaussianPolicy(μ, logΣ)
+μnet = ContinuousNetwork(Chain(trunk..., Dense(32, 4)))
+logΣnet = ContinuousNetwork(Chain(trunk..., Dense(32, 4)))
+p = SquashedGaussianPolicy(μnet, logΣnet)
 @test Crux.device(p) == cpu
 
 p_gpu = p |> gpu
@@ -267,7 +267,7 @@ p = ϵGreedyPolicy(1f0, [1,])
 a, logprob = exploration(p, s0; π_on=p_on, i=1)
 @test a==[1] && isnan(logprob)
 
-p = ϵGreedyPolicy(LinearDecaySchedule(1f0, 0f0, 10), [1,])
+p = ϵGreedyPolicy(Crux.LinearDecaySchedule(1f0, 0f0, 10), [1,])
 @test exploration(p, s0; π_on=p_on, i=0)[1] == [1]
 @test exploration(p, s0; π_on=p_on, i=10)[1] == [3]
 @test p.ϵ(5) == 0.5

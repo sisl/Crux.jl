@@ -18,16 +18,16 @@
     buffer_init::Int=max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
 end
 
-ValueDICE(;ΔN=50, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), kwargs...) = ValueDICESolver(;a_opt=TrainingParams(;loss=valueDICE_loss, a_opt...), c_opt=TrainingParams(;loss=valueDICE_loss, epochs=ΔN, c_opt...), kwargs...)
+ValueDICE(;ΔN=50, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), kwargs...) = ValueDICESolver(;ΔN=ΔN, a_opt=TrainingParams(;loss=valueDICE_loss, a_opt...), c_opt=TrainingParams(;loss=valueDICE_loss, epochs=ΔN, c_opt...), kwargs...)
 
 # orthogonal initialization
 # GP on critic
 # orthogonal regularization on the policy
 
 function valueDICE_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict())
-    a0, _= action_and_logprob(π.A, 𝒟_exp[:s]) #:s0
-    a, _ = action_and_logprob(π.A, 𝒟[:sp])
-    ae, _  = action_and_logprob(π.A, 𝒟_exp[:sp])
+    a0, _= exploration(π.A, 𝒟_exp[:s]) #:s0
+    a, _ = exploration(π.A, 𝒟[:sp])
+    ae, _  = exploration(π.A, 𝒟_exp[:sp])
     
     ΔνE = value(π, 𝒟_exp[:s], 𝒟_exp[:a]) - γ*value(π, 𝒟_exp[:sp], ae)
     Δν = value(π, 𝒟[:s], 𝒟[:a]) - γ*value(π, 𝒟[:sp], a)

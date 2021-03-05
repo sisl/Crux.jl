@@ -210,11 +210,12 @@ end
 
 # uniform sample
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-rand!(Random.GLOBAL_RNG, t, b)
+rand!(t, b)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3)
 ids = rand(1:length(b), 3)
-rand!(MersenneTwister(0), t, b)
+Random.seed!(0)
+rand!(t, b)
 
 for k in keys(t)
     @test t[k] == b[k][:,ids]
@@ -234,7 +235,7 @@ d = Dict(:s => 3*ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), 
 push!(t3, d)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-rand!(Random.GLOBAL_RNG, t, t1, t2, t3)
+rand!(t, t1, t2, t3)
 
 @test all(t[:s][:, 1:4] .== 1.0)
 @test all(t[:s][:, 5:7] .== 2.0)

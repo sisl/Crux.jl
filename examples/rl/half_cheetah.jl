@@ -75,6 +75,16 @@ solve(𝒮_td3, mdp)
 𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(Q(), Q())), shared..., off_policy...)
 solve(𝒮_sac, mdp)
 
+𝒮_sac
+s = Sampler(mdp, 𝒮_sac.π, S, max_steps=1000, required_columns=[:t])
+
+data = steps!(s, Nsteps=10000)
+sum(data[:r])/10
+data[:expert_val] = ones(Float32, 1, 10000)
+
+data = ExperienceBuffer(data)
+BSON.@save "examples/il/expert_data/half_cheetah.bson" data
+
 # Plot the learning curve
 p = plot_learning([𝒮_ppo, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title = "HalfCheetah Training Curves", labels = ["PPO", "DDPG", "TD3", "SAC"])
 Crux.savefig("half_cheetah_benchmark.pdf")

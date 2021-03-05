@@ -3,7 +3,7 @@ using Test
 
 
 m = MultitaskDecaySchedule(10, [1,2,3])
-l = LinearDecaySchedule(1.0, 0.1, 10)
+l = Crux.LinearDecaySchedule(1.0, 0.1, 10)
 
 for i=1:10
     @test m(i) == l(i)

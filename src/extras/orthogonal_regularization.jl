@@ -4,7 +4,7 @@ end
 
 function (R::OrthogonalRegularizer)(π)
     reg = 0f0
-    for l in layers(π)
+    for l in ignore(()->layers(π))
         if l isa Dense
             prod = l.W' * l.W
             mat = ignore(() -> ones(Float32, size(prod)...) .- Matrix{Float32}(I, size(prod)...) |> device(π))

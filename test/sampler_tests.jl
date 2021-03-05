@@ -46,11 +46,11 @@ data = steps!(s3, Nsteps = 100)
 @test size(data[:s], 2) == 100
 
 ## episodes! function
-data, episodes = episodes!(s2, Neps = 10, return_episodes = true)
+data, eps = episodes!(s2, Neps=10, return_episodes=true)
 
-@test length(episodes) == 10 
+@test length(eps) == 10 
 
-for e in episodes
+for e in eps
     @test e[1] < e[2]
     @test data[:done][e[2]] == 1f0 || e[2] - e[1] == s2.max_steps - 1
 end
@@ -59,7 +59,7 @@ end
 #TODO for GAIL
 
 ## Trajecory metrics
-for e in episodes
+for e in eps
     ur =  undiscounted_return(data, e...)
     @test ur in [-10., 10., 0., 3., -5.]
     @test discounted_return(data, e..., discount(mdp)) ≈ ur*discount(mdp)^(e[2] - e[1])

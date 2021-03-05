@@ -18,12 +18,12 @@ end
 
 function continual_learning(tasks, solver_generator)
     solvers = Solver[]
-    𝒮 = solver_generator(i = 1)
+    𝒮 = solver_generator(i=1, tasks=tasks[1:1])
     for i in 1:length(tasks)
         solve(𝒮, tasks[i])
         push!(solvers, deepcopy(𝒮))
         if i < length(tasks)
-            𝒮 = solver_generator(tasks = tasks[1:i], solvers=solvers, i = i+1)
+            𝒮 = solver_generator(tasks=tasks[1:i+1], solvers=solvers, i=i+1)
         end
     end
     solvers

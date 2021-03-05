@@ -154,10 +154,8 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     end
 end
 
-function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1)
-    lengths = [length.(source)...]
-    batches = floor.(Int, capacity(target) .* lengths ./ sum(lengths))
-    # batches = floor.(Int, capacity(target)  ./ fill(length(source), length(source)))
+function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1, fracs = ones(length(source))./length(source))
+    batches = floor.(Int, capacity(target) .* fracs)
     batches[1] += capacity(target) - sum(batches)
     
     for (b, B) in zip(source, batches)

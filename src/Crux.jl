@@ -1,9 +1,8 @@
 module Crux
     using Random
-    import Distributions:Categorical, MvNormal, logpdf
+    using Distributions
     using POMDPs
-    using POMDPPolicies
-    using POMDPModelTools
+    using POMDPModelTools:render
     using Parameters
     using TensorBoardLogger
     using Flux
@@ -20,20 +19,22 @@ module Crux
     using Statistics
     using Base.Iterators: partition
     
-    export AbstractSpace, DiscreteSpace, ContinuousSpace, useonehot, type, dim, 
+    export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
            state_space, device, cpucall, gpucall, mdcall, bslice, whiten
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, ExperienceBuffer, minibatch,
            prioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!
+           prioritized_sample!, capacity, geometric_sample!
     include("experience_buffer.jl")
     
+    export TrainingParams, batch_train!
     include("training.jl")
     
     export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
-           ActorCritic, GaussianPolicy, GaussianNoiseExplorationPolicy, FirstExplorePolicy,
-           entropy, action_space
+           DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy,
+           GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
+           entropy, logpdf, action_space, exploration, layers
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
@@ -43,28 +44,41 @@ module Crux
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
-           log_exploration, smooth, readtb, plot_learning, episode_frames, gif 
+           log_exploration
     include("logging.jl")
+    
+    export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
+           find_crossing, plot_jumpstart, directories, plot_peak_performance, plot_learning
+    include("analysis.jl")
+    
+    export DenseSN, ConvSN
+    include("extras/spectral_normalization.jl")
+    
+    export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ
+    include("extras/gans.jl")
     
     export DiagonalFisherRegularizer, add_fisher_information_diagonal!, update_fisher!
     include("extras/fisher_information.jl")
     
-    export MultitaskDecaySchedule, sequential_learning, experience_replay, ewc, log_multitask_performances!
+    export OrthogonalRegularizer
+    include("extras/orthogonal_regularization.jl")
+    
+    export MultitaskDecaySchedule, sequential_learning, experience_replay, ewc, log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
-    export weighted_mean, td_loss, td_error
-    include("solvers/value_common.jl")
-    
-    export DQNSolver
-    include("solvers/dqn.jl")
-    
-    export PGSolver, ppo, reinforce, a2c
-    include("solvers/actor_critic.jl")
-    
-    export GAILSolver
-    include("solvers/gail.jl")
-
-    export DDPGSolver
-    include("solvers/ddpg.jl")
+    export OnPolicySolver, OffPolicySolver
+    export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
+    export GAIL, ValueDICE
+    include("model_free/on_policy.jl")
+    include("model_free/off_policy.jl")
+    include("model_free/rl/reinforce.jl")
+    include("model_free/rl/a2c.jl")
+    include("model_free/rl/ppo.jl")
+    include("model_free/rl/dqn.jl")
+    include("model_free/rl/ddpg.jl")
+    include("model_free/rl/td3.jl")
+    include("model_free/rl/sac.jl")
+    include("model_free/il/gail.jl")
+    include("model_free/il/valueDICE.jl")
 end
 

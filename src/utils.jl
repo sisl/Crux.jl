@@ -2,8 +2,7 @@
 abstract type AbstractSpace end
 @with_kw struct DiscreteSpace <: AbstractSpace
     N::Int
-    onehot::Bool = true
-    type::Type = Bool
+    type::Type = Int32
 end
 DiscreteSpace(N::Int) = DiscreteSpace(N = N)
 
@@ -13,12 +12,8 @@ DiscreteSpace(N::Int) = DiscreteSpace(N = N)
 end
 ContinuousSpace(dims) = ContinuousSpace(dims = tuple(dims...))
 
-useonehot(s::DiscreteSpace) = s.onehot
-type(s::DiscreteSpace) = s.onehot ? Bool : s.type
-dim(s::DiscreteSpace) = s.onehot ? (s.N,) : (1,)
-
-useonehot(s::ContinuousSpace) = false
-type(s::ContinuousSpace) = s.type
+type(s::AbstractSpace) = s.type
+dim(s::DiscreteSpace) = (1,)
 dim(s::ContinuousSpace) = s.dims
 
 function state_space(mdp)
@@ -73,6 +68,9 @@ end
 
 ## Flux stuff
 whiten(v::AbstractArray) = (v .- mean(v)) ./ std(v)
+
+# Weighted mean aggregator
+weighted_mean(weights) = (y) -> mean(y .* weights)
     
 function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
     v = []
@@ -81,4 +79,3 @@ function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
     end
     norm(v, p)
 end
-

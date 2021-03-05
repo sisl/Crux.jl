@@ -12,30 +12,26 @@ s1 = DiscreteSpace(5)
 @test s1 isa AbstractSpace
 @test s1 isa DiscreteSpace
 @test s1.N == 5
-@test useonehot(s1)
-@test type(s1) == Bool
-@test dim(s1) == (5,)
+@test type(s1) == Int32
+@test Crux.dim(s1) == (1,)
 
-s2 = DiscreteSpace(5, false, Symbol)
+s2 = DiscreteSpace(5, Symbol)
 @test s2 isa AbstractSpace
 @test s2 isa DiscreteSpace
 @test s2.N == 5
-@test !useonehot(s2)
 @test type(s2) == Symbol
-@test dim(s2) == (1,)
+@test Crux.dim(s2) == (1,)
 
 s3 = ContinuousSpace((3,4), Float64)
 @test s3 isa AbstractSpace
 @test s3 isa ContinuousSpace
 @test s3.dims == (3,4)
-@test !useonehot(s3)
 @test type(s3) == Float64
-@test dim(s3) == (3,4)
+@test Crux.dim(s3) == (3,4)
 
 s4 = state_space(mdp)
 @test s4 isa ContinuousSpace
-@test dim(s4) == (2,)
-@test !useonehot(s4)
+@test Crux.dim(s4) == (2,)
 
 ## Gpu stuff
 vcpu = zeros(Float32, 10, 10)

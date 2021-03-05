@@ -33,7 +33,8 @@ N = 13500
 for i=1:N
     update!(priorities, i, rand(Float32))
 end
-ptot = prefixsum(priorities, 100000)
+ptot = prefixsum(priorities, N)
+
 B = 320
 Δp = ptot / B
 inverse_query(priorities, B*Δp)
@@ -41,25 +42,21 @@ inverse_query(priorities, ptot)
 @test inverse_query(priorities, B*Δp, N) <= N+1
 inverse_query(priorities, ptot, N-1)
 
-
-
 for i = 1:1000
     rns = [rand() for _=1:B]
-    indices = [inverse_query(priorities, (j + rns[j] - 1) * Δp) for j=1:B]
-    if !all(indices .<= 13500)
-        println("rn: ", rns)
+    indices = [inverse_query(priorities, (j + rns[j] - 1) * Δp, N-1) for j=1:B]
+    if !all(indices .<= N)
+        i = findfirst(indices .> N)
+        println("index: ", i, " rn: ", rns[i], " val: ", inverse_query(priorities, (i + rns[i] - 1) * Δp))
     end
+    @test all(indices .<= N)
 end
-
-
-ptot
-(B-1 + 0.9995799680)*Δp
 
 
 # power of 2 arrays
 for i=1:1000
     rval = 5*rand()
-    ind = inverse_query(t2pow, rval)
+    ind = inverse_query(t2pow, rval, 16)
 
     @test prefixsum(t2pow, ind) ≥ rval
     @test prefixsum(t2pow, ind-1) < rval
@@ -157,21 +154,21 @@ b_gpu = b |> gpu
 
 ## push!
 #push dictionary with one element
-d = Dict(:s => 2*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 2*ones(2,1), :a => ones(Int, 1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(b, d)
 @test length(b) == 1
 @test b[:s] == 2*ones(2,1)
-@test b[:a] == ones(4,1)
+@test b[:a] == ones(Int, 1,1)
 @test b[:sp] == ones(2,1)
 @test b[:r] == ones(1,1)
 @test b[:done] == zeros(1,1)
 
 # push dictionary with more than one element
-d = Dict(:s => 3*ones(2,3), :a => ones(4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
+d = Dict(:s => 3*ones(2,3), :a => ones(1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
 push!(b, d)
 @test length(b) == 4
 @test b[:s][:,2:end] ==  3*ones(2,3)
-@test b[:a][:,2:end] == ones(4,3)
+@test b[:a][:,2:end] == ones(1,3)
 @test b[:sp][:,2:end] == 5*ones(2,3)
 @test b[:r][:,2:end] == 6*ones(1,3)
 @test b[:done][:,2:end] == ones(1,3)
@@ -216,8 +213,7 @@ t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
 rand!(Random.GLOBAL_RNG, t, b)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 3)
-rng = MersenneTwister(0)
-ids = rand(rng, 1:length(b), 3)
+ids = rand(1:length(b), 3)
 rand!(MersenneTwister(0), t, b)
 
 for k in keys(t)
@@ -226,15 +222,15 @@ end
 
 # Test the multi-buffer sampling
 t1 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t1, d)
 
 t2 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => 2*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 2*ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t2, d)
 
 t3 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => 3*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 3*ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t3, d)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
@@ -253,7 +249,7 @@ t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 1000, [:weight])
 priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
 
 
-rand!(rng, t, bpriority)
+rand!(t, bpriority)
 
 # Test the the frequency of samples is proportional to their priority
 length(t)
@@ -276,7 +272,7 @@ b2d = ExperienceBuffer(ContinuousSpace((2,2), UInt8), DiscreteSpace(4), 100;)
 @test ndims(b2d[:s]) == 3
 b2d[:s]
 
-d = Dict(:s => 3*ones(2,2,1), :a => ones(4,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 3*ones(2,2,1), :a => ones(1,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(b2d, d)
 
 @test all(b2d[:s] .== 3)

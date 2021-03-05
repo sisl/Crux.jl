@@ -8,7 +8,7 @@ S = state_space(mdp)
 
 Vnet = ContinuousNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 Anet = Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as)), softmax)
-AC(rng = Random.GLOBAL_RNG) = ActorCritic(DiscreteNetwork(deepcopy(Anet), as, rng = rng), deepcopy(Vnet))
+AC() = ActorCritic(DiscreteNetwork(deepcopy(Anet), as, rng = rng), deepcopy(Vnet))
 AC_GPU(rng = Random.GLOBAL_RNG) = ActorCritic(DiscreteNetwork(deepcopy(Anet) |> gpu, as, rng = rng), deepcopy(Vnet) |> gpu)
 
 # CPU

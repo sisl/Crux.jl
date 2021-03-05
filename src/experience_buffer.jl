@@ -17,6 +17,8 @@ Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
 
 DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
 
+Base.zero(s::Type{Symbol}) = :zero # For initializing symbolic arrays
+
 # construction of common mdp data
 function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[]; ArrayType = Array, R = Float32, D = Bool, W = Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
     data = Dict{Symbol, ArrayType}(
@@ -27,12 +29,16 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :done => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:t, :return, :logprob, :advantage]
+        if k in [:return, :logprob, :advantage]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
         elseif k in [:episode_end]
             data[k] = ArrayType(fill(false, 1, capacity))
+        elseif k in [:t]
+            data[k] = ArrayType(fill(0, 1, capacity))
+        elseif k in [:s0]
+            data[k] = ArrayType(fill(zero(type(S)), dim(S)..., capacity))
         else
             error("Unrecognized key: ", k)
         end
@@ -85,8 +91,8 @@ function Flux.cpu(b::ExperienceBuffer)
     ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
 end
 
-function Random.shuffle!(rng::AbstractRNG, b::ExperienceBuffer)
-    new_i = shuffle(rng, 1:length(b))
+function Random.shuffle!(b::ExperienceBuffer)
+    new_i = shuffle(1:length(b))
     for k in keys(b)
         b[k] .= bslice(b[k], new_i)
     end
@@ -112,9 +118,15 @@ device(b::ExperienceBuffer{Array}) = cpu
 dim(b::ExperienceBuffer, s::Symbol) = size(b[s], 1)
 
 function episodes(b::ExperienceBuffer)
-    @assert haskey(b, :episode_end)
-    ep_ends = findall(b[:episode_end][1,:])
-    ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
+    if haskey(b, :episode_end)
+        ep_ends = findall(b[:episode_end][1,:])
+        ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
+    elseif haskey(b, :t)
+        ep_starts = findall(b[:t][1,:] .== 1)
+        ep_ends = [ep_starts[2:end] .- 1 ..., length(b)]
+    else
+        error("Need :episode_end flag or :t column to determine episodes")
+    end
     zip(ep_starts, ep_ends)
 end
 
@@ -130,6 +142,7 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
         
     b.elements = min(C, b.elements + N)
     b.next_ind = mod1(b.next_ind + N, C)
+    I
 end
 
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
@@ -141,7 +154,7 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     end
 end
 
-function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::ExperienceBuffer...; i = 1)
+function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1)
     lengths = [length.(source)...]
     batches = floor.(Int, capacity(target) .* lengths ./ sum(lengths))
     # batches = floor.(Int, capacity(target)  ./ fill(length(source), length(source)))
@@ -149,27 +162,49 @@ function Random.rand!(rng::AbstractRNG, target::ExperienceBuffer, source::Experi
     
     for (b, B) in zip(source, batches)
         B == 0 && continue
-        prioritized(b) ? prioritized_sample!(target, b, rng, i=i, B=B) : uniform_sample!(target, b, rng, B=B)
+        prioritized(b) ? prioritized_sample!(target, b, i=i, B=B) : uniform_sample!(target, b, B=B)
     end
 end
 
-function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; B = capacity(target))
-    ids = rand(rng, 1:length(source), B)
+function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer; B = capacity(target))
+    ids = rand(1:length(source), B)
     push!(target, source, ids = ids)
 end
 
 # With guidance from https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
-function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer, rng::AbstractRNG; i = 1, B = capacity(target))
+function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer; i = 1, B = capacity(target))
     @assert haskey(source, :weight) 
     N = length(source)
     ptot = prefixsum(source.priorities, N)
     Δp = ptot / B
-    target.indices = [inverse_query(source.priorities, (j + rand(rng) - 1) * Δp, N-1) for j=1:B]
+    target.indices = [inverse_query(source.priorities, (j + rand() - 1) * Δp, N-1) for j=1:B]
     target.indices = max.(target.indices, )
     pmin = first(source.minsort_priorities) / ptot
     max_w = (pmin*N)^(-source.β(i))
     source[:weight][1, target.indices] .= [(N * source.priorities[id] / ptot)^source.β(i) for id in target.indices] ./ max_w
     
     push!(target, source, ids = target.indices)
+end
+
+
+function find_ep(i, eps)
+    for ep in eps
+        i >= ep[1] && i <= ep[2] && return ep
+    end
+    error("$i out of range of $(collect(eps)[end][2])")
+end
+
+function geometric_sample!(target::ExperienceBuffer, source::ExperienceBuffer, γ; B = capacity(target))
+    ids = rand(1:length(source), B) # sample random starting points
+    eps = episodes(source)
+    eps = [Crux.find_ep(i, eps) for i in ids] # get the corresponding episode
+    range = [eps[i][2] - ids[i] for i=1:B] # get the length to the end of the episode
+    ids = [ids[i] + (range[i] == 0 ? 0 : Int(rand(Truncated(Geometric(1 - γ), 0, range[i])))) for i=1:B] # sample truncated geometric distribution
+    
+    indices = push!(target, source, ids=ids)
+    if haskey(target, :s0)
+        s0_ids = [ep[1] for ep in eps]
+        copyto!(bslice(target.data[:s0], indices), collect(bslice(source[:s], s0_ids)))
+    end
 end
 

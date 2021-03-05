@@ -28,8 +28,8 @@ function add_fisher_information_diagonal!(R::DiagonalFisherRegularizer, neg_loss
     end        
 end
 
-function update_fisher!(R::DiagonalFisherRegularizer, 𝒟, loss, θ, batch_size; i=0, rng::AbstractRNG = Random.GLOBAL_RNG)
-    shuffle!(rng, 𝒟)
+function update_fisher!(R::DiagonalFisherRegularizer, 𝒟, loss, θ, batch_size; i=0)
+    shuffle!(𝒟)
     for i in partition(1:length(𝒟), batch_size)
         mb = minibatch(𝒟, i)
         add_fisher_information_diagonal!(R, () -> -loss(𝒟), θ)

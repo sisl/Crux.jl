@@ -1,10 +1,9 @@
 using Crux
 using Test
-using POMDPPolicies
 
 
 m = MultitaskDecaySchedule(10, [1,2,3])
-l = LinearDecaySchedule(start = 1.0, stop = 0.1, steps = 10)
+l = LinearDecaySchedule(1.0, 0.1, 10)
 
 for i=1:10
     @test m(i) == l(i)

@@ -267,9 +267,9 @@ GaussianNoiseExplorationPolicy(σ::Real; kwargs...) = GaussianNoiseExplorationPo
 GaussianNoiseExplorationPolicy(σ::Function; kwargs...) = GaussianNoiseExplorationPolicy(σ = σ; kwargs...)
 
 function exploration(π::GaussianNoiseExplorationPolicy, s; π_on, i)
-    a = action(π_on, s)
+    a = action(π_on, s) |> cpu
     ϵ = randn(size(a)...)*π.σ(i)
-    clamp.(a .+ clamp.(ϵ, π.ϵ_min, π.ϵ_max), π.a_min, π.a_max), NaN
+    clamp.(a .+ clamp.(ϵ, π.ϵ_min, π.ϵ_max), π.a_min, π.a_max) |> device(s), NaN
 end
 
 

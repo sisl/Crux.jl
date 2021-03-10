@@ -63,19 +63,19 @@ off_policy = (ΔN=50,
 solve(𝒮_ppo, mdp)
 
 # Solve with DDPG
-𝒮_ddpg = DDPG(;π=ActorCritic(A(), Q()), shared..., off_policy...)  
+𝒮_ddpg = DDPG(;π=ActorCritic(A(), Q()) |> gpu, shared..., off_policy...)  
 solve(𝒮_ddpg, mdp)
 
 # Solve with TD3
-𝒮_td3 = TD3(;π=ActorCritic(A(), DoubleNetwork(Q(), Q())), shared..., off_policy..., 
+𝒮_td3 = TD3(;π=ActorCritic(A(), DoubleNetwork(Q(), Q())) |> gpu, shared..., off_policy..., 
                   π_smooth = GaussianNoiseExplorationPolicy(0.2f0, ϵ_min = -0.5f0, ϵ_max = 0.5f0, a_min = amin, a_max = amax))
 solve(𝒮_td3, mdp)
 
 # Solve with SAC
-𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(Q(), Q())), shared..., off_policy...)
+𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(Q(), Q())) |> gpu, shared..., off_policy...)
 solve(𝒮_sac, mdp)
 
-𝒮_sac
+using BSON
 s = Sampler(mdp, 𝒮_sac.π, S, max_steps=1000, required_columns=[:t])
 
 data = steps!(s, Nsteps=10000)
@@ -87,7 +87,7 @@ BSON.@save "examples/il/expert_data/half_cheetah.bson" data
 
 # Plot the learning curve
 p = plot_learning([𝒮_ppo, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title = "HalfCheetah Training Curves", labels = ["PPO", "DDPG", "TD3", "SAC"])
-Crux.savefig("half_cheetah_benchmark.pdf")
+Crux.savefig("examples/rl/half_cheetah_benchmark.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, 𝒮_ddpg.π, "mujoco.gif")

@@ -138,7 +138,7 @@ b_gpu = b |> gpu
 
 # Buffer_like function
 bsmall = Crux.buffer_like(b, capacity=3, device=cpu)
-@test device(bsmall) == cpu
+@test Crux.device(bsmall) == cpu
 @test keys(bsmall) == keys(b)
 @test capacity(bsmall) == 3
 @test length(bsmall) == 0
@@ -194,6 +194,22 @@ d2 = minibatch(b, I)
 for k in keys(d2)
     @test all(d2[k] .== b[k][:, I])
 end 
+
+## Split
+@test Crux.split_batches(100, [0.5, 0.5]) == [50,50]
+@test Crux.split_batches(100, [1.0]) == [100]
+@test Crux.split_batches(100, [1/3, 1/3, 1/3]) == [34,33,33]
+@test_throws AssertionError Crux.split_batches(100, 0.4)
+
+v = rand(3,100)
+bsplit = ExperienceBuffer(Dict(:a => v))
+
+b1, b2 = split(bsplit, [0.5, 0.5])
+@test length(b1) == 50
+@test b1[:a] == v[:,1:50]
+@test length(b2) == 50
+@test b2[:a] == v[:,51:100]
+
 
 ## update_priorities!
 update_priorities!(bpriority, [1,2,3], [1., 2., 3.])

@@ -17,3 +17,9 @@ expert_trajectories = BSON.load("examples/il/expert_data/cartpole.bson")[:data]
 𝒮_gail = GAIL(D=D(), gan_loss = GAN_LSLoss(), 𝒟_expert=expert_trajectories, solver=PPO, π=ActorCritic(A(), V()), S=S, N=10000, ΔN=1000)
 solve(𝒮_gail, mdp)
 
+𝒮_bc = BC(π=A(), 𝒟_expert=expert_trajectories, S=S, opt=(epochs=600,))
+solve(𝒮_bc, mdp)
+
+𝒮_advil = AdVIL(π=A(), D=D(), 𝒟_expert=expert_trajectories, S=S, a_opt=(epochs=600,))
+solve(𝒮_advil, mdp)
+

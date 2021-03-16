@@ -3,7 +3,7 @@
 Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
 Supports CPU and GPU computation and implements the following algorithms:
-
+### Reinforcement Learning
 * <a href="./src/model_free/rl/dqn.jl">Deep Q-Learning</a>
   * Prioritized Experience Replay
 * <a href="./src/model_free/rl/reinforce.jl">REINFORCE</a>
@@ -12,6 +12,9 @@ Supports CPU and GPU computation and implements the following algorithms:
 * <a href="./src/model_free/rl/ddpg.jl">Deep Deterministic Policy Gradient (DDPG)</a>
 * <a href="./src/model_free/rl/td3.jl">Twin Delayed DDPG (TD3)</a>
 * <a href="./src/model_free/rl/sac.jl">Soft Actor Critic (SAC)</a>
+
+### Imitation Learning
+* <a href="./src/model_free/il/bc.jl"> Behavioral Cloning </a>
 * <a href="./src/model_free/il/gail.jl">Generative Adversarial Imitation Learning (GAIL)</a>
 
 ## Installation

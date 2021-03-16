@@ -21,7 +21,7 @@ PPO(;π::ActorCritic, ϵ::Float32 = 0.2f0, λₚ::Float32 = 1f0, λₑ::Float32 
     OnPolicySolver(;
         π = π,
         log = LoggerParams(;dir = "log/ppo", log...),
-        a_opt = TrainingParams(;loss = ppo_loss(ϵ=ϵ, λₚ=λₚ, λₑ=λₑ), early_stopping = (info) -> (info[:kl] > 0.015), name = "actor_", a_opt...),
+        a_opt = TrainingParams(;loss = ppo_loss(ϵ=ϵ, λₚ=λₚ, λₑ=λₑ), early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
         c_opt = TrainingParams(;loss = (π, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
         post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
         kwargs...)

@@ -9,6 +9,22 @@
     name = ""
 end
 
+# Early stopping function that terminates training on validation error increase
+function stop_on_validation_increase(π, 𝒟_val, loss; window=5)
+    k = "validation_error"
+    (infos) -> begin
+        ve = loss(π, 𝒟_val) # Compute the validation error
+        infos[end][k] = ve # store it
+        N = length(infos)
+        # if length(infos) >= 2*window
+        #     curr_window = mean([infos[i][k] for i=N-window+1:N])
+        #     old_window = mean([infos[i][k] for i=N-2*window+1:N-window])
+        #     return curr_window >= old_window # check if the error has gone up
+        # end
+        false
+    end
+end
+
 function Flux.Optimise.train!(π, loss::Function, p::TrainingParams; info = Dict())
     θ = Flux.params(π)
     l, back = Flux.pullback(() -> loss(info = info) + p.regularizer(π), θ)
@@ -39,8 +55,8 @@ function batch_train!(π, p::TrainingParams, 𝒟::ExperienceBuffer...)
             mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
             push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π, mbs...; kwargs...), p))
         end
-        push!(infos, aggregate_info(minibatch_infos))
-        if p.early_stopping(infos[end])
+        push!(infos, aggregate_info(minibatch_infos))        
+        if p.early_stopping(infos)
             println("early stopping at epoch $epoch")
             break    
         end

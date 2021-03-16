@@ -58,6 +58,9 @@ module Crux
     export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ
     include("extras/gans.jl")
     
+    export gradient_penalty
+    include("extras/gradient_penalty.jl")
+    
     export DiagonalFisherRegularizer, add_fisher_information_diagonal!, update_fisher!
     include("extras/fisher_information.jl")
     
@@ -72,7 +75,8 @@ module Crux
     
     export OnPolicySolver, OffPolicySolver
     export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
-    export GAIL, ValueDICE
+    export GAIL, ValueDICE, BC, AdVIL
+    export mse_bc_loss, logpdf_bc_loss
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
     include("model_free/rl/reinforce.jl")
@@ -82,6 +86,8 @@ module Crux
     include("model_free/rl/ddpg.jl")
     include("model_free/rl/td3.jl")
     include("model_free/rl/sac.jl")
+    include("model_free/il/bc.jl")
+    include("model_free/il/AdVIL.jl")
     include("model_free/il/gail.jl")
     include("model_free/il/valueDICE.jl")
 end

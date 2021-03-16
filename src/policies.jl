@@ -29,7 +29,7 @@ mutable struct ContinuousNetwork <: NetworkPolicy
     network
     output_dim
     device
-    ContinuousNetwork(network, output_dim=size(last(network.layers).b), dev=nothing) = new(network, output_dim, device(network))
+    ContinuousNetwork(network, output_dim=size(last(network.layers).weight,1), dev=nothing) = new(network, output_dim, device(network))
 end
 
 Flux.@functor ContinuousNetwork 

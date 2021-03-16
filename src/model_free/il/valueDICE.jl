@@ -18,25 +18,52 @@
     buffer_init::Int=max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
 end
 
-ValueDICE(;ΔN=50, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), kwargs...) = ValueDICESolver(;ΔN=ΔN, a_opt=TrainingParams(;loss=valueDICE_loss, a_opt...), c_opt=TrainingParams(;loss=valueDICE_loss, epochs=ΔN, c_opt...), kwargs...)
+ValueDICE(;ΔN=50, λ_orth=1f-4, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) = 
+    ValueDICESolver(;ΔN=ΔN,
+                     log=LoggerParams(;dir="log/valueDICE", period=100, log...),
+                     a_opt=TrainingParams(;name="actor_", loss=valueDICE_π_loss, regularizer=OrthogonalRegularizer(λ_orth), a_opt...), 
+                     c_opt=TrainingParams(;name="critic_", loss=valueDICE_C_loss, epochs=ΔN, c_opt...), 
+                     kwargs...)
 
-# orthogonal initialization
-# GP on critic
-# orthogonal regularization on the policy
+function weighted_softmax(x, weights; dims=1)
+    x = x .- maximum(x, dims=dims)
+    weights .* exp.(x) ./ sum(weights .* exp.(x), dims=dims)
+end
 
 function valueDICE_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict())
-    a0, _= exploration(π.A, 𝒟_exp[:s]) #:s0
-    a, _ = exploration(π.A, 𝒟[:sp])
-    ae, _  = exploration(π.A, 𝒟_exp[:sp])
+    ae, _  = exploration(π.A, 𝒟_exp[:sp]) # Policy next actions
+    a, _ = exploration(π.A, 𝒟[:sp]) # rb next actions
+    a0, _= exploration(π.A, 𝒟_exp[:s]) #:s0 # Policy initial actions
     
-    ΔνE = value(π, 𝒟_exp[:s], 𝒟_exp[:a]) - γ*value(π, 𝒟_exp[:sp], ae)
-    Δν = value(π, 𝒟[:s], 𝒟[:a]) - γ*value(π, 𝒟[:sp], a)
+    νE_0 = value(π, 𝒟_exp[:s], a0) # expert_nu_0
+    νE = value(π, 𝒟_exp[:s], 𝒟_exp[:a]) # expert_nu
+    νE_next = value(π, 𝒟_exp[:sp], ae) # expert_nu
     
+    νRB = value(π, 𝒟[:s], 𝒟[:a]) # rb_nu
+    νRB_next = value(π, 𝒟[:sp], a)
     
-    Jlog = log(mean((1-α)*exp.(ΔνE) .+ α*exp.(Δν)))
-    Jlin = mean((1-α)*(1-γ)*value(π, 𝒟_exp[:s], a0) + α.*Δν)
+    ΔνE = νE - γ*νE_next
+    ΔνRB = νRB - γ*νRB_next
     
-    Jlog - Jlin
+    Jlin_E = mean(νE_0*(1f0-γ))
+    Jlin_RB = mean(ΔνRB)
+    Jlin = Jlin_E*(1f0-α) + Jlin_RB*α
+    
+    RB_E_diff = vcat(ΔνE, ΔνRB)
+    RB_E_weights = [1-α, α]
+    Jlog = sum(Zygote.dropgrad(weighted_softmax(RB_E_diff, RB_E_weights, dims=1)).*RB_E_diff)
+    
+    Jlog - Jlin, ae, a
+end
+
+valueDICE_π_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict()) = -valueDICE_loss(π, 𝒟, 𝒟_exp, α, γ, info=info)[1]
+
+function valueDICE_C_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict())
+    l, ae, a = valueDICE_loss(π, 𝒟, 𝒟_exp, α, γ, info=info)
+    real = hcat(vcat(𝒟_exp[:s], 𝒟_exp[:a]), vcat(𝒟_exp[:sp], ae))
+    fake = hcat(vcat(𝒟[:s], 𝒟[:a]), vcat(𝒟[:sp], a))
+    
+     l + 10f0*gradient_penalty(π.C, real, fake)
 end
 
 function POMDPs.solve(𝒮::ValueDICESolver, mdp, logmdp)
@@ -71,7 +98,7 @@ function POMDPs.solve(𝒮::ValueDICESolver, mdp, logmdp)
             
             # Update the critic and actor
             info_c = train!(𝒮.π.C, (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, 𝒟_exp, 𝒮.α, γ; kwargs...), 𝒮.c_opt)
-            info_a = train!(𝒮.π.A, (;kwargs...) -> -𝒮.a_opt.loss(𝒮.π, 𝒟, 𝒟_exp, 𝒮.α, γ; kwargs...), 𝒮.a_opt)
+            info_a = train!(𝒮.π.A, (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟, 𝒟_exp, 𝒮.α, γ; kwargs...), 𝒮.a_opt)
             
             push!(infos, merge(info_c, info_a))            
         end

@@ -9,7 +9,7 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
     verbose::Bool = true
 end
 
-Base.log(p::Nothing, i, data...)  = nothing
+Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 
 #Note that i can be an int or a unitrange
 function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...; s = nothing)

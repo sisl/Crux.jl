@@ -114,6 +114,23 @@ function Random.shuffle!(b::ExperienceBuffer)
     end
 end
 
+function split_batches(N, fracs)
+    @assert sum(fracs) ≈ 1
+    batches = floor.(Int, N .* fracs)
+    batches[1] += N - sum(batches)
+    batches
+end
+
+function Base.split(b::ExperienceBuffer, fracs)
+    buffers = ExperienceBuffer[]
+    start = 1
+    for batch in split_batches(length(b), fracs)
+        push!(buffers, ExperienceBuffer(minibatch(b, start:start+batch-1)))
+        start += batch
+    end
+    buffers
+end
+
 minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
 
 Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
@@ -171,9 +188,7 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
 end
 
 function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1, fracs = ones(length(source))./length(source))
-    batches = floor.(Int, capacity(target) .* fracs)
-    batches[1] += capacity(target) - sum(batches)
-    
+    batches = split_batches(capacity(target), fracs)
     for (b, B) in zip(source, batches)
         B == 0 && continue
         prioritized(b) ? prioritized_sample!(target, b, i=i, B=B) : uniform_sample!(target, b, B=B)

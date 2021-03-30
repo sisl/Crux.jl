@@ -31,13 +31,6 @@ Lᴳ(t::GAN_WLoss, G, D, z; yG = ()) = -mean(D(G(z, yG...), yG...))
 	noise_range::Float32 = 1f0 # Range of the ϵ parameter that picks a point to evalutate the gradient (smaller is closer to "real" data)
 end
 
-# function gradient_penalty(D, x, y)
-# 	B = size(x, ndims(x))
-# 	l, b = Flux.pullback(() -> D(x, y), Flux.params(x, y))
-# 	grads = b(ones(Float32, size(l)) |> device(x))
-# 	mean((sqrt.(sum(reshape(grads[x], :, B).^2, dims = 1) .+ sum(grads[y].^2, dims = 1)) .- 1f0).^2)
-# end
-
 function Lᴰ(t::GAN_WLossGP, D, x, xtilde; wD = 1f0, yG = (), yD = ())
 	loss = mean(D(xtilde, yG...)) -  mean((wD .* 2f0 .- 1f0) .* D(x, yD...))
 	

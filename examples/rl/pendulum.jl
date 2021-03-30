@@ -70,3 +70,14 @@ p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_ddpg, 𝒮
 # Produce a gif with the final policy
 gif(mdp, π_dqn, "pendulum.gif", max_steps=200)
 
+## Save data for imitation learning
+# using BSON
+# s = Sampler(mdp, 𝒮_ppo.π, max_steps=200, required_columns=[:t])
+# 
+# data = steps!(s, Nsteps=10000)
+# sum(data[:r])/50
+# data[:expert_val] = ones(Float32, 1, 10000)
+# 
+# data = ExperienceBuffer(data)
+# BSON.@save "examples/il/expert_data/pendulum.bson" data
+

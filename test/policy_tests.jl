@@ -13,24 +13,24 @@ c1 = Chain(Dense(5, 5, relu))
 c2 = Chain(Dense(5, 5, relu))
 c3 = Chain(Dense(5, 5, relu)) |> gpu
 
-@test c1[1].W != c2[1].W
+@test c1[1].weight != c2[1].weight
 copyto!(c1, c2)
 
-@test c1[1].W == c2[1].W
+@test c1[1].weight == c2[1].weight
 
 polyak_average!(c3, c2, 1f0)
-@test c3[1].W isa CuArray
-@test cpu(c3[1].W) == c2[1].W
+@test c3[1].weight isa CuArray
+@test cpu(c3[1].weight) == c2[1].weight
 
 ## Continuous Network
 p = ContinuousNetwork(Chain(Dense(2, 32, relu), Dense(32, 4)))
 
 @test Crux.device(p) == cpu
-@test p.output_dim == (4,)
+@test p.output_dim == 4
 
 p_gpu = p |> gpu
 @test Crux.device(p_gpu) == gpu
-@test p_gpu.output_dim == (4,)
+@test p_gpu.output_dim == 4
 
 @test length(Flux.params(p)) == 4
 @test length(layers(p)) == 2

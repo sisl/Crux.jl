@@ -15,44 +15,38 @@ msv(u, v, W) = u' * W * v
 
 
 ## Dense Layer with Spectral Normalization
-struct DenseSN{F,S<:AbstractArray,T<:AbstractArray, I<:Int, VV<:AbstractArray}
-  W::S
-  b::T
+struct DenseSN{F,S<:AbstractMatrix, B, I<:Int, VV<:AbstractArray}
+  weight::S
+  bias::B
   σ::F
   n_iterations::I # Number of power iterations for computing max singular value
   u::VV # Left vector for power iteration
+  function DenseSN(W::M, bias=true, σ::F=identity, n_iterations::I=1, u::VV=randn(Float32, size(W,1), 1)) where {M<:AbstractMatrix, F, I<:Int, VV<:AbstractArray}
+    b = Flux.create_bias(W, bias, size(W,1))
+    new{F,M,typeof(b), I, VV}(W, b, σ, n_iterations, u)
+  end
 end
 
-function DenseSN(in::Integer, out::Integer, σ = identity;
-               initW = Flux.glorot_uniform, initb = Flux.zeros, n_iterations = 1)
-  return DenseSN(initW(out, in), initb(out), σ, n_iterations, randn(Float32, out, 1))
+function DenseSN(in::Integer, out::Integer, σ=identity; init=Flux.glorot_uniform, bias=true, n_iterations=1, u=randn(Float32, out, 1))
+  DenseSN(init(out, in), bias, σ, n_iterations, u)
 end
 
 Flux.@functor DenseSN
 
-Flux.trainable(a::DenseSN) = (a.W, a.b)
+Flux.trainable(a::DenseSN) = (a.weight, a.bias)
 
-function (a::DenseSN)(x::AbstractArray)
-  W, b, σ = a.W, a.b, a.σ
+function (a::DenseSN)(x::AbstractVecOrMat)
+  W, b, σ = a.weight, a.bias, a.σ
   u, v = Zygote.ignore(() -> power_iteration!(W, a.u, a.n_iterations))
   σ.((W ./ msv(u, v, W))*x .+ b)
 end
 
+(a::DenseSN)(x::AbstractArray) = reshape(a(reshape(x, size(x,1), :)), :, size(x)[2:end]...)
+
 function Base.show(io::IO, l::DenseSN)
-  print(io, "DenseSN(", size(l.W, 2), ", ", size(l.W, 1))
+  print(io, "DenseSN(", size(l.weight, 2), ", ", size(l.weight, 1))
   l.σ == identity || print(io, ", ", l.σ)
   print(io, ")")
-end
-
-(a::DenseSN{<:Any,W})(x::AbstractArray{T}) where {T <: Union{Float32,Float64}, W <: AbstractArray{T}} =
-  invoke(a, Tuple{AbstractArray}, x)
-
-(a::DenseSN{<:Any,W})(x::AbstractArray{<:AbstractFloat}) where {T <: Union{Float32,Float64}, W <: AbstractArray{T}} =
-  a(T.(x))
-
-function outdims(l::DenseSN, isize)
-    first(isize) == size(l.W, 2) || throw(DimensionMismatch("input size should equal to ($(size(l.W, 2)),), got $isize"))
-    return (size(l.W, 1),)
 end
 
 
@@ -67,8 +61,6 @@ struct ConvSN{N,M,F,A,V, I<:Int, VV<:AbstractArray}
   n_iterations::I # Number of power iterations for computing max singular value
   u::VV # Left vector for power iteration
 end
-
-to2D(W) = reshape(W, :, size(W, ndims(W)))
 
 function ConvSN(w::AbstractArray{T,N}, b::Union{Flux.Zeros, AbstractVector{T}}, σ = identity;
               stride = 1, pad = 0, dilation = 1, n_iterations = 1) where {T,N}
@@ -102,14 +94,3 @@ function Base.show(io::IO, l::ConvSN)
   l.σ == identity || print(io, ", ", l.σ)
   print(io, ")")
 end
-
-(a::ConvSN{<:Any,<:Any,W})(x::AbstractArray{T}) where {T <: Union{Float32,Float64}, W <: AbstractArray{T}} =
-  invoke(a, Tuple{AbstractArray}, x)
-
-(a::ConvSN{<:Any,<:Any,W})(x::AbstractArray{<:Real}) where {T <: Union{Float32,Float64}, W <: AbstractArray{T}} =
-  a(T.(x))
-
-
-outdims(l::ConvSN, isize) =
-  output_size(DenseConvDims(_paddims(isize, size(l.weight)), size(l.weight); stride = l.stride, padding = l.pad, dilation = l.dilation))
-

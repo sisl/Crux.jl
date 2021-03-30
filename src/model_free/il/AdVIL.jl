@@ -35,10 +35,10 @@ end
 
 function POMDPs.solve(𝒮::AdVILSolver, mdp)
     # Minibatch buffer
-    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.a_opt.batch_size, device=device(𝒮.π))
+    𝒟 = buffer_like(𝒮.𝒟_expert, capacity=𝒮.a_opt.batch_size, device=device(𝒮.π))
     
     # Sampler for logging performance
-    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps=𝒮.max_steps)
+    s = Sampler(mdp, 𝒮.π, max_steps=𝒮.max_steps)
     
     # Loop over the number of epochs
     infos = []

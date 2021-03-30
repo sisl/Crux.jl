@@ -2,6 +2,7 @@ function gradient_penalty(D, x; target::Float32=1f0)
 	B = size(x, ndims(x))
 	l, b = Flux.pullback(D, x)
 	grads = b(ones(Float32, size(l)) |> device(x))
+	println(mean(sqrt.(sum(reshape(grads[1], :, B).^2, dims = 1))))
     Flux.mean((sqrt.(sum(reshape(grads[1], :, B).^2, dims = 1)) .- target).^2)
 end
 

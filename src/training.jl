@@ -9,26 +9,10 @@
     name = ""
 end
 
-# Early stopping function that terminates training on validation error increase
-function stop_on_validation_increase(π, 𝒟_val, loss; window=5)
-    k = "validation_error"
-    (infos) -> begin
-        ve = loss(π, 𝒟_val) # Compute the validation error
-        infos[end][k] = ve # store it
-        N = length(infos)
-        # if length(infos) >= 2*window
-        #     curr_window = mean([infos[i][k] for i=N-window+1:N])
-        #     old_window = mean([infos[i][k] for i=N-2*window+1:N-window])
-        #     return curr_window >= old_window # check if the error has gone up
-        # end
-        false
-    end
-end
-
 function Flux.Optimise.train!(π, loss::Function, p::TrainingParams; info = Dict())
     θ = Flux.params(π)
     l, back = Flux.pullback(() -> loss(info = info) + p.regularizer(π), θ)
-    typeof(l) == Float64 && @warn "Float64 loss found: computation in double precision may be slow"
+    typeof(l) == Float64 && @error "Float64 loss found: computation in double precision may be slow"
     grad = back(1f0)
     gnorm = norm(grad, p=2)
     @assert !isnan(gnorm)

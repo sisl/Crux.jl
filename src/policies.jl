@@ -177,7 +177,7 @@ end
 
 function exploration(π::GaussianPolicy, s; kwargs...) 
     μ, logΣ = action(π, s), device(s)(π.logΣ)
-    ϵ = Zygote.ignore(() -> randn(size(μ)...))
+    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...))
     a = ϵ.*exp.(logΣ) .+ μ
     a, gaussian_logpdf(μ, logΣ, a)
 end
@@ -207,16 +207,23 @@ device(π::SquashedGaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(
 
 POMDPs.action(π::SquashedGaussianPolicy, s) = π.ascale .* tanh.(action(π.μ, s))
 
+function squashed_gaussian_σ(logΣ)
+    LOG_STD_MIN = -5
+    LOG_STD_MAX = 2
+    logΣ = LOG_STD_MIN .+ 0.5f0 .* (LOG_STD_MAX - LOG_STD_MIN) * (logΣ .+ 1)
+    # logΣ = clamp.(logΣ, -20, 2)
+    exp.(logΣ)
+end
+
 function squashed_gaussian_logprob(μ, logΣ, a)
-    σ² = exp.(logΣ).^2
+    σ² = squashed_gaussian_σ(logΣ).^2
     sum(-((a .- μ).^2) ./ (2 .* σ²) .- 0.9189385332046727f0 .- logΣ .- 2*(log(2f0) .- a .- softplus.(-2 .* a)), dims=1)
 end
 
 function exploration(π::SquashedGaussianPolicy, s; kwargs...)
     μ, logΣ = action(π, s), value(π.logΣ, s)
-    logΣ = clamp.(logΣ, -20, 2)
-    ϵ = Zygote.ignore(() -> Float32.(randn(size(μ)...)) |> device(π))
-    σ = exp.(logΣ)
+    σ = squashed_gaussian_σ(logΣ)
+    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(π))
     a = ϵ.*σ .+ μ
     logprob = -((a .- μ).^2) ./ (2 .* σ.^2) .- 0.9189385332046727f0 .- logΣ .- 2*(log(2f0) .- a .- softplus.(-2 .* a))
     π.ascale .* tanh.(a), squashed_gaussian_logprob(μ ,logΣ, a) #TODO Add in action range
@@ -268,7 +275,7 @@ GaussianNoiseExplorationPolicy(σ::Function; kwargs...) = GaussianNoiseExplorati
 
 function exploration(π::GaussianNoiseExplorationPolicy, s; π_on, i)
     a = action(π_on, s) |> cpu
-    ϵ = randn(size(a)...)*π.σ(i)
+    ϵ = randn(Float32, size(a)...)*π.σ(i)
     clamp.(a .+ clamp.(ϵ, π.ϵ_min, π.ϵ_max), π.a_min, π.a_max) |> device(s), NaN
 end
 

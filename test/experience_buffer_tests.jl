@@ -120,24 +120,44 @@ circ_inds(start, Nsteps, l) = mod1.(start:start + Nsteps - 1, l)
 @test circ_inds(1, 120, 100) == [1:100 ..., 1:20 ...]
 @test circ_inds(90, 20, 100) == [90:100 ..., 1:9 ...]
 
+## Priority Param Construction
+p = PriorityParams(100, α=0.7)
+@test length(p.minsort_priorities) == 100
+@test length(p.priorities) == 100
+@test p.α == 0.7f0
+@test p.max_priority == 1.0f0
+
+p2 = PriorityParams(1000, p)
+@test length(p2.priorities)==1000
+@test p2.α == p.α
+@test p2.max_priority == p.max_priority
+
 ## Construction
 b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 100,)
-bpriority = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 50, prioritized = true)
+bpriority = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 50, prioritized=true)
 b_gpu = b |> gpu
+
+bcopy = ExperienceBuffer(deepcopy(b.data), elements=0)
+@test b.data == bcopy.data
+@test b.priority_params == bcopy.priority_params
+bcopy = ExperienceBuffer(deepcopy(b.data), prioritized=true)
+@test isprioritized(bcopy)
 
 @test b isa ExperienceBuffer{Array}
 @test b_gpu isa ExperienceBuffer{CuArray}
 
 @test length(keys(b.data)) == length(keys(b_gpu.data))
+@test !haskey(b, :weight)
 @test :s in keys(b_gpu.data)
 @test :a in keys(b_gpu.data)
 @test :sp in keys(b_gpu.data)
 @test :r in keys(b_gpu.data)
 @test :done in keys(b_gpu.data)
 @test haskey(bpriority, :weight)
+@test bpriority.data[:weight] == ones(Float32, 1, 50)
 
 # Buffer_like function
-bsmall = Crux.buffer_like(b, capacity=3, device=cpu)
+bsmall = buffer_like(b, capacity=3, device=cpu)
 @test Crux.device(bsmall) == cpu
 @test keys(bsmall) == keys(b)
 @test capacity(bsmall) == 3
@@ -155,10 +175,14 @@ bsmall = Crux.buffer_like(b, capacity=3, device=cpu)
 @test length(b_gpu) == 0
 @test capacity(b_gpu) == 100
 
-@test prioritized(bpriority)
+@test isprioritized(bpriority)
 @test Crux.device(b) == cpu
 @test Crux.device(bpriority) == cpu
 @test Crux.device(b_gpu) == gpu
+
+# Convert to and from GPU
+@test Crux.device(gpu(b)) == gpu
+@test Crux.device(cpu(b_gpu)) == cpu
 
 ## push!
 #push dictionary with one element
@@ -188,6 +212,12 @@ for k in keys(b)
     @test b[k][:, 1:4] == b[k][:, 5:8]
 end
 
+## clear!
+bcopy = deepcopy(b)
+clear!(bcopy)
+@test length(bcopy) == 0
+@test bcopy.next_ind == 1
+
 ## minibatch
 I = [1,2,4]
 d2 = minibatch(b, I)
@@ -213,21 +243,22 @@ b1, b2 = split(bsplit, [0.5, 0.5])
 
 ## update_priorities!
 update_priorities!(bpriority, [1,2,3], [1., 2., 3.])
-@test bpriority.max_priority == 3.0
-@test bpriority.priorities[1] ≈ 1f0^bpriority.α
-@test bpriority.priorities[2] ≈ 2f0^bpriority.α
-@test bpriority.priorities[3] ≈ 3f0^bpriority.α
-@test bpriority.minsort_priorities[1] ≈ 1f0^bpriority.α
-@test bpriority.minsort_priorities[2] ≈ 2f0^bpriority.α
-@test bpriority.minsort_priorities[3] ≈ 3f0^bpriority.α
+@test bpriority.priority_params.max_priority == 3.0
+@test bpriority.priority_params.priorities[1] ≈ 1f0^bpriority.priority_params.α
+@test bpriority.priority_params.priorities[2] ≈ 2f0^bpriority.priority_params.α
+@test bpriority.priority_params.priorities[3] ≈ 3f0^bpriority.priority_params.α
+@test bpriority.priority_params.minsort_priorities[1] ≈ 1f0^bpriority.priority_params.α
+@test bpriority.priority_params.minsort_priorities[2] ≈ 2f0^bpriority.priority_params.α
+@test bpriority.priority_params.minsort_priorities[3] ≈ 3f0^bpriority.priority_params.α
 
 
 push!(bpriority, d)
+d
 push!(bpriority, d)
-@test bpriority.max_priority == 3.0
+@test bpriority.priority_params.max_priority == 3.0
 for i=1:6
-    @test bpriority.priorities[i] ≈ 3f0^bpriority.α
-    @test bpriority.minsort_priorities[i] ≈ 3f0^bpriority.α
+    @test bpriority.priority_params.priorities[i] ≈ 3f0^bpriority.priority_params.α
+    @test bpriority.priority_params.minsort_priorities[i] ≈ 3f0^bpriority.priority_params.α
 end
     
 
@@ -273,7 +304,7 @@ rand!(t, t1, t2, t3)
 bpriority[:s] .= rand(Float32, 2, 6)
 update_priorities!(bpriority, [1:6...], [1.:6. ...])
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 1000, [:weight])
-priorities = [bpriority.priorities[i] for i=1:length(bpriority)]
+priorities = [bpriority.priority_params.priorities[i] for i=1:length(bpriority)]
 
 
 rand!(t, bpriority)

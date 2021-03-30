@@ -163,7 +163,7 @@ end
 
 
 ## Visualization
-function episode_frames(mdp, policy; Neps = 1, max_steps = 1000, use_obs = false)
+function episode_frames(mdp, policy; Neps=1, max_steps=1000, use_obs=false)
     frames = []
     for i = 1:Neps
         s = rand(initialstate(mdp))
@@ -185,8 +185,8 @@ function episode_frames(mdp, policy; Neps = 1, max_steps = 1000, use_obs = false
     frames
 end
 
-gif(mdp, policy, filename; fps = 15, Neps = 1, max_steps = 1000, use_obs = false) = gif(episode_frames(mdp, policy, Neps = Neps, max_steps = max_steps, use_obs = use_obs), filename, fps = fps)
+gif(mdp, policy, filename; fps=15, Neps=1, max_steps=1000, use_obs=false) = gif(episode_frames(mdp, policy, Neps = Neps, max_steps = max_steps, use_obs = use_obs), filename, fps = fps)
 
-function gif(frames, filename; fps = 15)
-    save(filename, cat(frames..., dims = 3), fps = fps)
+function gif(frames, filename; fps=15)
+    save(filename, cat(frames..., dims=3), fps = fps)
 end

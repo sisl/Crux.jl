@@ -1,6 +1,6 @@
 function TD3_target(π_smooth)
     (π, 𝒟, γ::Float32; i) -> begin
-        ap, _ = exploration(π_smooth, 𝒟[:sp], π_on=π, i=i)    
+        ap, _ = exploration(π_smooth, 𝒟[:sp], π_on=π, i=i)
         y = 𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* min.(value(π, 𝒟[:sp], ap)...)
     end
 end

@@ -22,9 +22,9 @@ end
 
 π_explore = ϵGreedyPolicy(Crux.LinearDecaySchedule(1., 0.1, Int(100/2)), actions(mdp))
 
-s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), ContinuousSpace(2), DiscreteSpace(4, Symbol), max_steps = 500)
-s2 = Sampler(mdp, FunctionPolicy((s) -> [:up]), ContinuousSpace(2), DiscreteSpace(4, Symbol), max_steps = 50, π_explore = π_explore)
-s3 = Sampler(pomdp, FunctionPolicy((s)-> 0), state_space(pomdp), DiscreteSpace(length(actions(pomdp))))
+s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(4, Symbol), max_steps=500)
+s2 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(4, Symbol), max_steps=50, π_explore = π_explore)
+s3 = Sampler(pomdp, FunctionPolicy((s)-> 0), A=DiscreteSpace(length(actions(pomdp))))
 
 
 ## Steps! function
@@ -90,7 +90,7 @@ fill_returns!(b, 1:5, 0.7f0)
 ## Test sampling with a vector of mdps
 mdps = [mdp, mdp, mdp]
 
-samplers = Sampler(mdps, FunctionPolicy((s) -> [:up]), ContinuousSpace(2), DiscreteSpace(4, Symbol))
+samplers = Sampler(mdps, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(4, Symbol))
 @test length(samplers) == 3
 
 data = steps!(samplers, Nsteps = 5)
@@ -99,7 +99,7 @@ data[:s]
 
 ## Test episodes
 mdp = GridWorldMDP()
-s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), ContinuousSpace(2), DiscreteSpace(4, Symbol), required_columns =[:episode_end], max_steps = 500,)
+s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(4, Symbol), required_columns =[:episode_end], max_steps = 500,)
 data, eps = episodes!(s1, Neps = 10, return_episodes = true,)
 buffer = ExperienceBuffer(data)
 eps2 = Crux.episodes(buffer)

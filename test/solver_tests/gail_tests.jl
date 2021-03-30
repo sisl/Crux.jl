@@ -18,7 +18,7 @@ A() = DiscreteNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 64, relu), Den
 π_dqn = solve(𝒮_dqn, mdp)
 
 # Fill a buffer with expert trajectories
-expert_trajectories = ExperienceBuffer(steps!(Sampler(mdp, π_dqn, S), Nsteps = expert_buffer_size))
+expert_trajectories = ExperienceBuffer(steps!(Sampler(mdp, π_dqn), Nsteps = expert_buffer_size))
 sum(expert_trajectories[:r])
 
 

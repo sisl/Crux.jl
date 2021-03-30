@@ -16,16 +16,22 @@ type(s::AbstractSpace) = s.type
 dim(s::DiscreteSpace) = (1,)
 dim(s::ContinuousSpace) = s.dims
 
+function state_space(o::AbstractArray)
+    dims = size(o)
+    length(dims) == 4 && dims[end] == 1 && (dims = dims[1:end-1]) # Handle image-like inputs that need to be 4D for conv layers
+    ContinuousSpace(dims, typeof(o[1]))
+end
+
 function state_space(mdp)
     if mdp isa MDP
         o = convert_s(AbstractArray, rand(initialstate(mdp)), mdp)
-    else
+    elseif mdp isa POMDP
         s = rand(initialstate(mdp))
         o = rand(initialobs(mdp, s))
+    else
+        error("Unrecognized problem: ", mdp)
     end
-    dims = o isa AbstractArray ? size(o) : (1,)
-    length(dims) == 4 && dims[end] == 1 && (dims = dims[1:end-1]) # Handle image-like inputs that need to be 4D for conv layers
-    ContinuousSpace(dims, typeof(o[1]))
+    return state_space(o)
 end
 
 ## GPU Stuff
@@ -67,7 +73,10 @@ mdcall(F, x, device) = device == gpu ? gpucall(F,x) : cpucall(F, x)
 end
 
 ## Flux stuff
+
 whiten(v::AbstractArray) = (v .- mean(v)) ./ std(v)
+
+to2D(W) = reshape(W, :, size(W, ndims(W))) # convert a multidimensional weight matrix to 2D
 
 # Weighted mean aggregator
 weighted_mean(weights) = (y) -> mean(y .* weights)

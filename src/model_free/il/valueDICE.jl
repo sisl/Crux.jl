@@ -66,18 +66,17 @@ function valueDICE_C_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict())
      l + 10f0*gradient_penalty(π.C, real, fake)
 end
 
-function POMDPs.solve(𝒮::ValueDICESolver, mdp, logmdp)
+function POMDPs.solve(𝒮::ValueDICESolver, mdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, [:t], device=device(𝒮.π))
     𝒟_exp = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, [:t], device=device(𝒮.π))
     𝒟_exp.data[:expert_val] = ones(Float32, 1, 𝒮.c_opt.batch_size)
     
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore, required_columns=[:t])
-    slog = Sampler(logmdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore, required_columns=[:t])
+    s = Sampler(mdp, 𝒮.π, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore, required_columns=[:t])
 
     # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, s=slog)
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i, s=s)
 
     # Fill the buffer with initial observations before training
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i=𝒮.i, explore=true)
@@ -103,7 +102,7 @@ function POMDPs.solve(𝒮::ValueDICESolver, mdp, logmdp)
             push!(infos, merge(info_c, info_a))            
         end
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), s=slog)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), s=s)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

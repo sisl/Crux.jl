@@ -45,67 +45,77 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
     end
     data
 end
-    
-## Experience Buffer stuff
-@with_kw mutable struct ExperienceBuffer{T <: AbstractArray} 
-    data::Dict{Symbol, T}
-    elements::Int64 = 0
-    next_ind::Int64 = 1
-    
-    indices::Vector{Int} = []
-    minsort_priorities::Union{Nothing, MinHeap} = nothing
-    priorities::Union{Nothing, FenwickTree} = nothing
+
+## Prioritized replay parameters
+@with_kw mutable struct PriorityParams
+    minsort_priorities::MinHeap
+    priorities::FenwickTree
     α::Float32 = 0.6
     β::Function = (i) -> 0.5f0
     max_priority::Float32 = 1.0
 end
 
-function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
-    data = Dict(k=>deepcopy(device(collect(bslice(v,1:capacity)))) for (k,v) in b.data)
-    clear!(ExperienceBuffer(data))
-end        
-
-function ExperienceBuffer(data::Dict{Symbol, T}) where {T <: AbstractArray}
-    elements = size(first(data)[2], 2)
-    ExperienceBuffer(data = data, elements = elements)
+PriorityParams(N::Int; kwargs...) = PriorityParams(;minsort_priorities=MinHeap(fill(Inf32, N)), priorities=FenwickTree(fill(0f0, N)), kwargs...)
+PriorityParams(N::Int, pp::PriorityParams) = PriorityParams(N, α=pp.α, β=pp.β, max_priority=pp.max_priority)
+    
+## Experience Buffer stuff
+@with_kw mutable struct ExperienceBuffer{T <: AbstractArray} 
+    data::Dict{Symbol, T}
+    elements::Int64
+    next_ind::Int64
+    indices::Vector{Int}
+    priority_params::Union{Nothing, PriorityParams}
 end
 
-function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[]; device = cpu, 
-                          prioritized = false, α = 0.6f0, β = (i) -> 0.5f0, max_priority = 1f0,
-                          R = Float32, D = Bool, W = Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
-    Atype = device == gpu ? CuArray : Array
-    prioritized && !(:weight in extras) && push!(extras, :weight)
-    b = ExperienceBuffer(data = mdp_data(S, A, capacity, extras, ArrayType = Atype,  R = R, D = D, W = W))
+function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_ind=1, indices=[], prioritized::Bool=false, priority_params::NamedTuple=(;)) where {T <: AbstractArray}
+    pp = nothing
     if prioritized
-        b.minsort_priorities = MinHeap(fill(Inf32, capacity))
-        b.priorities = FenwickTree(fill(0f0, capacity))
-        b.α = α
-        b.β = β
-        b.max_priority = max_priority
+        !haskey(data, :weight) && (data[:weight] = device(data)((ones(Float32, 1, capacity(data)))))
+        pp = PriorityParams(capacity(data); priority_params...)
     end
-    b
+    ExperienceBuffer(data, elements, next_ind, indices, pp)
+end
+
+function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol}=Symbol[]; device=cpu, 
+                          prioritized=false, priority_params::NamedTuple=(;), R=Float32, D=Bool, W=Float32) where {T1 <: AbstractSpace, T2 <: AbstractSpace}
+    Atype = device == gpu ? CuArray : Array
+    data = mdp_data(S, A, capacity, extras, ArrayType=Atype, R=R, D=D, W=W)
+    ExperienceBuffer(data, elements=0, prioritized=prioritized, priority_params=priority_params)
+end
+
+function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
+    data = Dict(k=>device(fill(v[1], size(v)[1:end-1]..., capacity)) for (k,v) in b.data)
+    ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing)
 end
 
 function Flux.gpu(b::ExperienceBuffer)
     data = Dict{Symbol, CuArray}(k => v |> gpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
 end
 
 function Flux.cpu(b::ExperienceBuffer)
     data = Dict{Symbol, Array}(k => v |> cpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.minsort_priorities, b.priorities, b.α, b.β, b.max_priority)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
 end
 
 function clear!(b::ExperienceBuffer)
     b.elements = 0
     b.next_ind = 1
-    b.indices = []
-    if prioritized(b)
-        b.minsort_priorities = MinHeap(fill(Inf32, capacity))
-        b.priorities = FenwickTree(fill(0f0, capacity))
-    end
+    b.indices = Int[]
+    isprioritized(b) && (b.priority_params = PriorityParams(capacity(b), b.priority_params))
     b
 end 
+
+function Base.vcat(buffers::ExperienceBuffer...; kwargs...)
+    data = deepcopy(buffers[1].data)
+    for b in buffers[2:end]
+        @assert keys(data) == keys(b)
+        for k in keys(b)
+            vcat(data[k], b[k])
+        end
+    end
+    ExperienceBuffer(data; kwargs...)
+end
 
 function Random.shuffle!(b::ExperienceBuffer)
     new_i = shuffle(1:length(b))
@@ -137,18 +147,20 @@ Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elemen
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
 
+Base.first(b::ExperienceBuffer) = first(b.data)
+
 Base.haskey(b::ExperienceBuffer, k) = haskey(b.data, k)
 
 Base.length(b::ExperienceBuffer) = b.elements
 
-DataStructures.capacity(b::ExperienceBuffer) = size(first(b.data)[2], 2)
+DataStructures.capacity(b::Union{Dict{Symbol, T}, ExperienceBuffer}) where {T <: AbstractArray} = size(first(b)[2])[end]
 
-prioritized(b::ExperienceBuffer) = !isnothing(b.priorities)
+isprioritized(b::ExperienceBuffer) = !isnothing(b.priority_params)
 
 device(b::ExperienceBuffer{CuArray}) = gpu
+device(b::Dict{Symbol, CuArray}) = gpu
 device(b::ExperienceBuffer{Array}) = cpu
-
-dim(b::ExperienceBuffer, s::Symbol) = size(b[s], 1)
+device(b::Dict{Symbol, Array}) = cpu
 
 function episodes(b::ExperienceBuffer)
     if haskey(b, :episode_end)
@@ -171,7 +183,7 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     for k in keys(b)
         copyto!(bslice(b.data[k], I), collect(bslice(data[k], ids)))
     end
-    prioritized(b) && update_priorities!(b, I, b.max_priority*ones(N))
+    isprioritized(b) && update_priorities!(b, I, b.priority_params.max_priority*ones(N))
         
     b.elements = min(C, b.elements + N)
     b.next_ind = mod1(b.next_ind + N, C)
@@ -181,9 +193,9 @@ end
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     for i = 1:length(I)
         val = v[i] + eps(Float32)
-        update!(b.priorities, I[i], val^b.α)
-        update!(b.minsort_priorities, I[i], val^b.α)
-        b.max_priority = max(val, b.max_priority)
+        update!(b.priority_params.priorities, I[i], val^b.priority_params.α)
+        update!(b.priority_params.minsort_priorities, I[i], val^b.priority_params.α)
+        b.priority_params.max_priority = max(val, b.priority_params.max_priority)
     end
 end
 
@@ -191,12 +203,13 @@ function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i =
     batches = split_batches(capacity(target), fracs)
     for (b, B) in zip(source, batches)
         B == 0 && continue
-        prioritized(b) ? prioritized_sample!(target, b, i=i, B=B) : uniform_sample!(target, b, B=B)
+        isprioritized(b) ? prioritized_sample!(target, b, i=i, B=B) : uniform_sample!(target, b, B=B)
     end
 end
 
 function uniform_sample!(target::ExperienceBuffer, source::ExperienceBuffer; B = capacity(target))
     ids = rand(1:length(source), B)
+    target.indices = ids
     push!(target, source, ids = ids)
 end
 
@@ -204,13 +217,13 @@ end
 function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer; i = 1, B = capacity(target))
     @assert haskey(source, :weight) 
     N = length(source)
-    ptot = prefixsum(source.priorities, N)
+    prs = source.priority_params.priorities
+    ptot = prefixsum(prs, N)
     Δp = ptot / B
-    target.indices = [inverse_query(source.priorities, (j + rand() - 1) * Δp, N-1) for j=1:B]
-    target.indices = max.(target.indices, )
-    pmin = first(source.minsort_priorities) / ptot
-    max_w = (pmin*N)^(-source.β(i))
-    source[:weight][1, target.indices] .= [(N * source.priorities[id] / ptot)^source.β(i) for id in target.indices] ./ max_w
+    target.indices = [inverse_query(prs, (j + rand() - 1) * Δp, N-1) for j=1:B]
+    pmin = first(source.priority_params.minsort_priorities) / ptot
+    max_w = (pmin*N)^(-source.priority_params.β(i))
+    source[:weight][1, target.indices] .= [(N * prs[id] / ptot)^source.priority_params.β(i) for id in target.indices] ./ max_w
     
     push!(target, source, ids = target.indices)
 end

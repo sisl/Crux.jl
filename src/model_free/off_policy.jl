@@ -18,17 +18,15 @@
     buffer_size = 1000 # Size of the buffer
     buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size) # The replay buffer
     buffer_init::Int = max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
-    required_columns = prioritized(buffer) ? [:weight] : Symbol[] # Extra data columns to store
     extra_buffers = [] # extra buffers (i.e. for experience replay in continual learning)
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
 end
 
 function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
-    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.c_opt.batch_size, 
-    𝒮.required_columns, device=device(𝒮.π))
+    𝒟 = buffer_like(𝒮.buffer, capacity=𝒮.c_opt.batch_size, device=device(𝒮.π))
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, 𝒮.S, 𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore)
+    s = Sampler(mdp, 𝒮.π, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore)
 
     # Log the pre-train performance
     log(𝒮.log, 𝒮.i, s=s)
@@ -45,15 +43,15 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         for epoch in 1:𝒮.c_opt.epochs
             # Sample a random minibatch of 𝑁 transitions (sᵢ, aᵢ, rᵢ, sᵢ₊₁) from 𝒟
             rand!(𝒟, 𝒮.buffer, 𝒮.extra_buffers..., fracs=𝒮.buffer_fractions, i=𝒮.i)
-
+            
             # Compute target
             y = 𝒮.target_fn(𝒮.π⁻, 𝒟, γ, i=𝒮.i)
             
             # Update priorities (for prioritized replay)
-            (isprioritized = prioritized(𝒮.buffer)) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
+            (ispri = isprioritized(𝒮.buffer)) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
             
             # Train the critic
-            info = train!(𝒮.π, (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; weighted=isprioritized, kwargs...), 𝒮.c_opt)
+            info = train!(𝒮.π, (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; weighted=ispri, kwargs...), 𝒮.c_opt)
             
             # Train the actor 
             if !isnothing(𝒮.a_opt) && ((epoch-1) % 𝒮.a_opt.update_every) == 0

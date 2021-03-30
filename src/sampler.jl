@@ -1,22 +1,23 @@
 @with_kw mutable struct Sampler{P, V, T1 <: AbstractSpace, T2 <: AbstractSpace}
     mdp::P
     π::Policy
-    S::T1 # State space
-    A::T2 # Action space
+    s::V = rand(initialstate(mdp)) # Current State
+    svec::AbstractArray = initial_observation(mdp, s) # Current observation
+    S::T1 = state_space(svec) # State space
+    A::T2 = action_space(π) # Action space
     max_steps::Int = 100
     required_columns::Array{Symbol} = []
     γ::Float32 = discount(mdp)
     λ::Float32 = NaN32
     π_explore = nothing
-    s::V = rand(initialstate(mdp)) # Current State
-    svec::AbstractArray = initial_observation(mdp, s) # Current observation
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π::Policy, S, A = action_space(π); kwargs...) = Sampler(mdp = mdp, π = π, S = S, A = A; kwargs...)
+Sampler(mdp, π; kwargs...) = Sampler(;mdp=mdp, π=π, kwargs...)
 
-Sampler(mdps::AbstractVector, π::Policy, S, A = action_space(π); kwargs...) = [Sampler(mdp = mdps[i], π = π, S = S, A = A; kwargs...) for i in 1:length(mdps)]
+# Construct a vector of samplers from a vector of mdps
+Sampler(mdps::AbstractVector, π; kwargs...) = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
 
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(initialstate(sampler.mdp))

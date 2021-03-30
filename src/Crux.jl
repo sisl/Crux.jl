@@ -20,11 +20,11 @@ module Crux
     using Base.Iterators: partition
     
     export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
-           state_space, device, cpucall, gpucall, mdcall, bslice, whiten
+           state_space, device, cpucall, gpucall, mdcall, bslice, whiten, to2D
     include("utils.jl")
     
-    export MinHeap, inverse_query, mdp_data, ExperienceBuffer, buffer_like, minibatch,
-           clear!, prioritized, dim, episodes, update_priorities!, uniform_sample!, 
+    export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
+           clear!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
            prioritized_sample!, capacity, geometric_sample!
     include("experience_buffer.jl")
     
@@ -64,19 +64,19 @@ module Crux
     export DiagonalFisherRegularizer, add_fisher_information_diagonal!, update_fisher!
     include("extras/fisher_information.jl")
     
-    export BCRegularizer
-    include("extras/behavioral_cloning_regularization.jl")
+    export BatchRegularizer, value_regularization, action_regularization, action_value_regularization
+    include("extras/batch_regularization.jl")
     
     export OrthogonalRegularizer
     include("extras/orthogonal_regularization.jl")
     
-    export MultitaskDecaySchedule, sequential_learning, experience_replay, ewc, log_multitask_performances!, continual_learning
+    export MultitaskDecaySchedule, log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
     export OnPolicySolver, OffPolicySolver
     export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
     export GAIL, ValueDICE, BC, AdVIL
-    export mse_bc_loss, logpdf_bc_loss
+    export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
     include("model_free/rl/reinforce.jl")

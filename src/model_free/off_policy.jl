@@ -26,7 +26,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = buffer_like(𝒮.buffer, capacity=𝒮.c_opt.batch_size, device=device(𝒮.π))
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore)
+    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore)
 
     # Log the pre-train performance
     log(𝒮.log, 𝒮.i, s=s)
@@ -51,11 +51,11 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
             (ispri = isprioritized(𝒮.buffer)) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
             
             # Train the critic
-            info = train!(𝒮.π, (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; weighted=ispri, kwargs...), 𝒮.c_opt)
+            info = train!(critic(𝒮.π), (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; weighted=ispri, kwargs...), 𝒮.c_opt)
             
             # Train the actor 
             if !isnothing(𝒮.a_opt) && ((epoch-1) % 𝒮.a_opt.update_every) == 0
-                info_a = train!(𝒮.π.A, (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟; kwargs...), 𝒮.a_opt)
+                info_a = train!(actor(𝒮.π), (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟; kwargs...), 𝒮.a_opt)
                 info = merge(info, info_a)
             
                 # Update the target network

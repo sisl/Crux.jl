@@ -6,7 +6,6 @@ init_mujoco_render() # Required for visualization
 
 # Construct the Mujoco environment
 mdp = GymPOMDP(:HalfCheetah, version = :v3)
-logmdp = GymPOMDP(:HalfCheetah, version = :v3)
 S = state_space(mdp)
 adim = length(POMDPs.actions(mdp)[1])
 amin = -1*ones(Float32, adim)
@@ -44,7 +43,7 @@ function SAC_A()
 end
 
 ## Setup params
-shared = (max_steps=1000, N=Int(1e4), S=S)
+shared = (max_steps=1000, N=Int(3e6), S=S)
 on_policy = (ΔN=4000, 
              λ_gae=0.97, 
              a_opt=(batch_size=4000, epochs=80, optimizer=ADAM(3e-4)), 
@@ -77,19 +76,19 @@ solve(𝒮_sac, mdp)
 
 # Plot the learning curve
 p = plot_learning([𝒮_ppo, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title = "HalfCheetah Training Curves", labels = ["PPO", "DDPG", "TD3", "SAC"])
-# Crux.savefig("examples/rl/half_cheetah_benchmark.pdf")
+Crux.savefig("examples/rl/half_cheetah_benchmark.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, 𝒮_ddpg.π, "half_cheetah_mujoco.gif")
 
 ## Save trajectories for imitation learning
-# using BSON
-# s = Sampler(mdp, 𝒮_sac.π, max_steps=1000, required_columns=[:t])
-# 
-# data = steps!(s, Nsteps=10000)
-# sum(data[:r])/10
-# data[:expert_val] = ones(Float32, 1, 10000)
-# 
-# data = ExperienceBuffer(data)
-# BSON.@save "examples/il/expert_data/half_cheetah.bson" data
+using BSON
+s = Sampler(mdp, 𝒮_ddpg.π, max_steps=1000, required_columns=[:t])
+
+data = steps!(s, Nsteps=10000)
+sum(data[:r])/10
+data[:expert_val] = ones(Float32, 1, 10000)
+
+data = ExperienceBuffer(data)
+BSON.@save "examples/il/expert_data/half_cheetah_mujoco.bson" data
 

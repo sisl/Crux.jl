@@ -84,7 +84,7 @@ function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol}=Sym
 end
 
 function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
-    data = Dict(k=>device(fill(v[1], size(v)[1:end-1]..., capacity)) for (k,v) in b.data)
+    data = Dict(k=>device(Array{eltype(v)}(undef, size(v)[1:end-1]..., capacity)) for (k,v) in b.data)
     ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing)
 end
 
@@ -141,6 +141,13 @@ function Base.split(b::ExperienceBuffer, fracs)
     buffers
 end
 
+function normalize!(b::ExperienceBuffer, S::AbstractSpace, A::AbstractSpace)
+    b[:s] .= tovec(b[:s], S)
+    b[:sp] .= tovec(b[:sp], S)
+    A isa ContinuousSpace && (b[:a] .= tovec(b[:a], A))
+    b
+end
+
 minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
 
 Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
@@ -181,7 +188,10 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     N, C = length(ids), capacity(b)
     I = mod1.(b.next_ind:b.next_ind + N - 1, C)
     for k in keys(b)
-        copyto!(bslice(b.data[k], I), collect(bslice(data[k], ids)))
+        v1 = bslice(b.data[k], I)
+        v2 = collect(bslice(data[k], ids))
+        @assert size(v1)[1:end-1] == size(v2)[1:end-1]
+        copyto!(v1, v2)
     end
     isprioritized(b) && update_priorities!(b, I, b.priority_params.max_priority*ones(N))
         
@@ -228,25 +238,4 @@ function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer;
     push!(target, source, ids = target.indices)
 end
 
-
-function find_ep(i, eps)
-    for ep in eps
-        i >= ep[1] && i <= ep[2] && return ep
-    end
-    error("$i out of range of $(collect(eps)[end][2])")
-end
-
-function geometric_sample!(target::ExperienceBuffer, source::ExperienceBuffer, γ; B = capacity(target))
-    ids = rand(1:length(source), B) # sample random starting points
-    eps = episodes(source)
-    eps = [Crux.find_ep(i, eps) for i in ids] # get the corresponding episode
-    range = [eps[i][2] - ids[i] for i=1:B] # get the length to the end of the episode
-    ids = [ids[i] + (range[i] == 0 ? 0 : Int(rand(Truncated(Geometric(1 - γ), 0, range[i])))) for i=1:B] # sample truncated geometric distribution
-    
-    indices = push!(target, source, ids=ids)
-    if haskey(target, :s0)
-        s0_ids = [ep[1] for ep in eps]
-        copyto!(bslice(target.data[:s0], indices), collect(bslice(source[:s], s0_ids)))
-    end
-end
 

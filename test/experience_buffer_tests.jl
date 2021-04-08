@@ -155,6 +155,7 @@ bcopy = ExperienceBuffer(deepcopy(b.data), prioritized=true)
 @test :done in keys(b_gpu.data)
 @test haskey(bpriority, :weight)
 @test bpriority.data[:weight] == ones(Float32, 1, 50)
+@test size(b[:a]) == (4,0)
 
 # Buffer_like function
 bsmall = buffer_like(b, capacity=3, device=cpu)
@@ -186,21 +187,21 @@ bsmall = buffer_like(b, capacity=3, device=cpu)
 
 ## push!
 #push dictionary with one element
-d = Dict(:s => 2*ones(2,1), :a => ones(Int, 1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1), :weight=>zeros(1,1))
+d = Dict(:s => 2*ones(2,1), :a => ones(Bool, 4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1), :weight=>zeros(1,1))
 push!(b, d)
 @test length(b) == 1
 @test b[:s] == 2*ones(2,1)
-@test b[:a] == ones(Int, 1,1)
+@test b[:a] == ones(Int, 4,1)
 @test b[:sp] == ones(2,1)
 @test b[:r] == ones(1,1)
 @test b[:done] == zeros(1,1)
 
 # push dictionary with more than one element
-d = Dict(:s => 3*ones(2,3), :a => ones(1,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3), :weight=>zeros(1,3))
+d = Dict(:s => 3*ones(2,3), :a => rand(4,3) .< 0.5, :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3), :weight=>zeros(1,3))
 push!(b, d)
 @test length(b) == 4
 @test b[:s][:,2:end] ==  3*ones(2,3)
-@test b[:a][:,2:end] == ones(1,3)
+@test b[:a][:,2:end] == d[:a]
 @test b[:sp][:,2:end] == 5*ones(2,3)
 @test b[:r][:,2:end] == 6*ones(1,3)
 @test b[:done][:,2:end] == ones(1,3)
@@ -280,15 +281,15 @@ end
 
 # Test the multi-buffer sampling
 t1 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => ones(2,1), :a => ones(Bool, 4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t1, d)
 
 t2 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => 2*ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 2*ones(2,1), :a => ones(Bool, 4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t2, d)
 
 t3 = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
-d = Dict(:s => 3*ones(2,1), :a => ones(1,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 3*ones(2,1), :a => ones(4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(t3, d)
 
 t = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10)
@@ -330,7 +331,7 @@ b2d = ExperienceBuffer(ContinuousSpace((2,2), UInt8), DiscreteSpace(4), 100;)
 @test ndims(b2d[:s]) == 3
 b2d[:s]
 
-d = Dict(:s => 3*ones(2,2,1), :a => ones(1,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
+d = Dict(:s => 3*ones(2,2,1), :a => ones(4,1), :sp => ones(2,2,1), :r => ones(1,1), :done => zeros(1,1))
 push!(b2d, d)
 
 @test all(b2d[:s] .== 3)

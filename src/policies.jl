@@ -1,6 +1,8 @@
 abstract type NetworkPolicy <: Policy end
 
 device(π::N) where N<:NetworkPolicy = π.device
+actor(π::N) where N<:NetworkPolicy = π
+critic(π::N) where N<:NetworkPolicy = π
 
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
@@ -49,6 +51,7 @@ action_space(π::ContinuousNetwork) = ContinuousSpace(π.output_dim)
 
 
 ## Network for representing a discrete set of outputs (value or policy)
+# NOTE: Incoming actions (i.e. arguments) are all assumed to be one hot encoding. Outputs are discrete actions taken form outputs
 mutable struct DiscreteNetwork <: NetworkPolicy
     network
     outputs
@@ -64,13 +67,13 @@ layers(π::DiscreteNetwork) = π.network.layers
 
 POMDPs.value(π::DiscreteNetwork, s) = mdcall(π.network, s, π.device)
 
-POMDPs.value(π::DiscreteNetwork, s, a) = sum(value(π, s) .* Flux.onehotbatch(π, a), dims = 1)
+POMDPs.value(π::DiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims = 1)
 
 POMDPs.action(π::DiscreteNetwork, s) = π.outputs[mapslices(argmax, value(π, s), dims=1)]
 
 function Flux.onehotbatch(π::DiscreteNetwork, a)  
     ignore() do 
-        a_oh = Flux.onehotbatch(a[:], π.outputs)
+        a_oh = Flux.onehotbatch(a[:] |> cpu, π.outputs) |> device(a)
         length(a) == 1 ? dropdims(a_oh, dims=2) : a_oh
     end
 end 
@@ -85,14 +88,14 @@ function exploration(π::DiscreteNetwork, s; kwargs...)
     a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
 end
 
-Distributions.logpdf(π::DiscreteNetwork, s, a) = categorical_logpdf(logits(π, s), Flux.onehotbatch(π, a))
+Distributions.logpdf(π::DiscreteNetwork, s, a_oh) = categorical_logpdf(logits(π, s), a_oh)
 
 function Distributions.entropy(π::DiscreteNetwork, s)
     ps = logits(π, s)
     sum(ps .* log.(ps .+ eps(Float32)), dims=1)
 end
 
-action_space(π::DiscreteNetwork) = DiscreteSpace(length(π.outputs), typeof(first(π.outputs)))
+action_space(π::DiscreteNetwork) = DiscreteSpace(length(π.outputs), π.outputs)
 
 
 
@@ -153,6 +156,9 @@ Distributions.entropy(π::ActorCritic, s) = entropy(π.A, s)
 
 action_space(π::ActorCritic) = action_space(π.A)
 
+actor(π::AC) where AC<:ActorCritic = π.A
+critic(π::AC) where AC<:ActorCritic = π.C
+
 
 ## Gaussian Policy
 mutable struct GaussianPolicy <: NetworkPolicy
@@ -177,8 +183,9 @@ end
 
 function exploration(π::GaussianPolicy, s; kwargs...) 
     μ, logΣ = action(π, s), device(s)(π.logΣ)
-    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...))
-    a = ϵ.*exp.(logΣ) .+ μ
+    σ = exp.(logΣ)
+    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
+    a = ϵ.*σ .+ μ
     a, gaussian_logpdf(μ, logΣ, a)
 end
 
@@ -223,10 +230,9 @@ end
 function exploration(π::SquashedGaussianPolicy, s; kwargs...)
     μ, logΣ = action(π, s), value(π.logΣ, s)
     σ = squashed_gaussian_σ(logΣ)
-    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(π))
+    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
     a = ϵ.*σ .+ μ
-    logprob = -((a .- μ).^2) ./ (2 .* σ.^2) .- 0.9189385332046727f0 .- logΣ .- 2*(log(2f0) .- a .- softplus.(-2 .* a))
-    π.ascale .* tanh.(a), squashed_gaussian_logprob(μ ,logΣ, a) #TODO Add in action range
+    π.ascale .* tanh.(a), squashed_gaussian_logprob(μ ,logΣ, a)
 end
 
 Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(action(π, s), value(π.logΣ, s), atanh.(a ./ π.ascale))

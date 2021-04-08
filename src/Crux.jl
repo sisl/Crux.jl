@@ -20,12 +20,12 @@ module Crux
     using Base.Iterators: partition
     
     export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
-           state_space, device, cpucall, gpucall, mdcall, bslice, whiten, to2D
+           state_space, device, cpucall, gpucall, mdcall, bslice, whiten, to2D, tovec
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!, capacity, geometric_sample!
+           prioritized_sample!, capacity, normalize!
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
@@ -34,7 +34,7 @@ module Crux
     export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
-           entropy, logpdf, action_space, exploration, layers
+           entropy, logpdf, action_space, exploration, layers, actor, critic
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
@@ -73,12 +73,13 @@ module Crux
     export MultitaskDecaySchedule, log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
-    export OnPolicySolver, OffPolicySolver
+    export OnPolicySolver, OffPolicySolver, BatchSolver
     export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
     export GAIL, ValueDICE, BC, AdVIL
     export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
+    include("model_free/batch.jl")
     include("model_free/rl/reinforce.jl")
     include("model_free/rl/a2c.jl")
     include("model_free/rl/ppo.jl")

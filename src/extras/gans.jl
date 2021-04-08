@@ -35,7 +35,7 @@ function Lᴰ(t::GAN_WLossGP, D, x, xtilde; wD = 1f0, yG = (), yD = ())
 	loss = mean(D(xtilde, yG...)) -  mean((wD .* 2f0 .- 1f0) .* D(x, yD...))
 	
 	# Compute gradient penalty
-	loss += (length(yG) == 1) ? error("not implemented") #=t.λ*gradient_penalty(D, xhat, ϵ .* yG[1] .+ (1f0 .- ϵ) .* yD[1])=# : t.λ*gradient_penalty(D, x, xtilde)
+	loss += (length(yG) == 1) ?  t.λ*gradient_penalty(D, vcat(x, yD...), vcat(xtilde, yG...)) : t.λ*gradient_penalty(D, x, xtilde)
 	loss
 end
 

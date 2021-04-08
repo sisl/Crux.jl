@@ -10,8 +10,5 @@ include("logging_tests.jl")
 include("extras_tests.jl")
 
 ## Solvers tests
-# include("solver_tests/dqn_tests.jl")
-# include("solver_tests/actor_critic_tests.jl")
-# include("solver_tests/gail_tests.jl")
-# include("solver_tests/ddpg_tests.jl")
+include("solver_tests.jl")
 

@@ -18,12 +18,18 @@
     buffer_init::Int=max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
 end
 
-ValueDICE(;ΔN=50, λ_orth=1f-4, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) = 
-    ValueDICESolver(;ΔN=ΔN,
+function ValueDICE(;π, S, A=action_space(π), 𝒟_expert, ΔN=50, λ_orth=1f-4, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...)
+    𝒟_expert = normalize!(deepcopy(𝒟_expert), S, A) |> device(π)
+    ValueDICESolver(;π=π, 
+                     S=S, 
+                     A=A,
+                     𝒟_expert=𝒟_expert,
+                     ΔN=ΔN,
                      log=LoggerParams(;dir="log/valueDICE", period=100, log...),
                      a_opt=TrainingParams(;name="actor_", loss=valueDICE_π_loss, regularizer=OrthogonalRegularizer(λ_orth), a_opt...), 
                      c_opt=TrainingParams(;name="critic_", loss=valueDICE_C_loss, epochs=ΔN, c_opt...), 
                      kwargs...)
+end
 
 function weighted_softmax(x, weights; dims=1)
     x = x .- maximum(x, dims=dims)
@@ -50,7 +56,7 @@ function valueDICE_loss(π, 𝒟, 𝒟_exp, α, γ; info=Dict())
     Jlin = Jlin_E*(1f0-α) + Jlin_RB*α
     
     RB_E_diff = vcat(ΔνE, ΔνRB)
-    RB_E_weights = [1-α, α]
+    RB_E_weights = [1-α, α] |> device(RB_E_diff)
     Jlog = sum(Zygote.dropgrad(weighted_softmax(RB_E_diff, RB_E_weights, dims=1)).*RB_E_diff)
     
     Jlog - Jlin, ae, a

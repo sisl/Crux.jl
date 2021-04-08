@@ -2,9 +2,9 @@
     mdp::P
     π::Policy
     s::V = rand(initialstate(mdp)) # Current State
-    svec::AbstractArray = initial_observation(mdp, s) # Current observation
-    S::T1 = state_space(svec) # State space
+    S::T1 = state_space(initial_observation(mdp, s)) # State space
     A::T2 = action_space(π) # Action space
+    svec::AbstractArray = tovec(initial_observation(mdp, s), S) # Current observation
     max_steps::Int = 100
     required_columns::Array{Symbol} = []
     γ::Float32 = discount(mdp)
@@ -18,10 +18,10 @@ Sampler(mdp, π; kwargs...) = Sampler(;mdp=mdp, π=π, kwargs...)
 
 # Construct a vector of samplers from a vector of mdps
 Sampler(mdps::AbstractVector, π; kwargs...) = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
-
+        
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(initialstate(sampler.mdp))
-    sampler.svec = initial_observation(sampler.mdp, sampler.s)
+    sampler.svec = tovec(initial_observation(sampler.mdp, sampler.s), sampler.S)
     sampler.episode_length = 0
 end
 
@@ -51,12 +51,13 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
         sp, r = gen(sampler.mdp, sampler.s, a)
         spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
+    spvec = tovec(spvec, sampler.S)
     done = isterminal(sampler.mdp, sp)
 
     # Save the tuple
-    bslice(data[:s], j) .= reshape(sampler.svec, dim(sampler.S)...)
-    data[:a][:, j] .= a  
-    bslice(data[:sp], j) .= reshape(spvec, dim(sampler.S)...)
+    bslice(data[:s], j:j) .= sampler.svec
+    data[:a][:, j:j] .= tovec(a, sampler.A)
+    bslice(data[:sp], j:j) .= spvec
     data[:r][1, j] = r
     data[:done][1, j] = done
     

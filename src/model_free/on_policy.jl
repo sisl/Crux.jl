@@ -20,7 +20,7 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.ΔN, 𝒮.required_columns, device=device(𝒮.π))
     γ, λ = Float32(discount(mdp)), 𝒮.λ_gae
-    s = Sampler(mdp, 𝒮.π, required_columns=𝒮.required_columns, λ=λ, max_steps=𝒮.max_steps, π_explore=𝒮.π)
+    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, required_columns=𝒮.required_columns, λ=λ, max_steps=𝒮.max_steps, π_explore=𝒮.π)
 
     # Log the pre-train performance
     log(𝒮.log, 𝒮.i, s=s)
@@ -35,11 +35,11 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         𝒮.post_batch_callback(𝒟, info=info_cb)
         
         # Train the actor
-        info = batch_train!(𝒮.π, 𝒮.a_opt, 𝒟)
+        info = batch_train!(actor(𝒮.π), 𝒮.a_opt, 𝒟)
         
         # Train the critic (if applicable)
         if !isnothing(𝒮.c_opt)
-            info_c = batch_train!(𝒮.π, 𝒮.c_opt, 𝒟)
+            info_c = batch_train!(critic(𝒮.π), 𝒮.c_opt, 𝒟)
             merge!(info, info_c)
         end
         

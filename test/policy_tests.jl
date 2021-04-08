@@ -67,8 +67,8 @@ p_gpu = p |> gpu
 
 s0 = rand(2)
 s = rand(2,100)
-a0 = rand([1,2,3,4],1)
-a = rand([1,2,3,4], 100)
+a0 = rand([true, false], 4)
+a = rand([true, false], 4, 100)
 
 @test size(value(p, s0)) == (4,)
 @test size(value(p, s)) == (4,100)
@@ -83,17 +83,20 @@ a = rand([1,2,3,4], 100)
 a, logprob = exploration(p, s0)
 @test size(a) == (1,)
 @test size(logprob) == (1,)
-@test all(logpdf(p, s0, a) .≈ logprob)
+@test all(logpdf(p, s0, Flux.onehotbatch(a, [1,2,3,4])) .≈ logprob)
 
 a, logprob = exploration(p, s)
 @test size(a) == (1,100)
 @test size(logprob) == (1,100)
-@test all(logpdf(p, s, a) .≈ logprob)
+@test all(logpdf(p, s, Flux.onehotbatch(a[:], [1,2,3,4])) .≈ logprob)
 
 @test size(entropy(p, s0)) == (1,)
 @test size(entropy(p, s)) == (1, 100)
 
-@test action_space(p) == DiscreteSpace(4, Int)
+@test action_space(p).vals == DiscreteSpace(4).vals
+
+# Onhotbatch - This used to error
+Flux.onehotbatch(p_gpu, ones(Int, 1, 10) |> gpu)
 
 ## Double Network
 Q1 = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 1)))
@@ -115,7 +118,7 @@ p_gpu = p |> gpu
 @test value(p, s[1:1,:], s[2:2,:]) == (value(p.N1, s[1:1,:], s[2:2,:]), value(p.N2, s[1:1,:], s[2:2,:]))
 @test action(p, s) == (action(p.N1, s), action(p.N2, s))
 
-Q1 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 1)), [1,])
+Q1 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 1)), [1,2])
 Q2 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 2)), [1,2])
 p = DoubleNetwork(Q1, Q2)
 
@@ -126,7 +129,7 @@ e2 = (exploration(p.N1, s), exploration(p.N2, s))
 @test e1 == e2 
 
 a = rand([1,], 100)
-@test logpdf(p, s, a) == (logpdf(p.N1, s, a), logpdf(p.N2, s, a))
+@test logpdf(p, s, Flux.onehotbatch(Q1, a)) == (logpdf(p.N1, s, Flux.onehotbatch(Q1, a)), logpdf(p.N2, s, Flux.onehotbatch(Q2, a)))
 @test entropy(p, s) == (entropy(p.N1, s), entropy(p.N2, s))
 
 @test action_space(p) == action_space(p.N1)

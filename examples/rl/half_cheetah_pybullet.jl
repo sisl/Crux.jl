@@ -3,7 +3,7 @@ using Crux, Flux, POMDPs, POMDPGym, Distributions
 import POMDPPolicies:FunctionPolicy
 using Random
 
-# Construct the Mujoco environment
+# Construct the Pybullet environment
 using PyCall
 pyimport("pybullet_envs")
 mdp = GymPOMDP(:HalfCheetahBulletEnv)

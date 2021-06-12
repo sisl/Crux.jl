@@ -7,6 +7,8 @@ critic(π::N) where N<:NetworkPolicy = π
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
 
+layers(π::Chain) = π.layers
+
 function polyak_average!(to, from, τ=1f0)
     to_data = Flux.params(to).order.data
     from_data, from_device = Flux.params(from).order.data, device(from)
@@ -231,8 +233,8 @@ function exploration(π::SquashedGaussianPolicy, s; kwargs...)
     μ, logΣ = action(π, s), value(π.logΣ, s)
     σ = squashed_gaussian_σ(logΣ)
     ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
-    a = ϵ.*σ .+ μ
-    π.ascale .* tanh.(a), squashed_gaussian_logprob(μ ,logΣ, a)
+    a = clamp.(tanh.(ϵ.*σ .+ μ), -1f0 + 1f-3, 1f0 - 1f-3)
+    π.ascale .* a, squashed_gaussian_logprob(μ ,logΣ, atanh.(a))
 end
 
 Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(action(π, s), value(π.logΣ, s), atanh.(a ./ π.ascale))

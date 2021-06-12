@@ -29,18 +29,18 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :done => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:return, :logprob, :advantage]
+        if k in [:return, :logprob, :advantage, :cost]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
         elseif k in [:episode_end]
             data[k] = ArrayType(fill(false, 1, capacity))
-        elseif k in [:t]
+        elseif k in [:t, :i]
             data[k] = ArrayType(fill(0, 1, capacity))
         elseif k in [:s0]
             data[k] = ArrayType(fill(zero(type(S)), dim(S)..., capacity))
         else
-            error("Unrecognized key: ", k)
+            CRUX_WARNINGS && @warn "Unrecognized key: $k"
         end
     end
     data
@@ -106,12 +106,12 @@ function clear!(b::ExperienceBuffer)
     b
 end 
 
-function Base.vcat(buffers::ExperienceBuffer...; kwargs...)
-    data = deepcopy(buffers[1].data)
-    for b in buffers[2:end]
+function Base.hcat(buffers::ExperienceBuffer...; kwargs...)
+    data = Dict(k=>Array{typeof(v[1])}(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
+    for b in buffers[1:end]
         @assert keys(data) == keys(b)
         for k in keys(b)
-            vcat(data[k], b[k])
+            data[k] = cat(data[k], b[k], dims=ndims(b[k]))
         end
     end
     ExperienceBuffer(data; kwargs...)
@@ -122,6 +122,7 @@ function Random.shuffle!(b::ExperienceBuffer)
     for k in keys(b)
         b[k] .= bslice(b[k], new_i)
     end
+    b
 end
 
 function split_batches(N, fracs)
@@ -142,8 +143,8 @@ function Base.split(b::ExperienceBuffer, fracs)
 end
 
 function normalize!(b::ExperienceBuffer, S::AbstractSpace, A::AbstractSpace)
-    b[:s] .= tovec(b[:s], S)
-    b[:sp] .= tovec(b[:sp], S)
+    haskey(b, :s) && (b[:s] .= tovec(b[:s], S))
+    haskey(b, :sp) && (b[:sp] .= tovec(b[:sp], S))
     A isa ContinuousSpace && (b[:a] .= tovec(b[:a], A))
     b
 end
@@ -153,6 +154,8 @@ minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) f
 Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
+
+extra_columns(b::ExperienceBuffer) = collect(setdiff(keys(b), [:s, :a, :sp, :r, :done]))
 
 Base.first(b::ExperienceBuffer) = first(b.data)
 
@@ -188,6 +191,10 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     N, C = length(ids), capacity(b)
     I = mod1.(b.next_ind:b.next_ind + N - 1, C)
     for k in keys(b)
+        if !haskey(data, k)
+            # CRUX_WARNINGS && @warn "Pushed data does not contain $k"
+            continue
+        end
         v1 = bslice(b.data[k], I)
         v2 = collect(bslice(data[k], ids))
         @assert size(v1)[1:end-1] == size(v2)[1:end-1]

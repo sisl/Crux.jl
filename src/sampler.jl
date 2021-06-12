@@ -44,11 +44,16 @@ end
 function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     a, logprob = explore ? exploration(sampler.π_explore, sampler.svec, π_on=sampler.π, i=i) : (action(sampler.π, sampler.svec), NaN)
     length(a) == 1 && (a = a[1]) # actions always come out as an array
+    
+    # This implements the ability to get cost information from safety gym
+    info = Dict()
+    kwargs = haskey(data, :cost) ? (info=info,) : () 
+    
     if sampler.mdp isa POMDP
-        sp, o, r = gen(sampler.mdp, sampler.s, a)
+        sp, o, r = gen(sampler.mdp, sampler.s, a; kwargs...)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
     else
-        sp, r = gen(sampler.mdp, sampler.s, a)
+        sp, r = gen(sampler.mdp, sampler.s, a; kwargs...)
         spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
     spvec = tovec(spvec, sampler.S)
@@ -64,6 +69,8 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     # Handle optional data storage
     haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)  
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
+    haskey(data, :i) && (data[:i][1, j] = i+1)
+    haskey(data, :cost) && (data[:cost][1,j] = info["cost"])
     
     # Cut the episode short if needed
     sampler.episode_length += 1
@@ -125,13 +132,24 @@ function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{T}}, N::Int; i=1,
     Nfill
 end
 
-## Undiscounted returns
-undiscounted_return(data, start, stop) = sum(data[:r][1,start:stop])
+## metric
 
-function undiscounted_return(s::Sampler; Neps=100, kwargs...)
+# Recover multiple metrics from a single sampler
+metrics_by_key(data, start, stop; keys) = [sum(data[key][1,start:stop]) for key in keys]
+
+function metrics_by_key(s::Sampler; keys, Neps=100, kwargs...)
     data = episodes!(s, Neps=Neps; kwargs...)
-    sum(data[:r]) / Neps
+    [sum(data[key]) / Neps for key in keys]
 end
+
+# recover a single metric 
+metric_by_key(data, start, stop; key) = metrics_by_key(data, start, stop; keys=[key])[1]
+
+metric_by_key(s::Sampler; key, Neps=100, kwargs...) = metrics_by_key(s; keys=[key], Neps=Neps, kwargs...)[1]
+
+# Get the undiscounted return
+undiscounted_return(data, start, stop) = metric_by_key(data, start, stop; key=:r)
+undiscounted_return(s::Sampler; Neps=100, kwargs...) = metric_by_key(s; Neps=Neps, key=:r, kwargs...)
 
 
 ## Discounted returns

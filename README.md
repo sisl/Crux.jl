@@ -16,8 +16,14 @@ Supports CPU and GPU computation and implements the following algorithms:
 ### Imitation Learning
 * <a href="./src/model_free/il/bc.jl"> Behavioral Cloning </a>
 * <a href="./src/model_free/il/gail.jl">Generative Adversarial Imitation Learning (GAIL)</a>
-* <a href="./src/model_free/il/AdVIL.jl">Adversarial value moment imitatino learning (AdVIL)</a>
+* <a href="./src/model_free/il/AdVIL.jl">Adversarial value moment imitation learning (AdVIL)</a>
+* <a href="./src/model_free/il/AdRIL.jl">(AdRIL)</a>
+* <a href="./src/model_free/il/sqil.jl">(SQIL)</a>
 * <a href="./src/model_free/il/valueDICE.jl">valueDICE</a>
+* <a href="./src/model_free/il/asaf.jl">Adversarial Soft Advantage Fitting (ASAF)</a>
+
+
+Note for imitation learning algorithms: The parameter `normalize_demo::Bool` determines if the provided expert demonstrations should be normalized by the state and action spaces provided to the solver.
 
 ## Installation
 

@@ -58,12 +58,15 @@ test_solver((π) -> SAC(π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G
 
 
 # Continuous IL
-𝒟_expert = expert_trajectories = BSON.load("examples/il/expert_data/pendulum.bson")[:data]
+𝒟_demo = expert_trajectories = BSON.load("examples/il/expert_data/pendulum.bson")[:data]
 D() = ContinuousNetwork(Chain(DenseSN(3, 32, relu), DenseSN(32, 1)))
 
-test_solver((π, D) -> GAIL(D=D, 𝒟_expert=𝒟_expert, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), V()), QSA())
-test_solver(π -> BC(π=π, 𝒟_expert=𝒟_expert, S=S, opt=(epochs=1,)), continuous_mdp, A())
+test_solver((π, D) -> GAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), V()), QSA())
+test_solver(π -> BC(π=π, 𝒟_demo=𝒟_demo, S=S, opt=(epochs=1,)), continuous_mdp, A())
 # NOTE: gradient penalty on the gpu only plays nicely with tanh, not relus in the discriminator?
-test_solver((π) -> AdVIL(𝒟_expert=𝒟_expert, π=π, S=S, a_opt=(epochs=1,) ), continuous_mdp, ActorCritic(A(), QSA()))
-test_solver((π) -> ValueDICE(𝒟_expert=𝒟_expert, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), QSA()))
+test_solver((π) -> AdVIL(𝒟_demo=𝒟_demo, π=π, S=S, a_opt=(epochs=1,) ), continuous_mdp, ActorCritic(A(), QSA()))
+test_solver((π) -> ValueDICE(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), QSA()))
+test_solver((π) -> SQIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
+test_solver((π) -> AdRIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
+test_solver((π) -> ASAF(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, G())
 

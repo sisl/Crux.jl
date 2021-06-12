@@ -10,7 +10,7 @@
     a_opt::TrainingParams # Training parameters for the actor
     c_opt::TrainingParams # Training parameters for the critic
     
-    𝒟_expert # expert buffer
+    𝒟_demo # expert buffer
     α::Float32 = 0.1 # mixing parameter
     π_explore=π
     buffer_size = 1000 # Size of the buffer
@@ -18,12 +18,13 @@
     buffer_init::Int=max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
 end
 
-function ValueDICE(;π, S, A=action_space(π), 𝒟_expert, ΔN=50, λ_orth=1f-4, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...)
-    𝒟_expert = normalize!(deepcopy(𝒟_expert), S, A) |> device(π)
+function ValueDICE(;π, S, A=action_space(π), 𝒟_demo, normalize_demo::Bool=true, ΔN=50, λ_orth=1f-4, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...)
+    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
+    𝒟_demo = 𝒟_demo |> device(π)
     ValueDICESolver(;π=π, 
                      S=S, 
                      A=A,
-                     𝒟_expert=𝒟_expert,
+                     𝒟_demo=𝒟_demo,
                      ΔN=ΔN,
                      log=LoggerParams(;dir="log/valueDICE", period=100, log...),
                      a_opt=TrainingParams(;name="actor_", loss=valueDICE_π_loss, regularizer=OrthogonalRegularizer(λ_orth), a_opt...), 
@@ -80,9 +81,10 @@ function POMDPs.solve(𝒮::ValueDICESolver, mdp)
     
     γ = Float32(discount(mdp))
     s = Sampler(mdp, 𝒮.π, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore, required_columns=[:t])
+    isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
     # Log the pre-train performance
-    𝒮.i == 0 && log(𝒮.log, 𝒮.i, s=s)
+    𝒮.i == 0 && log(𝒮.log, 𝒮.i)
 
     # Fill the buffer with initial observations before training
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i=𝒮.i, explore=true)
@@ -99,7 +101,7 @@ function POMDPs.solve(𝒮::ValueDICESolver, mdp)
             # geometric_sample!(𝒟_exp, 𝒮.𝒟_expert, γ)
             # 
             rand!(𝒟, 𝒮.buffer)
-            rand!(𝒟_exp, 𝒮.𝒟_expert)
+            rand!(𝒟_exp, 𝒮.𝒟_demo)
             
             # Update the critic and actor
             info_c = train!(𝒮.π.C, (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, 𝒟_exp, 𝒮.α, γ; kwargs...), 𝒮.c_opt)
@@ -108,7 +110,7 @@ function POMDPs.solve(𝒮::ValueDICESolver, mdp)
             push!(infos, merge(info_c, info_a))            
         end
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), s=s)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos))
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

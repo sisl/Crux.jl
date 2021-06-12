@@ -9,7 +9,7 @@ end
 function logpdf_bc_loss(λe::Float32)
     (π, 𝒟; info=Dict())->begin
         eloss = -mean(entropy(π, 𝒟[:s]))
-        lloss = -mean(logpdf(π, 𝒟[:s], 𝒟[:a]))
+        lloss = -mean(logpdf(π, 𝒟[:s], 𝒟[:a]).*𝒟[:r])
         ignore() do
             info[:entropy] = -eloss
             info[:logpdf] = lloss
@@ -18,13 +18,17 @@ function logpdf_bc_loss(λe::Float32)
     end
 end
 
-function BC(;π, 𝒟_expert, S, A=action_space(π), loss=nothing, validation_fraction=0.3, window=100, λe::Float32=1f-3, opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...)
+function BC(;π, S, A=action_space(π), 𝒟_demo, normalize_demo::Bool=true, loss=nothing, validation_fraction=0.3, window=100, λe::Float32=1f-3, opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...)
     if isnothing(loss)
         loss = π isa ContinuousNetwork ? mse_action_loss() : logpdf_bc_loss(λe)
     end
-    𝒟_expert = normalize!(deepcopy(𝒟_expert), S, A) |> device(π)
-    shuffle!(𝒟_expert)
-    𝒟_train, 𝒟_validate = split(𝒟_expert, [1-validation_fraction, validation_fraction])
+    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
+    𝒟_demo = 𝒟_demo |> device(π)
+    
+    # Splite between train and validation sets
+    shuffle!(𝒟_demo)
+    𝒟_train, 𝒟_validate = split(𝒟_demo, [1-validation_fraction, validation_fraction])
+    
     BatchSolver(;π=π, 
               S=S,
               A=A,

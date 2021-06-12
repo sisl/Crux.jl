@@ -4,7 +4,7 @@ end
 
 function (R::OrthogonalRegularizer)(π)    
     reg = 0f0
-    dev = device(π)
+    dev = Zygote.ignore(()->device(π))
     for l in Zygote.ignore(()->filter((l)->hasproperty(l, :weight), layers(π)))
         W = to2D(l.weight)
         prod = W' * W

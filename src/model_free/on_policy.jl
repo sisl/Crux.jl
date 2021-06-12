@@ -21,9 +21,10 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
     𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.ΔN, 𝒮.required_columns, device=device(𝒮.π))
     γ, λ = Float32(discount(mdp)), 𝒮.λ_gae
     s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, required_columns=𝒮.required_columns, λ=λ, max_steps=𝒮.max_steps, π_explore=𝒮.π)
+    isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
     # Log the pre-train performance
-    log(𝒮.log, 𝒮.i, s=s)
+    log(𝒮.log, 𝒮.i)
 
     # Loop over the desired number of environment interactions
     for 𝒮.i = range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
@@ -44,7 +45,7 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         end
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info, info_cb, s=s)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info, info_cb)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

@@ -100,7 +100,7 @@ h = MutableBinaryHeap{Float64, DataStructures.FasterForward}(vlarge)
 ## mdp_data
 d1 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100)
 d2 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:weight, :t, :advantage, :return, :logprob])
-@test_throws ErrorException  mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:bad_key])
+# @test_throws ErrorException  mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, [:bad_key]) # Now this just throws a warning
 d3 = mdp_data(ContinuousSpace(3), ContinuousSpace(4), 100, ArrayType = CuArray)
 
 @test d1[:s] == zeros(Float32, 3, 100) && d2[:s] == zeros(Float32, 3, 100) && size(d3[:s]) == (3, 100)

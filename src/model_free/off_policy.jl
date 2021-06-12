@@ -9,6 +9,7 @@
     i::Int = 0 # The current number of environment interactions
     a_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the actor
     c_opt::TrainingParams # Training parameters for the critic
+    post_batch_callback = (𝒟) -> nothing
     
     # Off-policy-specific parameters
     π⁻ = deepcopy(π)
@@ -16,7 +17,8 @@
     target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0) # Function for updating the target network
     target_fn # Target for critic regression with input signature (π⁻, 𝒟, γ; i)
     buffer_size = 1000 # Size of the buffer
-    buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size) # The replay buffer
+    required_columns = Symbol[]
+    buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size, required_columns) # The replay buffer
     buffer_init::Int = max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
     extra_buffers = [] # extra buffers (i.e. for experience replay in continual learning)
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
@@ -26,10 +28,11 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = buffer_like(𝒮.buffer, capacity=𝒮.c_opt.batch_size, device=device(𝒮.π))
     γ = Float32(discount(mdp))
-    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore)
+    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, max_steps=𝒮.max_steps, π_explore=𝒮.π_explore, required_columns=extra_columns(𝒮.buffer))
+    isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
     # Log the pre-train performance
-    log(𝒮.log, 𝒮.i, s=s)
+    log(𝒮.log, 𝒮.i)
 
     # Fill the buffer with initial observations before training
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i=𝒮.i, explore=true)
@@ -38,6 +41,10 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     for 𝒮.i in range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
         # Sample transitions into the replay buffer
         push!(𝒮.buffer, steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i))
+        
+        # callback for potentially updating the buffer
+        𝒮.post_batch_callback(𝒮.buffer) 
+        
         infos = []
         # Loop over the desired number of training steps
         for epoch in 1:𝒮.c_opt.epochs
@@ -70,7 +77,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         isnothing(𝒮.a_opt) && 𝒮.target_update(𝒮.π⁻, 𝒮.π, i=𝒮.i + 1:𝒮.i + 𝒮.ΔN)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), s=s)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos))
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

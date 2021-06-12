@@ -163,7 +163,7 @@ end
 
 
 ## Visualization
-function episode_frames(mdp, policy; Neps=1, max_steps=1000, use_obs=false)
+function episode_frames(mdp, policy; Neps=1, max_steps=1000, use_obs=false, render_kwargs::NamedTuple=(;), S=state_space(mdp))
     frames = []
     for i = 1:Neps
         s = rand(initialstate(mdp))
@@ -171,7 +171,7 @@ function episode_frames(mdp, policy; Neps=1, max_steps=1000, use_obs=false)
         step = 0
         while !isterminal(mdp, s) && step < max_steps
             step += 1
-            a = action(policy, o)
+            a = action(policy, tovec(o,S))
             size(a) == (1,) && (a=a[1])
             if mdp isa POMDP
                 s, o, _ = gen(mdp, s, a)
@@ -179,14 +179,20 @@ function episode_frames(mdp, policy; Neps=1, max_steps=1000, use_obs=false)
                 s, _ = gen(mdp, s, a)
                 o = convert_s(AbstractArray, s, mdp)
             end
-            use_obs ? push!(frames, o') : push!(frames, render(mdp, s, a))
+            use_obs ? push!(frames, o') : push!(frames, render(mdp, s, a; render_kwargs...))
         end
     end
     frames
 end
 
-gif(mdp, policy, filename; fps=15, Neps=1, max_steps=1000, use_obs=false) = gif(episode_frames(mdp, policy, Neps = Neps, max_steps = max_steps, use_obs = use_obs), filename, fps = fps)
+function gif(mdp, data::ExperienceBuffer, filename; convert_s = (s)->s, convert_a=(a)->a, render_kwargs::NamedTuple=(;), kwargs...)
+    frames = [render(mdp, convert_s(bslice(data[:s], i)), convert_a(bslice(data[:a], i)); render_kwargs...) for i=1:length(data)]
+    gif(frames, filename; kwargs...)
+end
+
+gif(mdp, policy, filename; fps=15, Neps=1, max_steps=1000, use_obs=false, S=state_space(mdp), render_kwargs::NamedTuple=(;)) = gif(episode_frames(mdp, policy, Neps=Neps, max_steps=max_steps, use_obs=use_obs, render_kwargs=render_kwargs, S=S), filename, fps=fps)
 
 function gif(frames, filename; fps=15)
-    save(filename, cat(frames..., dims=3), fps = fps)
+    save(filename, cat(frames..., dims=3), fps=fps)
 end
+

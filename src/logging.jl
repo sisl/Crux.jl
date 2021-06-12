@@ -7,20 +7,21 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
     logger = TBLogger(dir, tb_increment)
     fns = [log_undiscounted_return(10)]
     verbose::Bool = true
+    sampler::Union{Sampler, Nothing} = nothing
 end
 
 Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 
 #Note that i can be an int or a unitrange
-function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...; s = nothing)
+function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
-    for dict in [p.fns..., data..., log_exploration(s.π_explore)]
-        d = dict isa Function ? dict(s=s, i=i) : dict
+    for dict in [p.fns..., data..., log_exploration(p.sampler.π_explore)]
+        d = dict isa Function ? dict(s=p.sampler, i=i) : dict
         for (k,v) in d
-            log_value(p.logger, string(k), v, step = i)
             p.verbose && print(", ", k, ": ", v)
+            log_value(p.logger, string(k), v, step = i)
         end
     end
     p.verbose && println()
@@ -40,6 +41,16 @@ log_discounted_return(Neps) = (;s, kwargs...) -> log_performance(s, "discounted_
 log_undiscounted_return(Neps; name="undiscounted_return") = (;s, kwargs...) -> log_performance(s, name, undiscounted_return, Neps=Neps)
 log_undiscounted_return(s, Neps; name="undiscounted_return") = (;kwargs...) -> log_performance(s, name, undiscounted_return, Neps=Neps)
 log_failure(Neps) = (;s, kwargs...) -> log_performance(s, "failure_rate", failure, Neps=Neps)
+log_metric_by_key(key, Neps) = (;s, kwargs...) -> log_performance(s, string(key), metric_by_key, key=key, Neps=Neps)
+
+function log_metrics_by_key(keys, Neps; kwargs...)
+    (;s,kwargs2...) -> begin
+        vals = metrics_by_key(s, keys=keys, Neps=Neps, kwargs...)
+        Dict(k=>v for (k,v) in zip(keys, vals))
+    end
+end
+
+log_validation_error(loss, 𝒟_val; name="validation_error") = (;s, kwargs...) -> Dict(name => loss(s.π, 𝒟_val))
 
 log_exploration(policy) = (;kwargs...) -> Dict()
 log_exploration(policy::ϵGreedyPolicy; name = "eps") = (;i, kwargs...) -> Dict(name => policy.ϵ(i))

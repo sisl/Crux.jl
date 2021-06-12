@@ -30,15 +30,15 @@ p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn], title = "CartP
 # Produce a gif with the final policy
 gif(mdp, π_ppo, "cartpole_policy.gif", max_steps=100)
 
-## Save data for imitation learning
-using BSON
-s = Sampler(mdp, 𝒮_dqn.π, max_steps=100, required_columns=[:t])
-
-data = steps!(s, Nsteps=10000)
-sum(data[:r])/100
-data[:expert_val] = ones(Float32, 1, 10000)
-data[:a]
-
-data = ExperienceBuffer(data)
-BSON.@save "examples/il/expert_data/cartpole.bson" data
+## Optional - Save data for imitation learning
+# using BSON
+# s = Sampler(mdp, 𝒮_dqn.π, max_steps=100, required_columns=[:t])
+# 
+# data = steps!(s, Nsteps=10000)
+# sum(data[:r])/100
+# data[:expert_val] = ones(Float32, 1, 10000)
+# data[:a]
+# 
+# data = ExperienceBuffer(data)
+# BSON.@save "examples/il/expert_data/cartpole.bson" data
 

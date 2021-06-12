@@ -7,8 +7,8 @@ end
 
 TD3_actor_loss(π, 𝒟; info = Dict()) = -mean(value(π.C.N1, 𝒟[:s], action(π, 𝒟[:s])))
 
-TD3(;π::ActorCritic{ContinuousNetwork, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}}, ΔN=50, 
-     π_smooth::Policy=GaussianNoiseExplorationPolicy(0.1f0, ϵ_min=-0.5f0, ϵ_max=0.5f0), π_explore=GaussianNoiseExplorationPolicy(0.1f0), a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) = 
+TD3(;π::ActorCritic{A, C}, ΔN=50, 
+     π_smooth::Policy=GaussianNoiseExplorationPolicy(0.1f0, ϵ_min=-0.5f0, ϵ_max=0.5f0), π_explore=GaussianNoiseExplorationPolicy(0.1f0), a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) where {A, C<:DoubleNetwork} = 
     OffPolicySolver(;
         π = π,
         ΔN=ΔN,

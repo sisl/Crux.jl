@@ -1,4 +1,8 @@
 module Crux
+    CRUX_WARNINGS = true
+    
+    set_crux_warnings(val::Bool) = CRUX_WARNINGS = val
+    
     using Random
     using Distributions
     using POMDPs
@@ -25,26 +29,26 @@ module Crux
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!, capacity, normalize!
+           prioritized_sample!, capacity, normalize!, extra_columns
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
     include("training.jl")
     
     export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
-           DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy,
+           DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
            entropy, logpdf, action_space, exploration, layers, actor, critic
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
-           episodes!, fillto!, undiscounted_return, discounted_return, failure, 
+           episodes!, fillto!, metric_by_key, metrics_by_key, undiscounted_return, discounted_return, failure, 
            fill_gae!, fill_returns!, trime!
     include("sampler.jl")
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
-           log_exploration
+           log_exploration, log_metric_by_key, log_validation_error
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
@@ -74,12 +78,11 @@ module Crux
     include("extras/multitask_learning.jl")
     
     export OnPolicySolver, OffPolicySolver, BatchSolver
-    export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
-    export GAIL, ValueDICE, BC, AdVIL
-    export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
     include("model_free/batch.jl")
+    
+    export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
     include("model_free/rl/reinforce.jl")
     include("model_free/rl/a2c.jl")
     include("model_free/rl/ppo.jl")
@@ -87,9 +90,18 @@ module Crux
     include("model_free/rl/ddpg.jl")
     include("model_free/rl/td3.jl")
     include("model_free/rl/sac.jl")
+    
+    export TIER, LatentConditionedNetwork
+    include("model_free/rl/tier.jl")
+    
+    export GAIL, ValueDICE, BC, AdVIL, SQIL, AdRIL, ASAF
+    export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
     include("model_free/il/gail.jl")
     include("model_free/il/valueDICE.jl")
+    include("model_free/il/asaf.jl")
+    include("model_free/il/sqil.jl")
+    include("model_free/il/AdRIL.jl")
 end
 

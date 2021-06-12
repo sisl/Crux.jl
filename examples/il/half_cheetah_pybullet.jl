@@ -33,15 +33,13 @@ S = state_space(mdp, μ=μ_s, σ=σ_s)
 Winit(out, in) = Float32.(rand(Uniform(-sqrt(1/in), sqrt(1/in)), out, in))
 binit(in) = (out) -> Float32.(rand(Uniform(-sqrt(1/in), sqrt(1/in)), out))
 
-# Networks for on-policy algorithms
-idim = 
 
 ## Setup params
 
 # Solve with PPO-GAIL
 # 𝒮_gail = GAIL(;D=D(), 
 #               gan_loss=GAN_LSLoss(), 
-#               𝒟_expert=expert_trajectories, 
+#               𝒟_demo=expert_trajectories, 
 #               solver=PPO, 
 #               π=ActorCritic(GaussianPolicy(μ(), log_std()), V()), 
 #               ΔN=4000, 
@@ -54,7 +52,7 @@ idim =
 log_std() = -0.5f0*ones(Float32, adim)
 
 𝒮_bc = BC(π=GaussianPolicy(μ(), log_std()), 
-          𝒟_expert=expert_trajectories, 
+          𝒟_demo=expert_trajectories, 
           S=S, 
           # window=500,
           opt=(epochs=100000, early_stopping=(args...)->false,), 
@@ -71,6 +69,6 @@ D() = ContinuousNetwork(Chain(Dense(S.dims[1] + adim, 256, relu, init=Flux.ortho
             Dense(256, 256, relu, init=Flux.orthogonal), 
             Dense(256, 1, init=Flux.orthogonal)))
             
-𝒮_advil = AdVIL(π=ActorCritic(A(),D()), 𝒟_expert=expert_trajectories, S=S, a_opt=(epochs=100000, optimizer=ADAM(8f-6), batch_size=1024), c_opt=(optimizer=ADAM(8e-4),), max_steps=1000, log=(period=100,))
+𝒮_advil = AdVIL(π=ActorCritic(A(),D()), 𝒟_demo=expert_trajectories, S=S, a_opt=(epochs=100000, optimizer=ADAM(8f-6), batch_size=1024), c_opt=(optimizer=ADAM(8e-4),), max_steps=1000, log=(period=100,))
 solve(𝒮_advil, mdp)
 

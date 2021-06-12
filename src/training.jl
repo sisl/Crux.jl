@@ -15,7 +15,7 @@ function Flux.Optimise.train!(π, loss::Function, p::TrainingParams; info = Dict
     typeof(l) == Float64 && @error "Float64 loss found: computation in double precision may be slow"
     grad = back(1f0)
     gnorm = norm(grad, p=2)
-    @assert !isnan(gnorm)
+    isnan(gnorm) && error("NaN detected! Loss: $l")
     Flux.update!(p.optimizer, θ, grad)
     info[string(p.name, "loss")] = l
     info[string(p.name, "grad_norm")] = gnorm

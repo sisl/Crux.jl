@@ -7,12 +7,17 @@
     a_opt::TrainingParams # Training parameters for the actor
     c_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the discriminator
     log::Union{Nothing, LoggerParams} = nothing # The logging parameters
+    required_columns = Symbol[] # Extra columns to sample
     epoch = 0 # Number of epochs of training
 end
 
 function POMDPs.solve(𝒮::BatchSolver, mdp)    
     # Sampler for logging performance
-    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, max_steps=𝒮.max_steps)
+    s = Sampler(mdp, 𝒮.π, S=𝒮.S, A=𝒮.A, max_steps=𝒮.max_steps, required_columns=𝒮.required_columns)
+    isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
+    
+    # Log initial performance
+    log(𝒮.log, 𝒮.epoch)
     
     # Loop over the number of epochs
     infos = []
@@ -42,7 +47,7 @@ function POMDPs.solve(𝒮::BatchSolver, mdp)
         𝒮.a_opt.early_stopping(infos) && break
         
         # Log the results
-        log(𝒮.log, 𝒮.epoch, infos[end], s=s)
+        log(𝒮.log, 𝒮.epoch+1, infos[end])
     end
     
     𝒮.π

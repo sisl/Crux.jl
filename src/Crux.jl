@@ -48,7 +48,7 @@ module Crux
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
-           log_exploration, log_metric_by_key, log_validation_error
+           log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 

@@ -11,6 +11,7 @@ function SQIL(;π, S, A=action_space(π), 𝒟_demo, normalize_demo::Bool=true, 
             A=A, 
             post_batch_callback=SQIL_callback, 
             extra_buffers=[𝒟_demo],
+            buffer_fractions=[1/2, 1/2],
             log=(dir="log/sqil", period=500, log...),
             kwargs...)
 end

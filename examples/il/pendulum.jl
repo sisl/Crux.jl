@@ -79,8 +79,8 @@ solve(𝒮_adril, mdp)
 solve(𝒮_ASAF, mdp)
 
 using Plots
-p = plot_learning([𝒮_gail, 𝒮_bc, 𝒮_advil, 𝒮_sqil, 𝒮_ASAF], title="Pendulum Swingup Imitation Learning Curves", labels=["GAIL", "BC", "AdVIL", "SQIL", "AdRIL", "ASAF"], legend=:right)
-plot!(p, [1,100000], [expert_perf, expert_perf], color=:black, label="expert")
+p = plot_learning([𝒮_gail, 𝒮_bc, 𝒮_advil, 𝒮_sqil, 𝒮_adril,𝒮_ASAF], title="Pendulum Swingup Imitation Learning Curves", labels=["GAIL", "BC", "AdVIL", "SQIL", "AdRIL", "ASAF"], legend=:right)
+plot!(p, [1,50000], [expert_perf, expert_perf], color=:black, label="expert")
 
 savefig("pendulum_benchmark.pdf")
 

@@ -260,6 +260,33 @@ a, logprob = exploration(p, s)
 
 @test action_space(p) == ContinuousSpace(4)
 
+
+## Distribution Network
+p = DistributionPolicy(Distributions.product_distribution([Uniform(-1,1) for i=1:6]))
+
+@test Crux.device(p) == cpu
+
+@test length(Flux.params(p)) == 0
+@test length(layers(p)) == 0
+
+s0 = rand(2)
+s = rand(2,100)
+
+a, logprob = exploration(p, s0)
+@test size(a) == (6,)
+@test size(logprob) == (1,1)
+@test all(logpdf(p, s0, a) .≈ logprob)
+
+a, logprob = exploration(p, s)
+@test size(a) == (6,100)
+@test size(logprob) == (1,100)
+@test all(logpdf(p, s, a) .≈ logprob)
+
+@test size(entropy(p, s0)) == (1,)
+@test size(entropy(p, s)) == (1, 100)
+
+@test action_space(p) == ContinuousSpace(6)
+
 ## ϵGreedyPolicy
 p_on = DiscreteNetwork((s)->[0.5, 1.0], [2,3])
 p = ϵGreedyPolicy(0f0, [1,])

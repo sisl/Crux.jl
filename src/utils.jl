@@ -98,3 +98,4 @@ function LinearAlgebra.norm(grads::Flux.Zygote.Grads; p::Real = 2)
     end
     norm(v, p)
 end
+

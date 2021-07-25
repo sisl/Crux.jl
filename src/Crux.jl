@@ -23,7 +23,7 @@ module Crux
     using Statistics
     using Base.Iterators: partition
     
-    export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
+    export ScalarParams, AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
            state_space, device, cpucall, gpucall, mdcall, bslice, whiten, to2D, tovec
     include("utils.jl")
     
@@ -37,6 +37,7 @@ module Crux
     
     export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
+           DistributionPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
            entropy, logpdf, action_space, exploration, layers, actor, critic
     include("policies.jl")
@@ -94,14 +95,16 @@ module Crux
     export TIER, LatentConditionedNetwork
     include("model_free/rl/tier.jl")
     
-    export GAIL, ValueDICE, BC, AdVIL, SQIL, AdRIL, ASAF
+    export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
     export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
     include("model_free/il/gail.jl")
-    include("model_free/il/valueDICE.jl")
     include("model_free/il/asaf.jl")
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
+    
+    export CQL
+    include("model_free/offline/cql.jl")
 end
 

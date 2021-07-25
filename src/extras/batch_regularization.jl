@@ -8,7 +8,11 @@ end
 
 value_regularization(π, 𝒟) = Flux.mse(value(π, 𝒟[:s]), 𝒟[:value])
 action_regularization(π, 𝒟) = Flux.mse(action(π, 𝒟[:s]), 𝒟[:a])
-action_value_regularization(π, 𝒟) = Flux.mse(value(π, 𝒟[:s], 𝒟[:a]), 𝒟[:value])
+action_value_regularization(π, 𝒟) = begin 
+    v = value(π, 𝒟[:s], 𝒟[:a])
+    v isa Tuple && (v = v[1])
+    Flux.mse(v, 𝒟[:value])
+end
 
 function (R::BatchRegularizer)(π)
     # sample a random batch for each buffer

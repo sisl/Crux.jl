@@ -32,7 +32,7 @@ end
 action_space(π::LatentConditionedNetwork) = action_space(π.policy)
 
 
-@with_kw mutable struct TIERSolver <: Solver
+@with_kw mutable struct OffPolicyLatentSolver <: Solver
     π # Policy
     S::AbstractSpace # State space
     A::AbstractSpace = action_space(π) # Action space
@@ -60,7 +60,7 @@ action_space(π::LatentConditionedNetwork) = action_space(π.policy)
 end
 
 TIER(;π::ActorCritic, ΔN=50, π_explore=GaussianNoiseExplorationPolicy(0.1f0),  a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), π_smooth::Policy=GaussianNoiseExplorationPolicy(0.1f0, ϵ_min=-0.5f0, ϵ_max=0.5f0), kwargs...) = 
-    TIERSolver(;
+    OffPolicyLatentSolver(;
         π=π, 
         ΔN=ΔN,
         log=LoggerParams(;dir = "log/ddpg", log...),
@@ -153,9 +153,12 @@ function TD3_target_w_latent(π_smooth)
     end
 end
 
+action_regularization_tier(π, 𝒟s) = length(𝒟s) == 0 ? 0 : mean([Flux.mse(action(actor(π), 𝒟[:s], z=𝒟[:μ_z]), 𝒟[:a]) for 𝒟 in 𝒟s])
+action_value_regularization_tier(π, 𝒟s) = length(𝒟s) == 0 ? 0 : mean([Flux.mse(value(critic(π).N1, 𝒟[:s], 𝒟[:a], z=𝒟[:μ_z]), 𝒟[:value]) for 𝒟 in 𝒟s]) +  mean([Flux.mse(value(critic(π).N2, 𝒟[:s], 𝒟[:a], z=𝒟[:μ_z]), 𝒟[:value]) for 𝒟 in 𝒟s])
 
 
-function POMDPs.solve(𝒮::TIERSolver, mdp)
+
+function POMDPs.solve(𝒮::OffPolicyLatentSolver, mdp)
     # Compute the latent dimension
     latent_dim = length(actor(𝒮.π).z)
     
@@ -244,11 +247,11 @@ function POMDPs.solve(𝒮::TIERSolver, mdp)
             y = 𝒮.target_fn(𝒮.π⁻, 𝒟, γ, i=𝒮.i)
 
             # Train the critic
-            info = train!(critic(𝒮.π), (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; kwargs...), 𝒮.c_opt)
+            info = train!(critic(𝒮.π), (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; kwargs...) + action_value_regularization_tier(𝒮.π, 𝒟s[1:end-1]), 𝒮.c_opt)
 
             # Train the actor 
             if !isnothing(𝒮.a_opt) && ((epoch-1) % 𝒮.a_opt.update_every) == 0
-                info_a = train!(actor(𝒮.π), (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟; kwargs...), 𝒮.a_opt)
+                info_a = train!(actor(𝒮.π), (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟; kwargs...) + action_regularization_tier(𝒮.π, 𝒟s[1:end-1]), 𝒮.a_opt)
                 info = merge(info, info_a)
 
                 # Update the target network

@@ -52,17 +52,18 @@ off_policy = (S=S,
               a_opt=(batch_size=100, optimizer=ADAM(1e-3)),
               π_explore=FirstExplorePolicy(1000, rand_policy, GaussianNoiseExplorationPolicy(0.5f0, a_min=[-2.0], a_max=[2.0])))
               
-# Solver with DDPG (gets to > -200 reward, ~1 min)
+# Solver with DDPG
 𝒮_ddpg = DDPG(;π=ActorCritic(A(), QSA()), off_policy...)
 @time π_ddpg = solve(𝒮_ddpg, mdp)
 
-# Solve with TD3 (didn't learn much, ~1.5 min)
+# Solve with TD3
 𝒮_td3 = TD3(;π=ActorCritic(A(), DoubleNetwork(QSA(), QSA())), off_policy...)
 @time π_td3 = solve(𝒮_td3, mdp)
 
-# Solve with TD3 (didn't learn much, ~1.5 min)
-𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), off_policy...)
+# Solve with SAC
+𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), off_policy..., H_target=-6f0)
 @time π_sac = solve(𝒮_sac, mdp)
+
 
 # Plot the learning curve
 p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", labels=["REINFORCE", "A2C", "PPO", "DQN", "DDPG", "TD3", "SAC"], legend=:right)

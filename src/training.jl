@@ -9,8 +9,9 @@
     name = ""
 end
 
-function Flux.Optimise.train!(π, loss::Function, p::TrainingParams; info = Dict())
-    θ = Flux.params(π)
+Flux.Optimise.train!(π::N, loss::Function, p::TrainingParams; info = Dict()) where {N <: Policy} = train!(Flux.params(π), loss, p, info=info)
+    
+function Flux.Optimise.train!(θ, loss::Function, p::TrainingParams; info = Dict())
     l, back = Flux.pullback(() -> loss(info = info) + p.regularizer(π), θ)
     typeof(l) == Float64 && @error "Float64 loss found: computation in double precision may be slow"
     grad = back(1f0)
@@ -23,7 +24,7 @@ function Flux.Optimise.train!(π, loss::Function, p::TrainingParams; info = Dict
 end
 
 # Train with minibatches and epochs
-function batch_train!(π, p::TrainingParams, 𝒟::ExperienceBuffer...)
+function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; info=Dict(), max_batches=Inf)
     infos = [] # stores the aggregated info for each epoch
     for epoch in 1:p.epochs
         minibatch_infos = [] # stores the info from each minibatch
@@ -35,9 +36,12 @@ function batch_train!(π, p::TrainingParams, 𝒟::ExperienceBuffer...)
         
         # Call train for each minibatch
         partitions = [partition(1:length(D), p.batch_size) for D in 𝒟]
+        batch_num = 1
         for indices in zip(partitions...)
             mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
-            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π, mbs...; kwargs...), p))
+            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π, 𝒫, mbs...; kwargs...), p))
+            batch_num > max_batches && break 
+            batch_num += 1    
         end
         push!(infos, aggregate_info(minibatch_infos))        
         if p.early_stopping(infos)
@@ -45,6 +49,6 @@ function batch_train!(π, p::TrainingParams, 𝒟::ExperienceBuffer...)
             break    
         end
     end
-    aggregate_info(infos)
+    merge!(info, aggregate_info(infos))
 end
 

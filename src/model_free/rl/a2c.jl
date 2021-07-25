@@ -1,28 +1,25 @@
-# A2C loss
-a2c_loss(;λₚ::Float32 = 1f0, λₑ::Float32 = 0.1f0) = (π, 𝒟; info = Dict()) -> a2c_loss(π, 𝒟[:s], 𝒟[:a], 𝒟[:advantage], 𝒟[:logprob], λₚ, λₑ, info)
-
-function a2c_loss(π, s, a, A, old_probs, λₚ, λₑ, info = Dict())
-    new_probs = logpdf(π, s, a)
-    p_loss = -mean(new_probs .* A)
-    e_loss = -mean(entropy(π, s))
+function a2c_loss(π, 𝒫, 𝒟; info = Dict())
+    new_probs = logpdf(π, 𝒟[:s], 𝒟[:a])
+    p_loss = -mean(new_probs .* 𝒟[:advantage])
+    e_loss = -mean(entropy(π, 𝒟[:s]))
     
     # Log useful information
     ignore() do
         info[:entropy] = -e_loss
-        info[:kl] = mean(old_probs .- new_probs)
+        info[:kl] = mean(𝒟[:logprob] .- new_probs)
     end 
     
-    λₚ*p_loss + λₑ*e_loss
+    𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss
 end
 
-# Build an A2C solver
-A2C(;π::ActorCritic, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), λₚ::Float32 = 1f0, λₑ::Float32 = 0.1f0, kwargs...) = 
+A2C(;π::ActorCritic, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), λp::Float32 = 1f0, λe::Float32 = 0.1f0, kwargs...) = 
     OnPolicySolver(;
         π = π,
-        log = LoggerParams(;dir = "log/a2c", log...),
-        a_opt = TrainingParams(;loss = a2c_loss(λₚ=λₚ, λₑ=λₑ), early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
-        c_opt = TrainingParams(;loss = (π, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
-        post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+        𝒫=(λp=λp, λe=λe),
+        log=LoggerParams(;dir = "log/a2c", log...),
+        a_opt=TrainingParams(;loss=a2c_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
+        c_opt=TrainingParams(;loss=(π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
+        post_batch_callback=(𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
         kwargs...)
     
 

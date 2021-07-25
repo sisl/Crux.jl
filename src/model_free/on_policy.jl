@@ -9,6 +9,7 @@
     i::Int = 0 # The current number of environment interactions
     a_opt::TrainingParams # Training parameters for the actor
     c_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the critic
+    𝒫::NamedTuple = (;) # Parameters of the algorithm
     
     # On-policy-specific parameters
     λ_gae::Float32 = 0.95 # Generalized advantage estimation parameter
@@ -31,21 +32,22 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         # Sample transitions into the batch buffer
         push!(𝒟, steps!(s, Nsteps=𝒮.ΔN, reset=true, explore=true, i=𝒮.i))
         
+        # Info to collect during training
+        info = Dict()
+        
         # Call the post-batch callback function
-        info_cb = Dict()
-        𝒮.post_batch_callback(𝒟, info=info_cb)
+        𝒮.post_batch_callback(𝒟, info=info)
         
         # Train the actor
-        info = batch_train!(actor(𝒮.π), 𝒮.a_opt, 𝒟)
+        batch_train!(actor(𝒮.π), 𝒮.a_opt, 𝒮.𝒫, 𝒟, info=info)
         
         # Train the critic (if applicable)
         if !isnothing(𝒮.c_opt)
-            info_c = batch_train!(critic(𝒮.π), 𝒮.c_opt, 𝒟)
-            merge!(info, info_c)
+            batch_train!(critic(𝒮.π), 𝒮.c_opt, 𝒮.𝒫, 𝒟, info=info)
         end
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info, info_cb)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.π

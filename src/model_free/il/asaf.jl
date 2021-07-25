@@ -26,6 +26,26 @@ function ASAF(;π, S, A=action_space(π), 𝒟_demo, normalize_demo::Bool=true, 
 end
 
 
+# function ASAF_actor_loss(πG)
+#     (π, 𝒟, 𝒟_demo; info=Dict()) -> begin
+#         πsa_G = exp.(logpdf(π, 𝒟[:s], 𝒟[:a]))
+#         πsa_E = exp.(logpdf(π, 𝒟_demo[:s], 𝒟_demo[:a]))
+#         πGsa_G = exp.(logpdf(πG, 𝒟[:s], 𝒟[:a]))
+#         πGsa_E = exp.(logpdf(πG, 𝒟_demo[:s], 𝒟_demo[:a]))
+#         e = mean(entropy(π, 𝒟[:s]))
+#         r = 𝒟_demo[:r]
+# 
+#         ignore() do
+#             info[:entropy] = e
+#         end 
+# 
+#         DE = πsa_E ./ (πsa_E .+ πGsa_E .+ 1f-3)
+#         DG = πsa_G ./ (πsa_G .+ πGsa_G .+ 1f-3)
+# 
+#         -Flux.mean(log.(1 .- r  .+ 2f0*(r .- 0.5f0) .* DE)) - Flux.mean(log.(1 .- DG))  - 0.1f0*e
+#     end
+# end
+
 function ASAF_actor_loss(πG)
     (π, 𝒟, 𝒟_demo; info=Dict()) -> begin
         πsa_G = logpdf(π, 𝒟[:s], 𝒟[:a])

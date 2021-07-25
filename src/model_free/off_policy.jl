@@ -7,9 +7,12 @@
     max_steps::Int = 100 # Maximum number of steps per episode
     log::Union{Nothing, LoggerParams} = nothing # The logging parameters
     i::Int = 0 # The current number of environment interactions
+    param_optimizers::Dict{Any, TrainingParams} = Dict() # Training parameters for the parameters
     a_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the actor
     c_opt::TrainingParams # Training parameters for the critic
-    post_batch_callback = (𝒟) -> nothing
+    post_experience_callback = (buffer) -> nothing
+    post_batch_callback = (𝒟; kwargs...) -> nothing
+    𝒫::NamedTuple = (;) # Parameters of the algorithm
     
     # Off-policy-specific parameters
     π⁻ = deepcopy(π)
@@ -43,7 +46,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         push!(𝒮.buffer, steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i))
         
         # callback for potentially updating the buffer
-        𝒮.post_batch_callback(𝒮.buffer) 
+        𝒮.post_experience_callback(𝒮.buffer) 
         
         infos = []
         # Loop over the desired number of training steps
@@ -51,19 +54,31 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
             # Sample a random minibatch of 𝑁 transitions (sᵢ, aᵢ, rᵢ, sᵢ₊₁) from 𝒟
             rand!(𝒟, 𝒮.buffer, 𝒮.extra_buffers..., fracs=𝒮.buffer_fractions, i=𝒮.i)
             
+            # Dictionary to store info from the various optimization processes
+            info = Dict()
+            
+            # Callack for potentially updating the buffer
+            𝒮.post_batch_callback(𝒟, info=info)
+            
             # Compute target
-            y = 𝒮.target_fn(𝒮.π⁻, 𝒟, γ, i=𝒮.i)
+            y = 𝒮.target_fn(𝒮.π⁻, 𝒮.𝒫, 𝒟, γ, i=𝒮.i)
             
             # Update priorities (for prioritized replay)
             (ispri = isprioritized(𝒮.buffer)) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.π, 𝒟, y)))
             
+            # Train parameters
+            for (θs, p_opt) in 𝒮.param_optimizers
+                train!(θs, (;kwargs...) -> p_opt.loss(𝒮.π, 𝒮.𝒫, 𝒟; kwargs...), p_opt, info=info)
+            end
+            
             # Train the critic
-            info = train!(critic(𝒮.π), (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒟, y; weighted=ispri, kwargs...), 𝒮.c_opt)
+            if ((epoch-1) % 𝒮.c_opt.update_every) == 0
+                train!(critic(𝒮.π), (;kwargs...) -> 𝒮.c_opt.loss(𝒮.π, 𝒮.𝒫, 𝒟, y; weighted=ispri, kwargs...), 𝒮.c_opt, info=info)
+            end
             
             # Train the actor 
             if !isnothing(𝒮.a_opt) && ((epoch-1) % 𝒮.a_opt.update_every) == 0
-                info_a = train!(actor(𝒮.π), (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒟; kwargs...), 𝒮.a_opt)
-                info = merge(info, info_a)
+                train!(actor(𝒮.π), (;kwargs...) -> 𝒮.a_opt.loss(𝒮.π, 𝒮.𝒫, 𝒟; kwargs...), 𝒮.a_opt, info=info)
             
                 # Update the target network
                 𝒮.target_update(𝒮.π⁻, 𝒮.π)
@@ -83,7 +98,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     𝒮.π
 end
 
-function td_loss(π, 𝒟, y; loss=Flux.mse, weighted=false, name=:Qavg, info=Dict())
+function td_loss(π, 𝒫, 𝒟, y; loss=Flux.mse, weighted=false, name=:Qavg, info=Dict())
     Q = value(π, 𝒟[:s], 𝒟[:a]) 
     
     # Store useful information
@@ -94,10 +109,10 @@ function td_loss(π, 𝒟, y; loss=Flux.mse, weighted=false, name=:Qavg, info=Di
     loss(Q, y, agg = weighted ? weighted_mean(𝒟[:weight]) : mean)
 end
 
-function double_Q_loss(π, 𝒟, y; info=Dict(), weighted=false)
-    q1loss = td_loss(π.C.N1, 𝒟, y, info=info, name=:Q1avg, weighted=weighted)
-    q2loss = td_loss(π.C.N2, 𝒟, y, info=info, name=:Q2avg, weighted=weighted)
-    q1loss + q2loss
+function double_Q_loss(π, 𝒫, 𝒟, y; info=Dict(), weighted=false)
+    q1loss = td_loss(π.C.N1, 𝒫, 𝒟, y, info=info, name=:Q1avg, weighted=weighted)
+    q2loss = td_loss(π.C.N2, 𝒫, 𝒟, y, info=info, name=:Q2avg, weighted=weighted)
+    0.5f0*q1loss + 0.5f0*q2loss
 end
 
 td_error(π, 𝒟, y) = abs.(value(π, 𝒟[:s], 𝒟[:a])  .- y)

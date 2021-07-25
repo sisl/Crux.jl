@@ -214,34 +214,60 @@ layers(π::SquashedGaussianPolicy) = unique((layers(π.μ)..., layers(π.logΣ).
 
 device(π::SquashedGaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) : error("Mismatched devices")
 
-POMDPs.action(π::SquashedGaussianPolicy, s) = π.ascale .* tanh.(action(π.μ, s))
+POMDPs.action(π::SquashedGaussianPolicy, s) = π.ascale .* tanh.(π.μ(s))
 
 function squashed_gaussian_σ(logΣ)
     LOG_STD_MIN = -5
     LOG_STD_MAX = 2
-    logΣ = LOG_STD_MIN .+ 0.5f0 .* (LOG_STD_MAX - LOG_STD_MIN) * (logΣ .+ 1)
-    # logΣ = clamp.(logΣ, -20, 2)
+    # logΣ = LOG_STD_MIN .+ 0.5f0 .* (LOG_STD_MAX - LOG_STD_MIN) * (logΣ .+ 1)
+    logΣ = clamp.(logΣ, LOG_STD_MIN, LOG_STD_MAX)
     exp.(logΣ)
 end
 
+# a is  untanh'd 
 function squashed_gaussian_logprob(μ, logΣ, a)
     σ² = squashed_gaussian_σ(logΣ).^2
     sum(-((a .- μ).^2) ./ (2 .* σ²) .- 0.9189385332046727f0 .- logΣ .- 2*(log(2f0) .- a .- softplus.(-2 .* a)), dims=1)
 end
 
 function exploration(π::SquashedGaussianPolicy, s; kwargs...)
-    μ, logΣ = action(π, s), value(π.logΣ, s)
+    μ, logΣ = π.μ(s), π.logΣ(s)
     σ = squashed_gaussian_σ(logΣ)
     ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
-    a = clamp.(tanh.(ϵ.*σ .+ μ), -1f0 + 1f-3, 1f0 - 1f-3)
-    π.ascale .* a, squashed_gaussian_logprob(μ ,logΣ, atanh.(a))
+    a_pretanh = ϵ.*σ .+ μ
+    π.ascale .* tanh.(a_pretanh), squashed_gaussian_logprob(μ ,logΣ, a_pretanh)
 end
 
-Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(action(π, s), value(π.logΣ, s), atanh.(a ./ π.ascale))
+Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(π.μ(s), π.logΣ(s), atanh.(clamp.(a ./ π.ascale, -1f0 + 1f-5, 1f0 - 1f-5)))
 
 Distributions.entropy(π::SquashedGaussianPolicy, s) = 1.4189385332046727f0 .+ sum(value(π.logΣ, s), dims=1) # 1.4189385332046727 = 0.5 + 0.5 * log(2π) #TODO: This doesn't account for the squash
 
 action_space(π::SquashedGaussianPolicy) = action_space(π.μ)
+
+## Distribution policy -> For state-independent policies
+mutable struct DistributionPolicy <: Policy
+    distribution
+end
+
+layers(π::DistributionPolicy) = ()
+
+device(π::DistributionPolicy) = cpu
+actor(π::DistributionPolicy) = π
+
+function exploration(π::DistributionPolicy, s; kwargs...)
+    B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
+    a = Float32.(rand(π.distribution, B...))
+    a |> device(s), logpdf(π, s, a)
+end
+
+Distributions.logpdf(π::DistributionPolicy, s, a) = Float32.(reshape([logpdf(π.distribution, a)...], 1, :)) |> device(s)
+
+function Distributions.entropy(π::DistributionPolicy, s)
+    B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
+    Float32(entropy(π.distribution)) * ones(Float32, 1, B...)
+end
+
+action_space(π::DistributionPolicy) = ContinuousSpace(length(π.distribution))
 
 
 ## Exploration policy with Gaussian noise

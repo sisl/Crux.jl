@@ -7,7 +7,7 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
     logger = TBLogger(dir, tb_increment)
     fns = [log_undiscounted_return(10)]
     verbose::Bool = true
-    sampler::Union{Sampler, Nothing} = nothing
+    sampler::Union{Sampler, Nothing, Vector} = nothing
 end
 
 Base.log(p::Nothing, i, data...; kwargs...)  = nothing
@@ -17,7 +17,9 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
-    for dict in [p.fns..., data..., log_exploration(p.sampler.π_explore)]
+    π_explore = (p.sampler isa Vector) ?  first(p.sampler).π_explore : p.sampler.π_explore
+        
+    for dict in [p.fns..., data..., log_exploration(π_explore)]
         d = dict isa Function ? dict(s=p.sampler, i=i) : dict
         for (k,v) in d
             p.verbose && print(", ", k, ": ", v)

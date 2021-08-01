@@ -26,13 +26,15 @@ function BC(;π, S, A=action_space(π), 𝒟_demo, normalize_demo::Bool=true, lo
     # Split between train and validation sets
     shuffle!(𝒟_demo)
     𝒟_train, 𝒟_validate = split(𝒟_demo, [1-validation_fraction, validation_fraction])
+    #TODO: We should include a validation loss, then early stopping should just analyze the history of the validation loss. 
     
+    𝒫 = (λe=λe,)
     BatchSolver(;π=π, 
               S=S,
               A=A,
-              𝒫=(λe=λe,),
+              𝒫=𝒫,
               𝒟_train=𝒟_train, 
-              a_opt=TrainingParams(;early_stopping=stop_on_validation_increase(π, Dict(), 𝒟_validate, loss, window=window), loss=loss, opt...), 
+              a_opt=TrainingParams(;early_stopping=stop_on_validation_increase(π, 𝒫, 𝒟_validate, loss, window=window), loss=loss, opt...), 
               log=LoggerParams(;dir="log/bc", period=1, log...),
               kwargs...)
 end

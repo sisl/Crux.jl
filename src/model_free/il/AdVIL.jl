@@ -3,7 +3,7 @@ function AdVIL_π_loss(π, 𝒫, 𝒟; info=Dict())
     mean(value(π, 𝒟[:s], π_a)) + 𝒫[:λ_BC]*Flux.mse(π_a, 𝒟[:a])
 end
 
-function AdVIL_D_loss(π, 𝒫, 𝒟; info=Dict())
+function AdVIL_D_loss(π, 𝒫, 𝒟, y; info=Dict())
     π_sa = vcat(𝒟[:s], action(π, 𝒟[:s]))
     expert_sa = vcat(𝒟[:s], 𝒟[:a])
     mean(value(π, expert_sa)) - mean(value(π, π_sa)) + 𝒫[:λ_GP]*gradient_penalty(critic(π), expert_sa, π_sa, target=0.4f0)

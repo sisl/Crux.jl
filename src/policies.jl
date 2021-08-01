@@ -57,8 +57,9 @@ action_space(π::ContinuousNetwork) = ContinuousSpace(π.output_dim)
 mutable struct DiscreteNetwork <: NetworkPolicy
     network
     outputs
+    logit_conversion
     device
-    DiscreteNetwork(network, outputs, dev=nothing) = new(network, cpu(outputs), device(network))
+    DiscreteNetwork(network, outputs,  logit_conversion=softmax, dev=nothing) = new(network, cpu(outputs), logit_conversion, device(network))
 end
 
 Flux.@functor DiscreteNetwork 
@@ -80,7 +81,7 @@ function Flux.onehotbatch(π::DiscreteNetwork, a)
     end
 end 
 
-logits(π::DiscreteNetwork, s) = softmax(value(π, s))
+logits(π::DiscreteNetwork, s) = π.logit_conversion(value(π, s))
 
 categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1) .+ eps(Float32))
 
@@ -128,6 +129,27 @@ Distributions.logpdf(π::DoubleNetwork, s, a) = (logpdf(π.N1, s, a), logpdf(π.
 Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2, s))
 
 action_space(π::DoubleNetwork) = action_space(π.N1)
+
+
+## Double Network architecture
+mutable struct AdversarialPolicy{T1, T2} <: NetworkPolicy
+    P::T1 # Protagonist
+    A::T2 # Antagonist
+end
+Flux.@functor AdversarialPolicy
+Flux.trainable(π::AdversarialPolicy) = (Flux.trainable(π.P)..., Flux.trainable(π.A)...)
+layers(π::AdversarialPolicy) = unique((layers(π.P)..., layers(π.A)...))
+device(π::AdversarialPolicy) = device(π.A) == device(π.P) ? device(π.A) : error("Mismatched devices")
+POMDPs.value(π::AdversarialPolicy, s) = value(π.P, s)
+POMDPs.value(π::AdversarialPolicy, s, a) = value(π.P, s, a)
+POMDPs.action(π::AdversarialPolicy, s) = action(π.P, s)
+exploration(π::AdversarialPolicy, s; kwargs...) = exploration(π.P, s; kwargs...)
+Distributions.logpdf(π::AdversarialPolicy, s, a) = logpdf(π.P, s, a)
+Distributions.entropy(π::AdversarialPolicy, s) = entropy(π.P, s)
+action_space(π::AdversarialPolicy) = action_space(π.P)
+
+protagonist(π::AdversarialPolicy) = π.P
+antagonist(π::AdversarialPolicy) = π.A
 
 
 ## Actor Critic Architecture

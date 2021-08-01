@@ -6,7 +6,7 @@
     A::T2 = action_space(π) # Action space
     svec::AbstractArray = tovec(initial_observation(mdp, s), S) # Current observation
     max_steps::Int = 100
-    required_columns::Array{Symbol} = []
+    required_columns::Array{Symbol} = π isa AdversarialPolicy ? [:x] : []
     γ::Float32 = discount(mdp)
     λ::Float32 = NaN32
     π_explore = nothing
@@ -49,7 +49,16 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     info = Dict()
     kwargs = haskey(data, :cost) ? (info=info,) : () 
     
-    if sampler.mdp isa POMDP
+    if sampler.π isa AdversarialPolicy
+        π_adv = antagonist(sampler.π)
+        #TODO: What to do about the explore variable? For now, always explore or pass in a non Adversarial Policy
+        #TODO: What to do about the π_explore function? For now, just use the antagonist policy
+        x, xlogprob = exploration(π_adv, sampler.svec, π_on=π_adv, i=i)
+        length(x) == 1 && (x = x[1]) # actions always come out as an array
+        sp, r = gen(sampler.mdp, sampler.s, a, x; kwargs...)
+        spvec = convert_s(AbstractArray, sp, sampler.mdp)
+        data[:x][:, j:j] .= tovec(x, sampler.A) # NOTE: Assumes that the disturbance space is the same as the action space
+    elseif sampler.mdp isa POMDP
         sp, o, r = gen(sampler.mdp, sampler.s, a; kwargs...)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
     else

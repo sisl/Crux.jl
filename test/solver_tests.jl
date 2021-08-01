@@ -42,7 +42,7 @@ test_solver((π) -> DQN(π=π, S=S, N=N), discrete_mdp, A())
 
 
 ## Continuous RL 
-continuous_mdp = PendulumMDP()
+continuous_mdp = PendulumPOMDP()
 S = state_space(continuous_mdp)
 QSA() = ContinuousNetwork(Chain(Dense(3, 32, tanh), Dense(32, 1)))
 V() = ContinuousNetwork(Chain( Dense(2, 32, relu), Dense(32, 1)))
@@ -59,14 +59,19 @@ test_solver((π) -> SAC(π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G
 
 # Continuous IL
 𝒟_demo = expert_trajectories = BSON.load("examples/il/expert_data/pendulum.bson")[:data]
-D() = ContinuousNetwork(Chain(DenseSN(3, 32, relu), DenseSN(32, 1)))
+D(output=1) = ContinuousNetwork(Chain(DenseSN(3, 32, relu), DenseSN(32, output)))
 
-test_solver((π, D) -> GAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), V()), QSA())
+test_solver((π, D) -> OnPolicyGAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), V()), D())
+test_solver((π, D) -> OffPolicyGAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())), D(2))
 test_solver(π -> BC(π=π, 𝒟_demo=𝒟_demo, S=S, opt=(epochs=1,)), continuous_mdp, A())
 # NOTE: gradient penalty on the gpu only plays nicely with tanh, not relus in the discriminator?
 test_solver((π) -> AdVIL(𝒟_demo=𝒟_demo, π=π, S=S, a_opt=(epochs=1,) ), continuous_mdp, ActorCritic(A(), QSA()))
-test_solver((π) -> ValueDICE(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), QSA()))
 test_solver((π) -> SQIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
 test_solver((π) -> AdRIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
 test_solver((π) -> ASAF(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, G())
+
+# Batch RL
+test_solver(π -> BatchSAC(π=π, 𝒟_train=𝒟_demo, S=S, a_opt=(epochs=1,)), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
+test_solver(π -> CQL(π=π, 𝒟_train=𝒟_demo, S=S, a_opt=(epochs=1,)), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
+
 

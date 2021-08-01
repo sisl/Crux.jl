@@ -59,7 +59,7 @@ off_policy = (ΔN=50,
               π_explore=FirstExplorePolicy(10000, rand_policy, GaussianNoiseExplorationPolicy(0.1f0, a_min=amin, a_max=amax)))
 
 ## Run solvers 
-𝒮_ppo = PPO(;π=ActorCritic(GaussianPolicy(μ(), log_std()), V()), λₑ=0f0, shared..., on_policy...)
+𝒮_ppo = PPO(;π=ActorCritic(GaussianPolicy(μ(), log_std()), V()), λe=0f0, shared..., on_policy...)
 solve(𝒮_ppo, mdp)
 
 # Solve with DDPG
@@ -76,20 +76,20 @@ solve(𝒮_td3, mdp)
 solve(𝒮_sac, mdp)
 
 # Plot the learning curve
-p = plot_learning([𝒮_ppo, 𝒮_ddpg, 𝒮_td3#=, 𝒮_sac=#], title = "HalfCheetah Training Curves", labels = ["PPO", "DDPG", "TD3", #="SAC"=#])
+p = plot_learning([𝒮_ppo, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title = "HalfCheetah PyBullet Training Curves", labels = ["PPO", "DDPG", "TD3", "SAC"])
 Crux.savefig("examples/rl/half_cheetah_pybullet_benchmark.pdf")
 
 # Produce a gif with the final policy
-gif(mdp, 𝒮_ddpg.π, "half_cheeta_pybullet.gif")
+gif(mdp, 𝒮_ddpg.π, "half_cheetah_pybullet.gif")
 
 ## Save trajectories for imitation learning
-using BSON
-s = Sampler(mdp, 𝒮_ddpg.π, max_steps=1000, required_columns=[:t])
-
-data = steps!(s, Nsteps=25000)
-sum(data[:r])/25
-data[:expert_val] = ones(Float32, 1, 25000)
-
-data = ExperienceBuffer(data)
-BSON.@save "examples/il/expert_data/half_cheetah_pybullet.bson" data
+# using BSON
+# s = Sampler(mdp, 𝒮_ddpg.π, max_steps=1000, required_columns=[:t])
+# 
+# data = steps!(s, Nsteps=25000)
+# sum(data[:r])/25
+# data[:expert_val] = ones(Float32, 1, 25000)
+# 
+# data = ExperienceBuffer(data)
+# BSON.@save "examples/il/expert_data/half_cheetah_pybullet.bson" data
 

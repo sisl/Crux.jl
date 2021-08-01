@@ -70,9 +70,6 @@ function POMDPs.solve(𝒮::BatchSolver, mdp)
         
         # Early stopping
         𝒮.a_opt.early_stopping(infos) && break
-        
-        # Log the results
-        log(𝒮.log, 𝒮.epoch+1, infos[end])
     end
     
     𝒮.π

@@ -25,8 +25,7 @@ log_std() = -0.5f0*ones(Float32, adim)
 
 𝒮_bc = BC(π=μ(), 
           𝒟_demo=expert_trajectories, 
-          S=S, 
-          # window=500,
+          S=S,
           opt=(epochs=100000, batch_size=1024), 
           log=(period=500,),
           max_steps=1000)

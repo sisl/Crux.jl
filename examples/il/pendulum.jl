@@ -3,16 +3,15 @@ import POMDPPolicies:FunctionPolicy
 import Distributions:Uniform
 using Random
 using Distributions
+using Plots
 
 ## Pendulum
-mdp = PendulumMDP()
+mdp = PendulumPOMDP()
 as = [actions(mdp)...]
 amin = [-2f0]
 amax = [2f0]
 rand_policy = FunctionPolicy((s) -> Float32.(rand.(Uniform.(amin, amax))))
 S = state_space(mdp, σ=[6.3f0, 8f0])
-
-𝒟_random = ExperienceBuffer(steps!(Sampler(mdp, rand_policy, A=ContinuousSpace(1)), Nsteps=10000))
 
 # get expert trajectories
 expert_trajectories = BSON.load("/home/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
@@ -21,10 +20,13 @@ expert_trajectories[:r] .= 1
 
 # Define the networks we will use
 QSA() = ContinuousNetwork(Chain(Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
-QSA_SN() = ContinuousNetwork(Chain(DenseSN(3, 64, relu), DenseSN(64, 64, relu), DenseSN(64, 2), Dense(2,1)))
+QSA_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 64, relu), DenseSN(64, 64, relu), DenseSN(64, 2), Dense(2,output)))
 V() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 A() = ContinuousNetwork(Chain(Dense(2, 64, relu, init=Flux.orthogonal), Dense(64, 64, relu, init=Flux.orthogonal), Dense(64, 1, tanh, init=Flux.orthogonal), x -> 2f0 * x), 1)
 G() = GaussianPolicy(A(), zeros(Float32, 1))
+
+
+D_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 12, relu), DenseSN(12, 2), Dense(2,output)))
 
 function SAC_A()
     base = Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu))
@@ -33,12 +35,12 @@ function SAC_A()
     SquashedGaussianPolicy(mu, logΣ)
 end
 
-# This currently doesn't work for some reason
-𝒮_gail = OnPolicyGAIL(D=QSA_SN(), gan_loss=GAN_BCELoss(), 𝒟_demo=expert_trajectories, solver=REINFORCE, π=ActorCritic(G(), V()), S=S, N=1000000, ΔN=1024)
-solve(𝒮_gail, mdp)
+## On-Policy GAIL - This currently doesn't work for some reason
+𝒮_gail_on = OnPolicyGAIL(D=QSA_SN(), gan_loss=GAN_BCELoss(), 𝒟_demo=expert_trajectories, solver=REINFORCE, π=ActorCritic(G(), V()), S=S, N=1000000, ΔN=1024)
+solve(𝒮_gail_on, mdp)
 
-𝒮_gail = OffPolicyGAIL(D=QSA_SN(), 
-                       gan_loss=GAN_BCELoss(), 
+## Off-Policy GAIL
+𝒮_gail = OffPolicyGAIL(D=D_SN(2), 
                        𝒟_demo=expert_trajectories, 
                        solver=TD3, 
                        π=ActorCritic(A(), DoubleNetwork(QSA(), QSA())), 
@@ -54,14 +56,15 @@ solve(𝒮_gail, mdp)
 solve(𝒮_gail, mdp)
 
 
-
-𝒮_bc = BC(π=A(), 𝒟_demo=expert_trajectories, S=S, opt=(epochs=100,), log=(period=10,))
+## Behavioral Cloning 
+𝒮_bc = BC(π=A(), 𝒟_demo=expert_trajectories, S=S, opt=(epochs=100,), log=(period=100,))
 solve(𝒮_bc, mdp)
 
-# 𝒮_advil = AdVIL(π=ActorCritic(A(),QSA()), 𝒟_demo=expert_trajectories, S=S, a_opt=(epochs=1000, optimizer=ADAM(8f-4), batch_size=1024), c_opt=(optimizer=ADAM(8e-4),), max_steps=100, log=(period=10,))
-# solve(𝒮_advil, mdp)
+## Advil
+𝒮_advil = AdVIL(π=ActorCritic(A(),QSA()), 𝒟_demo=expert_trajectories, S=S, a_opt=(epochs=1000, optimizer=ADAM(8f-4), batch_size=1024), c_opt=(optimizer=ADAM(8e-4),), max_steps=100, log=(period=100,))
+solve(𝒮_advil, mdp)
 
-
+## SQIL
 𝒮_sqil = SQIL(π=ActorCritic(A(), DoubleNetwork(QSA(), QSA())), 
               S=S,
               𝒟_demo=expert_trajectories,
@@ -72,9 +75,9 @@ solve(𝒮_bc, mdp)
               a_opt=(batch_size=128, optimizer=ADAM(1e-3)),
               solver=TD3,
               π_explore=GaussianNoiseExplorationPolicy(0.2f0, a_min=[-2.0], a_max=[2.0]))
-
 solve(𝒮_sqil, mdp)
 
+## Adril
 Crux.set_crux_warnings(false)
 𝒮_adril = AdRIL(π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), 
               S=S,
@@ -85,10 +88,10 @@ Crux.set_crux_warnings(false)
               c_opt=(batch_size=128, optimizer=ADAM(1e-3)),
               a_opt=(batch_size=128, optimizer=ADAM(1e-3)),
               π_explore=GaussianNoiseExplorationPolicy(0.2f0, a_min=[-2.0], a_max=[2.0]))
-
 solve(𝒮_adril, mdp)
 
 
+## ASAF
 𝒮_ASAF = ASAF(π=G(), 
               S=S, 
               ΔN=2000, 
@@ -96,12 +99,11 @@ solve(𝒮_adril, mdp)
               N=50000,
               max_steps=100,
               a_opt=(batch_size=256, optimizer=Flux.Optimise.Optimiser(Flux.ClipValue(1f0), ADAM(1e-3)), epochs=10))
-
 solve(𝒮_ASAF, mdp)
 
-using Plots
-p = plot_learning([𝒮_gail, 𝒮_bc, 𝒮_advil, 𝒮_sqil, 𝒮_adril,𝒮_ASAF], title="Pendulum Swingup Imitation Learning Curves", labels=["GAIL", "BC", "AdVIL", "SQIL", "AdRIL", "ASAF"], legend=:right)
+
+p = plot_learning([𝒮_gail_on, 𝒮_gail, 𝒮_bc, 𝒮_advil, 𝒮_sqil, 𝒮_adril,𝒮_ASAF], title="Pendulum Swingup Imitation Learning Curves", labels=["On Policy GAIL", "Off-Policy GAIL", "BC", "AdVIL", "SQIL", "AdRIL", "ASAF"], legend=:right)
 plot!(p, [1,50000], [expert_perf, expert_perf], color=:black, label="expert")
 
-savefig("pendulum_benchmark.pdf")
+savefig("examples/il/pendulum_benchmark.pdf")
 

@@ -13,7 +13,7 @@ A() = DiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, l
 expert_trajectories = BSON.load("examples/il/expert_data/cartpole.bson")[:data]
 
 # Solve with PPO-GAIL
-𝒮_gail = GAIL(D=D(), gan_loss = GAN_LSLoss(), 𝒟_demo=expert_trajectories, solver=PPO, π=ActorCritic(A(), V()), S=S, N=40000, ΔN=1024, d_opt=(batch_size=1024, epochs=80))
+𝒮_gail = OnPolicyGAIL(D=D(), gan_loss = GAN_LSLoss(), 𝒟_demo=expert_trajectories, solver=PPO, π=ActorCritic(A(), V()), S=S, N=40000, ΔN=1024, d_opt=(batch_size=1024, epochs=80))
 solve(𝒮_gail, mdp)
 
 # Solve with Behavioral Cloning

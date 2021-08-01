@@ -5,7 +5,7 @@ using Random
 using Distributions
 
 ## Pendulum
-mdp = PendulumMDP(actions=[-2., -0.5, 0, 0.5, 2.])
+mdp = PendulumPOMDP(actions=[-2., -0.5, 0, 0.5, 2.])
 as = [actions(mdp)...]
 amin = [-1f0]
 amax = [1f0]
@@ -61,12 +61,13 @@ off_policy = (S=S,
 @time π_td3 = solve(𝒮_td3, mdp)
 
 # Solve with SAC
-𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), off_policy..., H_target=-6f0)
+𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), off_policy...)
 @time π_sac = solve(𝒮_sac, mdp)
 
 
 # Plot the learning curve
 p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", labels=["REINFORCE", "A2C", "PPO", "DQN", "DDPG", "TD3", "SAC"], legend=:right)
+Crux.savefig("examples/rl/pendulum_benchmark.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, π_dqn, "pendulum.gif", max_steps=200)

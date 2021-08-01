@@ -28,7 +28,7 @@ module Crux
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
-           clear!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
+           clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
            prioritized_sample!, capacity, normalize!, extra_columns
     include("experience_buffer.jl")
     
@@ -37,7 +37,7 @@ module Crux
     
     export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
-           DistributionPolicy,
+           DistributionPolicy, AdversarialPolicy, protagonist, antagonist,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
            entropy, logpdf, action_space, exploration, layers, actor, critic
     include("policies.jl")
@@ -104,7 +104,13 @@ module Crux
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
     
-    export CQL
-    include("model_free/offline/cql.jl")
+    export CQL, BatchSAC
+    include("model_free/batch/cql.jl")
+    include("model_free/batch/sac.jl")
+    
+    export AdversarialOffPolicySolver, RARL, ISARL
+    include("model_free/adversarial/adv_off_policy.jl")
+    include("model_free/adversarial/rarl.jl")
+    include("model_free/adversarial/is.jl")
 end
 

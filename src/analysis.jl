@@ -14,6 +14,7 @@ end
 
 # Convert various inputs to an arrow of directories for plotting
 directories(input::String) = [input]
+directories(input::T) where {T <: Solver} = [input.log.logger.logdir ]
 directories(input::AbstractArray{Any}) = [i isa Solver ? i.log.logger.logdir : i for i in input]
 directories(input::AbstractArray{T}) where {T <: String} = input
 directories(input::AbstractArray{T}) where {T <: Solver} = [input[i].log.logger.logdir for i=1:length(input)]

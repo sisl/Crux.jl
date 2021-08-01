@@ -39,6 +39,8 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
             data[k] = ArrayType(fill(0, 1, capacity))
         elseif k in [:s0]
             data[k] = ArrayType(fill(zero(type(S)), dim(S)..., capacity))
+        elseif k in [:x] # Disturbances for adversarial policy
+            data[k] = ArrayType(fill(zero(type(A)), dim(A)..., capacity))
         else
             CRUX_WARNINGS && @warn "Unrecognized key: $k"
         end
@@ -107,7 +109,7 @@ function clear!(b::ExperienceBuffer)
 end 
 
 function Base.hcat(buffers::ExperienceBuffer...; kwargs...)
-    data = Dict(k=>Array{typeof(v[1])}(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
+    data = Dict(k=>typeof(v)(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
     for b in buffers[1:end]
         @assert keys(data) == keys(b)
         for k in keys(b)
@@ -148,6 +150,18 @@ function normalize!(b::ExperienceBuffer, S::AbstractSpace, A::AbstractSpace)
     A isa ContinuousSpace && (b[:a] .= tovec(b[:a], A))
     b
 end
+
+function trim!(b::ExperienceBuffer, range)
+    for k in keys(b)
+        b.data[k] = bslice(b.data[k], range)
+    end
+    b.elements = min(b.elements, length(range))
+    if b.next_ind > b.elements
+        b.next_ind = 1
+    end
+    b
+end
+
 
 minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
 

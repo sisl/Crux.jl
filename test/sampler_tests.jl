@@ -6,6 +6,7 @@ using Random
 using Flux
 using POMDPModels
 using POMDPGym
+using Distributions
 
 mdp = GridWorldMDP()
 pomdp = TigerPOMDP()
@@ -103,4 +104,15 @@ buffer = ExperienceBuffer(data)
 eps2 = Crux.episodes(buffer)
 
 @test all(eps .== eps2)
+
+## Test the adversarial MDP stuff
+amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], [1,1]))
+G() = GaussianPolicy(ContinuousNetwork(Chain(Dense(4,2))), zeros(2))
+apol = AdversarialPolicy(G(), G())
+
+s = Sampler(amdp, apol)
+@test :x in s.required_columns
+
+d = steps!(s, Nsteps=100)
+size(d[:x]) == size(d[:a])
 

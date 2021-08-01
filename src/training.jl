@@ -9,10 +9,10 @@
     name = ""
 end
 
-Flux.Optimise.train!(π::N, loss::Function, p::TrainingParams; info = Dict()) where {N <: Policy} = train!(Flux.params(π), loss, p, info=info)
+Flux.Optimise.train!(π::N, loss::Function, p::TrainingParams; info = Dict()) where {N <: Policy} = train!(Flux.params(π), (;info) -> loss(info = info) + p.regularizer(π), p, info=info)
     
 function Flux.Optimise.train!(θ, loss::Function, p::TrainingParams; info = Dict())
-    l, back = Flux.pullback(() -> loss(info = info) + p.regularizer(π), θ)
+    l, back = Flux.pullback(() -> loss(info = info), θ)
     typeof(l) == Float64 && @error "Float64 loss found: computation in double precision may be slow"
     grad = back(1f0)
     gnorm = norm(grad, p=2)

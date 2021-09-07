@@ -1,5 +1,8 @@
 # Crux.jl
 
+[![Build Status](https://github.com/ancorso/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ancorso/Crux.jl/actions/workflows/CI.yml)
+[![Code Coverage](https://codecov.io/gh/ancorso/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/ancorso/Crux.jl)
+
 Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
 Supports CPU and GPU computation and implements the following algorithms:

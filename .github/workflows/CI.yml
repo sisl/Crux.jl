@@ -28,8 +28,6 @@ jobs:
         id: cuda-toolkit
         with:
           cuda: '11.2.2'
-      - run: echo "Installed cuda version is: ${{steps.cuda-toolkit.outputs.cuda}}"
-      - run: echo "Cuda install location: ${{steps.cuda-toolkit.outputs.CUDA_PATH}}"
 
       # check out the project and install Julia
       - uses: actions/checkout@v2

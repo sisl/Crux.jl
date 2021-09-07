@@ -31,7 +31,10 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
 
-      - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym"; Pkg.instantiate()'
+      - run: julia --color=yes --project -e 'using Pkg; pkg\"add https://github.com/ancorso/POMDPGym.jl\"; Pkg.instantiate()'
+        if: matrix.os == 'windows-latest'
+      - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'
+        if: matrix.os != 'windows-latest'
 
       # using a cache can speed up execution times
       - uses: actions/cache@v2

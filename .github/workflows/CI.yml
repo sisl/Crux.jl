@@ -20,10 +20,17 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-          - macos-latest
         arch:
           - x64
     steps:
+      # install CUDA
+      - uses: Jimver/cuda-toolkit@v0.2.4
+        id: cuda-toolkit
+        with:
+          cuda: '11.2.2'
+      - run: echo "Installed cuda version is: ${{steps.cuda-toolkit.outputs.cuda}}"
+      - run: echo "Cuda install location: ${{steps.cuda-toolkit.outputs.CUDA_PATH}}"
+
       # check out the project and install Julia
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1

@@ -99,7 +99,8 @@ module Crux
     export mse_action_loss, logpdf_bc_loss, mse_value_loss
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
-    include("model_free/il/gail.jl")
+    include("model_free/il/on_policy_gail.jl")
+    include("model_free/il/off_policy_gail.jl")
     include("model_free/il/asaf.jl")
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")

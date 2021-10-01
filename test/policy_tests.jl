@@ -8,6 +8,21 @@ using Statistics
 using Distributions
 using CUDA
 
+## Deep copy of gpu policies
+π1 = ContinuousNetwork(Chain(Dense(5, 5, relu))) |> gpu
+π1⁻ = deepcopy(π1)
+
+polyak_average!(π1, π1⁻, 0.005f0)
+
+weightbefore = cpu(π1⁻.network[1].weight)
+
+π1.network[1].weight .= 1
+
+@test cpu(π1⁻.network[1].weight)  == weightbefore
+
+
+
+
 ## Copyto and polyak average
 c1 = Chain(Dense(5, 5, relu))
 c2 = Chain(Dense(5, 5, relu))
@@ -21,6 +36,7 @@ copyto!(c1, c2)
 polyak_average!(c3, c2, 1f0)
 @test c3[1].weight isa CuArray
 @test cpu(c3[1].weight) == c2[1].weight
+
 
 ## Continuous Network
 p = ContinuousNetwork(Chain(Dense(2, 32, relu), Dense(32, 4)))

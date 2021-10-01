@@ -2,25 +2,33 @@ using POMDPs, POMDPGym, Test, Crux, Flux, Random, BSON
 function test_solver(𝒮fn, mdp, π...)
     # run it once
     Random.seed!(0)
-    π1 = solve(𝒮fn(deepcopy.(π)...), deepcopy(mdp))
+    S1 = 𝒮fn(deepcopy.(π)...)
+    π1 = solve(S1, deepcopy(mdp))
     
     # run it again on the cpu with the same rng
     Random.seed!(0)
-    π2 = solve(𝒮fn(deepcopy.(π)...), deepcopy(mdp))
+    S2 = 𝒮fn(deepcopy.(π)...)
+    π2 = solve(S2, deepcopy(mdp))
     
     # Run it on the gpu
     Random.seed!(0)
-    π3 = solve(𝒮fn(gpu.(deepcopy.(π))...), deepcopy(mdp))
+    S3 = 𝒮fn(gpu.(deepcopy.(π))...)
+    π3 = solve(S3, deepcopy(mdp))
     
     # compare the results
     s = rand(Crux.dim(state_space(mdp))...)
     try
         value(π[1], s)
         @test all(value(π1, s) .≈ value(π2, s))
-        @test all(abs.(value(π2, s) .- value(π3, s)) .< 1e-3)
+        @test all(abs.(value(π2, s) .- value(π3, s)) .< 1e-2)
     catch
-        @test all(action(π1, s) .≈ action(π2, s))
-        @test all(abs.(action(π2, s) .- action(π3, s)) .< 1e-3)
+        if action(π1, s)[1] isa Symbol
+            @test all(action(π1, s) .== action(π2, s))
+            @test all(action(π2, s) .== action(π3, s))
+        else
+            @test all(action(π1, s) .≈ action(π2, s))
+            @test all(abs.(action(π2, s) .- action(π3, s)) .< 1e-2)
+        end
     end
 end
 
@@ -40,7 +48,6 @@ test_solver((π) -> A2C(π=π, S=S, N=N, ΔN=ΔN), discrete_mdp, AC())
 test_solver((π) -> PPO(π=π, S=S, N=N, ΔN=ΔN), discrete_mdp, AC())
 test_solver((π) -> DQN(π=π, S=S, N=N), discrete_mdp, A())
 
-
 ## Continuous RL 
 continuous_mdp = PendulumPOMDP()
 S = state_space(continuous_mdp)
@@ -59,16 +66,17 @@ test_solver((π) -> SAC(π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G
 
 # Continuous IL
 𝒟_demo = expert_trajectories = BSON.load("examples/il/expert_data/pendulum.bson")[:data]
-D(output=1) = ContinuousNetwork(Chain(DenseSN(3, 32, relu), DenseSN(32, output)))
+D(output=1) = ContinuousNetwork(Chain(DenseSN(3, 12, relu), DenseSN(12, output)))
 
 test_solver((π, D) -> OnPolicyGAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), V()), D())
-test_solver((π, D) -> OffPolicyGAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())), D(2))
-test_solver(π -> BC(π=π, 𝒟_demo=𝒟_demo, S=S, opt=(epochs=1,)), continuous_mdp, A())
+test_solver((π, D) -> OffPolicyGAIL(D=D, 𝒟_demo=𝒟_demo, π=π, S=S, N=50, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())), D(2))
+test_solver(π -> BC(π=π, 𝒟_demo=𝒟_demo, S=S, opt=(epochs=1,), log=(period=50,)), continuous_mdp, A())
 # NOTE: gradient penalty on the gpu only plays nicely with tanh, not relus in the discriminator?
-test_solver((π) -> AdVIL(𝒟_demo=𝒟_demo, π=π, S=S, a_opt=(epochs=1,) ), continuous_mdp, ActorCritic(A(), QSA()))
+test_solver((π) -> AdVIL(𝒟_demo=𝒟_demo, π=π, S=S, a_opt=(epochs=1,), log=(period=50,)), continuous_mdp, ActorCritic(A(), QSA()))
 test_solver((π) -> SQIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
 test_solver((π) -> AdRIL(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))
 test_solver((π) -> ASAF(𝒟_demo=𝒟_demo, π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, G())
+
 
 # Batch RL
 test_solver(π -> BatchSAC(π=π, 𝒟_train=𝒟_demo, S=S, a_opt=(epochs=1,)), continuous_mdp, ActorCritic(G(), DoubleNetwork(QSA(), QSA())))

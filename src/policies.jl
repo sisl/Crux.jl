@@ -1,5 +1,10 @@
 abstract type NetworkPolicy <: Policy end
 
+# Fixing bug with gpu deepcopies
+function Base.deepcopy(x::NetworkPolicy)
+    invoke(deepcopy, Tuple{Any}, (x |> cpu))  |> device(x)
+end
+
 device(π::N) where N<:NetworkPolicy = π.device
 actor(π::N) where N<:NetworkPolicy = π
 critic(π::N) where N<:NetworkPolicy = π

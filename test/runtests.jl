@@ -1,6 +1,8 @@
 using CUDA, Crux
 CUDA.allowscalar(false)
 Crux.set_crux_warnings(false)
+include("spaces_tests.jl")
+include("devices_tests.jl")
 include("util_tests.jl")
 include("experience_buffer_tests.jl")
 include("sampler_tests.jl")

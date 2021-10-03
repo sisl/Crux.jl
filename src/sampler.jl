@@ -1,23 +1,23 @@
-@with_kw mutable struct Sampler{P, V, T1 <: AbstractSpace, T2 <: AbstractSpace}
+@with_kw mutable struct Sampler{P, V, Pol <: Policy, T1 <: AbstractSpace, T2 <: AbstractSpace}
     mdp::P
-    π::Policy
+    agent::PolicyParams{Pol, T2} # The agent
+    adversary = nothing # The adversary
     s::V = rand(initialstate(mdp)) # Current State
     S::T1 = state_space(initial_observation(mdp, s)) # State space
-    A::T2 = action_space(π) # Action space
     svec::AbstractArray = tovec(initial_observation(mdp, s), S) # Current observation
     max_steps::Int = 100
-    required_columns::Array{Symbol} = π isa AdversarialPolicy ? [:x] : []
+    required_columns::Array{Symbol} = !isnothing(adversary) ? [:x] : []
     γ::Float32 = discount(mdp)
     λ::Float32 = NaN32
-    π_explore = nothing
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
 end
 
-Sampler(mdp, π; kwargs...) = Sampler(;mdp=mdp, π=π, kwargs...)
+Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=PolicyParams(π), kwargs...)
+Sampler(mdp, agent::T; kwargs...) where {T <: PolicyParams} = Sampler(;mdp=mdp, agent=agent, kwargs...)
 
 # Construct a vector of samplers from a vector of mdps
-Sampler(mdps::AbstractVector, π; kwargs...) = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, agent; kwargs...) = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(initialstate(sampler.mdp))
@@ -36,33 +36,32 @@ end
 function terminate_episode!(sampler::Sampler, data, j)
     haskey(data, :episode_end) && (data[:episode_end][1,j] = true)
     ep = j - sampler.episode_length + 1 : j
-    haskey(data, :advantage) && fill_gae!(data, ep, sampler.π, sampler.λ, sampler.γ)
+    haskey(data, :advantage) && fill_gae!(data, ep, sampler.agent.π, sampler.λ, sampler.γ)
     haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
     reset_sampler!(sampler)
 end
     
 function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
-    a, logprob = explore ? exploration(sampler.π_explore, sampler.svec, π_on=sampler.π, i=i) : (action(sampler.π, sampler.svec), NaN)
-    length(a) == 1 && (a = a[1]) # actions always come out as an array
+    a, logprob = explore ? exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i) : (action(sampler.agent.π, sampler.svec), NaN)
+    length(a) == 1 && (a = a[1],) # actions always come out as an array
     
     # This implements the ability to get cost information from safety gym
     info = Dict()
     kwargs = haskey(data, :cost) ? (info=info,) : () 
     
-    if sampler.π isa AdversarialPolicy
-        π_adv = antagonist(sampler.π)
-        #TODO: What to do about the explore variable? For now, always explore or pass in a non Adversarial Policy
-        #TODO: What to do about the π_explore function? For now, just use the antagonist policy
-        x, xlogprob = exploration(π_adv, sampler.svec, π_on=π_adv, i=i)
-        length(x) == 1 && (x = x[1]) # actions always come out as an array
-        sp, r = gen(sampler.mdp, sampler.s, a, x; kwargs...)
-        spvec = convert_s(AbstractArray, sp, sampler.mdp)
-        data[:x][:, j:j] .= tovec(x, sampler.A) # NOTE: Assumes that the disturbance space is the same as the action space
-    elseif sampler.mdp isa POMDP
-        sp, o, r = gen(sampler.mdp, sampler.s, a; kwargs...)
+    if !isnothing(sampler.adversary)
+        x, xlogprob = explore ? exploration(sampler.adversary.π_explore, sampler.svec, π_on=sampler.adversary.π, i=i) : (action(sampler.adversary.π, sampler.svec), NaN)
+        length(x) == 1 && (x = x[1]) # disturbances always come out as an array
+        data[:x][:, j:j] .= tovec(x, sampler.adversary.space)
+        haskey(data, :xlogprob) && (data[:xlogprob][:, j] .= xlogprob)
+        a = (a..., x)
+    end
+    
+    if sampler.mdp isa POMDP
+        sp, o, r = gen(sampler.mdp, sampler.s, a...; kwargs...)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
     else
-        sp, r = gen(sampler.mdp, sampler.s, a; kwargs...)
+        sp, r = gen(sampler.mdp, sampler.s, a...; kwargs...)
         spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
     spvec = tovec(spvec, sampler.S)
@@ -70,7 +69,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
 
     # Save the tuple
     bslice(data[:s], j:j) .= sampler.svec
-    data[:a][:, j:j] .= tovec(a, sampler.A)
+    data[:a][:, j:j] .= tovec(a, sampler.agent.space)
     bslice(data[:sp], j:j) .= spvec
     data[:r][1, j] = r
     data[:done][1, j] = done
@@ -80,6 +79,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     haskey(data, :i) && (data[:i][1, j] = i+1)
     haskey(data, :cost) && (data[:cost][1,j] = info["cost"])
+    haskey(data, :fail) && (data[:fail][1,j] = extra_functions["isfailure"](sampler.mdp, sp)) #TODO Changed this to "s" instead of "sp" for the continuum world
     
     # Cut the episode short if needed
     sampler.episode_length += 1
@@ -91,17 +91,21 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     end
 end
 
-function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, return_episodes=false)
-    data = mdp_data(sampler.S, sampler.A, Nsteps, return_episodes ? [sampler.required_columns..., :episode_end] : sampler.required_columns)
+function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, return_episodes=false, return_at_episode_end=false)
+    data = mdp_data(sampler.S, sampler.agent.space, Nsteps, return_episodes ? [sampler.required_columns..., :episode_end] : sampler.required_columns)
     for j=1:Nsteps
         step!(data, j, sampler, explore=explore, i=i + (j-1))
+        if return_at_episode_end && sampler.episode_length == 0 
+            trim!(data, j)
+            break
+        end
     end
     reset && terminate_episode!(sampler, data, Nsteps)
     return_episodes ? (data, episodes(data)) : data
 end
 
 function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, reset = false, return_episodes = false) where {T<:Sampler}
-    data = mdp_data(samplers[1].S, samplers[1].A, Nsteps*length(samplers), return_episodes ? [samplers[1].required_columns..., :episode_end] : samplers[1].required_columns)
+    data = mdp_data(samplers[1].S, samplers[1].agent.space, Nsteps*length(samplers), return_episodes ? [samplers[1].required_columns..., :episode_end] : samplers[1].required_columns)
     j = 1
     for s=1:Nsteps
         for sampler in samplers

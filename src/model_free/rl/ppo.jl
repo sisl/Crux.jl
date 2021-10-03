@@ -16,15 +16,24 @@ function ppo_loss(π, 𝒫, 𝒟; info = Dict())
     𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss
 end
 
-PPO(;π::ActorCritic, ϵ::Float32 = 0.2f0, λp::Float32 = 1f0, λe::Float32 = 0.1f0, a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) = 
-    OnPolicySolver(;
-        π = π,
-        𝒫=(ϵ=ϵ, λp=λp, λe=λe),
-        log = LoggerParams(;dir = "log/ppo", log...),
-        a_opt = TrainingParams(;loss = ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
-        c_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
-        post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
-        kwargs...)
+function PPO(;π::ActorCritic, 
+     ϵ::Float32 = 0.2f0, 
+     λp::Float32 = 1f0, 
+     λe::Float32 = 0.1f0, 
+     a_opt::NamedTuple=(;), 
+     c_opt::NamedTuple=(;), 
+     log::NamedTuple=(;), 
+     kwargs...)
+     
+     OnPolicySolver(;π=PolicyParams(π),
+                    𝒫=(ϵ=ϵ, λp=λp, λe=λe),
+                    log = LoggerParams(;dir = "log/ppo", log...),
+                    a_opt = TrainingParams(;loss = ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
+                    c_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
+                    post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+                    kwargs...)
+end
+        
     
 
 

@@ -1,6 +1,5 @@
 function AdRIL(;π, 
-                S, 
-                A=action_space(π), 
+                S,
                 ΔN=50,
                 solver=SAC, 
                 𝒟_demo, 
@@ -9,11 +8,11 @@ function AdRIL(;π,
                 buffer_size = 1000, 
                 buffer_init=0,
                 log::NamedTuple=(;),
-                buffer::ExperienceBuffer = ExperienceBuffer(S, A, buffer_size, [:i]), 
+                buffer::ExperienceBuffer = ExperienceBuffer(S, action_space(π), buffer_size, [:i]), 
                 kwargs...)
     
     !haskey(𝒟_demo, :r) && error("AdRIL requires a reward value for the demonstrations")
-    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
+    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
     
     
@@ -29,7 +28,6 @@ function AdRIL(;π,
     
     solver(;π=π, 
             S=S, 
-            A=A,
             ΔN=ΔN, 
             post_experience_callback=AdRIL_callback, 
             extra_buffers=[𝒟_demo], 

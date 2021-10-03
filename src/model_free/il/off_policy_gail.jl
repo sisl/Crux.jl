@@ -1,4 +1,14 @@
-function OffPolicyGAIL(;π, S, A=action_space(π), 𝒟_demo, 𝒟_ndas::Array{ExperienceBuffer} = ExperienceBuffer[], normalize_demo::Bool=true, D::ContinuousNetwork, solver=SAC, d_opt::NamedTuple=(epochs=5,), log::NamedTuple=(;), kwargs...)
+function OffPolicyGAIL(;π, 
+                        S, 
+                        𝒟_demo, 
+                        𝒟_ndas::Array{ExperienceBuffer} = ExperienceBuffer[], 
+                        normalize_demo::Bool=true, 
+                        D::ContinuousNetwork, 
+                        solver=SAC, 
+                        d_opt::NamedTuple=(epochs=5,), 
+                        log::NamedTuple=(;), 
+                        kwargs...)
+                        
     # Define the training parameters for the desciminator
     d_opt = TrainingParams(;name="discriminator_", loss=()->nothing, d_opt...)
     
@@ -9,6 +19,7 @@ function OffPolicyGAIL(;π, S, A=action_space(π), 𝒟_demo, 𝒟_ndas::Array{E
     
     # Normalize and/or change device of expert and NDA data
     dev = device(π)
+    A = action_space(π)
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
     𝒟_demo = 𝒟_demo |> dev
     for i in 1:N_nda
@@ -17,10 +28,11 @@ function OffPolicyGAIL(;π, S, A=action_space(π), 𝒟_demo, 𝒟_ndas::Array{E
     end
 
     # Build the solver
-    𝒮 = solver(;π=π, S=S, A=A, 
-            post_experience_callback=(𝒟; kwargs...) -> 𝒟[:r] .= 0, # This zeros out the reward that is collected so we don't accidentally use it. 
-            log=(dir="log/offpolicygail", period=500, log...),
-            kwargs...)
+    𝒮 = solver(;π=π, 
+                S=S,
+                post_experience_callback=(𝒟; kwargs...) -> 𝒟[:r] .= 0, # This zeros out the reward that is collected so we don't accidentally use it. 
+                log=(dir="log/offpolicygail", period=500, log...),
+                kwargs...)
             
     # Setup the training of the discriminator
     B = d_opt.batch_size

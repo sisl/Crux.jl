@@ -1,3 +1,12 @@
+# Struct for combining useful policy parameters together
+@with_kw mutable struct PolicyParams{Pol <: Policy, T2 <: AbstractSpace}
+    π::Pol
+    space::T2 = action_space(π)
+    π_explore = π
+    π⁻ = nothing
+end
+PolicyParams(π::T) where {T <: Policy} = PolicyParams(π=π)
+
 abstract type NetworkPolicy <: Policy end
 
 # Fixing bug with gpu deepcopies
@@ -63,8 +72,9 @@ mutable struct DiscreteNetwork <: NetworkPolicy
     network
     outputs
     logit_conversion
+    always_stochastic
     device
-    DiscreteNetwork(network, outputs,  logit_conversion=softmax, dev=nothing) = new(network, cpu(outputs), logit_conversion, device(network))
+    DiscreteNetwork(network, outputs, logit_conversion=softmax, always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
 end
 
 Flux.@functor DiscreteNetwork 
@@ -77,7 +87,7 @@ POMDPs.value(π::DiscreteNetwork, s) = mdcall(π.network, s, π.device)
 
 POMDPs.value(π::DiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims = 1)
 
-POMDPs.action(π::DiscreteNetwork, s) = π.outputs[mapslices(argmax, value(π, s), dims=1)]
+POMDPs.action(π::DiscreteNetwork, s) = π.always_stochastic ? exploration(π, s)[1] : π.outputs[mapslices(argmax, value(π, s), dims=1)]
 
 function Flux.onehotbatch(π::DiscreteNetwork, a)  
     ignore() do 
@@ -96,7 +106,13 @@ function exploration(π::DiscreteNetwork, s; kwargs...)
     a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
 end
 
-Distributions.logpdf(π::DiscreteNetwork, s, a_oh) = categorical_logpdf(logits(π, s), a_oh)
+function Distributions.logpdf(π::DiscreteNetwork, s, a)
+    # If a does not seem to be a one-hot encoding then we encode it
+    Zygote.ignore() do 
+        size(a,1) == 1 && (a = Flux.onehotbatch(π, a)) 
+    end
+    return categorical_logpdf(logits(π, s), a)
+end
 
 function Distributions.entropy(π::DiscreteNetwork, s)
     ps = logits(π, s)
@@ -136,27 +152,6 @@ Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2,
 action_space(π::DoubleNetwork) = action_space(π.N1)
 
 
-## Double Network architecture
-mutable struct AdversarialPolicy{T1, T2} <: NetworkPolicy
-    P::T1 # Protagonist
-    A::T2 # Antagonist
-end
-Flux.@functor AdversarialPolicy
-Flux.trainable(π::AdversarialPolicy) = (Flux.trainable(π.P)..., Flux.trainable(π.A)...)
-layers(π::AdversarialPolicy) = unique((layers(π.P)..., layers(π.A)...))
-device(π::AdversarialPolicy) = device(π.A) == device(π.P) ? device(π.A) : error("Mismatched devices")
-POMDPs.value(π::AdversarialPolicy, s) = value(π.P, s)
-POMDPs.value(π::AdversarialPolicy, s, a) = value(π.P, s, a)
-POMDPs.action(π::AdversarialPolicy, s) = action(π.P, s)
-exploration(π::AdversarialPolicy, s; kwargs...) = exploration(π.P, s; kwargs...)
-Distributions.logpdf(π::AdversarialPolicy, s, a) = logpdf(π.P, s, a)
-Distributions.entropy(π::AdversarialPolicy, s) = entropy(π.P, s)
-action_space(π::AdversarialPolicy) = action_space(π.P)
-
-protagonist(π::AdversarialPolicy) = π.P
-antagonist(π::AdversarialPolicy) = π.A
-
-
 ## Actor Critic Architecture
 mutable struct ActorCritic{TA, TC} <: NetworkPolicy
     A::TA # actor 
@@ -192,37 +187,36 @@ critic(π::AC) where AC<:ActorCritic = π.C
 ## Gaussian Policy
 mutable struct GaussianPolicy <: NetworkPolicy
     μ::ContinuousNetwork
-    logΣ::AbstractArray
+    logΣ::ContinuousNetwork
+    always_stochastic::Bool
+    GaussianPolicy(μ::ContinuousNetwork, logΣ::ContinuousNetwork, always_stochastic=false) = new(μ, logΣ, always_stochastic)
+    GaussianPolicy(μ::ContinuousNetwork, logΣ::AbstractArray, always_stochastic=false) = new(μ, ContinuousNetwork((x) -> logΣ, size(logΣ), device(logΣ)), always_stochastic)
 end
 
 Flux.@functor GaussianPolicy
 
-Flux.trainable(π::GaussianPolicy) = (Flux.trainable(π.μ)..., π.logΣ)
+Flux.trainable(π::GaussianPolicy) = (Flux.trainable(π.μ)..., Flux.trainable(π.logΣ)...)
 
-layers(π::GaussianPolicy) = (layers(π.μ)..., π.logΣ)
+layers(π::GaussianPolicy) = (layers(π.μ)..., layers(π.logΣ))
 
 device(π::GaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) : error("Mismatched devices")
 
-POMDPs.action(π::GaussianPolicy, s) = action(π.μ, s)
-
-function gaussian_logpdf(μ, logΣ, a)
-    σ² = exp.(logΣ).^2
-    sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.9189385332046727f0 .- logΣ, dims = 1) # 0.9189385332046727f0 = log(sqrt(2π))
-end 
+POMDPs.action(π::GaussianPolicy, s) = π.always_stochastic ? exploration(π, s)[1] : π.μ(s)
 
 function exploration(π::GaussianPolicy, s; kwargs...) 
-    μ, logΣ = action(π, s), device(s)(π.logΣ)
+    μ, logΣ = π.μ(s), π.logΣ(s)
     σ = exp.(logΣ)
     ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
     a = ϵ.*σ .+ μ
     a, gaussian_logpdf(μ, logΣ, a)
 end
 
-Distributions.logpdf(π::GaussianPolicy, s, a) = gaussian_logpdf(action(π, s), device(s)(π.logΣ), a)
+Distributions.logpdf(π::GaussianPolicy, s, a) = gaussian_logpdf(π.μ(s), π.logΣ(s), a)
 
-Distributions.entropy(π::GaussianPolicy, s) = 1.4189385332046727f0 .+ sum(device(s)(π.logΣ)) # 1.4189385332046727 = 0.5 + 0.5 * log(2π)
+Distributions.entropy(π::GaussianPolicy, s) = 1.4189385332046727f0 .+ sum(π.logΣ(s)) # 1.4189385332046727 = 0.5 + 0.5 * log(2π)
 
 action_space(π::GaussianPolicy) = action_space(π.μ)
+
 
 
 ## Squashed Gaussian policy
@@ -230,7 +224,8 @@ mutable struct SquashedGaussianPolicy <: NetworkPolicy
     μ::ContinuousNetwork
     logΣ::ContinuousNetwork
     ascale::Float32
-    SquashedGaussianPolicy(μ, logΣ, ascale=1f0) = new(μ, logΣ, ascale)
+    always_stochastic::Bool
+    SquashedGaussianPolicy(μ, logΣ, ascale=1f0, always_stochastic=false) = new(μ, logΣ, ascale, always_stochastic)
 end
 
 Flux.@functor SquashedGaussianPolicy
@@ -241,7 +236,7 @@ layers(π::SquashedGaussianPolicy) = unique((layers(π.μ)..., layers(π.logΣ).
 
 device(π::SquashedGaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) : error("Mismatched devices")
 
-POMDPs.action(π::SquashedGaussianPolicy, s) = π.ascale .* tanh.(π.μ(s))
+POMDPs.action(π::SquashedGaussianPolicy, s) = π.always_stochastic ? exploration(π,s)[1] : π.ascale .* tanh.(π.μ(s))
 
 function squashed_gaussian_σ(logΣ)
     LOG_STD_MIN = -5
@@ -267,7 +262,7 @@ end
 
 Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(π.μ(s), π.logΣ(s), atanh.(clamp.(a ./ π.ascale, -1f0 + 1f-5, 1f0 - 1f-5)))
 
-Distributions.entropy(π::SquashedGaussianPolicy, s) = 1.4189385332046727f0 .+ sum(value(π.logΣ, s), dims=1) # 1.4189385332046727 = 0.5 + 0.5 * log(2π) #TODO: This doesn't account for the squash
+Distributions.entropy(π::SquashedGaussianPolicy, s) = 1.4189385332046727f0 .+ sum(π.logΣ(s), dims=1) # 1.4189385332046727 = 0.5 + 0.5 * log(2π) #TODO: This doesn't account for the squash
 
 action_space(π::SquashedGaussianPolicy) = action_space(π.μ)
 
@@ -280,8 +275,10 @@ layers(π::DistributionPolicy) = ()
 
 device(π::DistributionPolicy) = cpu
 actor(π::DistributionPolicy) = π
+action(π::DistributionPolicy, s) = exploration(π, s)[1]
 
 function exploration(π::DistributionPolicy, s; kwargs...)
+    @assert ndims(s) == 2
     B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
     a = Float32.(rand(π.distribution, B...))
     a |> device(s), logpdf(π, s, a)
@@ -297,29 +294,31 @@ end
 action_space(π::DistributionPolicy) = ContinuousSpace(length(π.distribution))
 
 
-## Exploration policy with Gaussian noise
-struct LinearDecaySchedule{R<:Real} <: Function
-    start::R
-    stop::R
-    steps::Int
-end
-
-function (schedule::LinearDecaySchedule)(i)
-    rate = (schedule.start - schedule.stop) / schedule.steps
-    val = schedule.start - i*rate 
-    val = max(schedule.stop, val)
-end
-
-mutable struct ϵGreedyPolicy <: Policy
+## Mixed policy
+mutable struct MixedPolicy <: Policy
     ϵ::Function
-    actions
+    policy
 end
 
-ϵGreedyPolicy(ϵ::Real, actions) = ϵGreedyPolicy((i) -> ϵ, actions)
+MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
+ϵGreedyPolicy(ϵ, actions) = MixedPolicy(ϵ, DistributionPolicy(ObjectCategorical(actions)))
 
-function exploration(π::ϵGreedyPolicy, s; π_on, i,)
-    rand() < π.ϵ(i) ? (rand(π.actions, 1), NaN) : (action(π_on, s), NaN)
+function exploration(π::MixedPolicy, s; π_on, i,)
+    ϵ = π.ϵ(i)
+    x = rand() < ϵ ? rand(π.policy) : action(π_on, s)
+    size(x) == () && (x=fill(x, 1))
+    
+    if π.policy isa UnivariateDistribution
+        logp1 = Base.log(ϵ) .+ logpdf.(π.policy, x)
+    else
+        logp1 = Base.log(ϵ) .+ logpdf(π.policy, x)
+    end
+    
+    logp2 = Base.log(1-ϵ) .+ logpdf(π_on, s, x)
+    
+    x, logsumexp(vcat(logp1, logp2), dims=1)
 end
+
 
 
 ## Exploration policy with Gaussian noise

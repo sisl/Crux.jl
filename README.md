@@ -24,8 +24,13 @@ Supports CPU and GPU computation and implements the following algorithms:
 * <a href="./src/model_free/il/sqil.jl">(SQIL)</a>
 * <a href="./src/model_free/il/asaf.jl">Adversarial Soft Advantage Fitting (ASAF)</a>
 
+### Batch RL
+* <a href="./src/model_free/batch/sac.jl">Batch Soft Actor Critic (SAC)</a>
+* <a href="./src/model_free/batch/cql.jl">Conservative Q-Learning (CQL)</a>
 
-Note for imitation learning algorithms: The parameter `normalize_demo::Bool` determines if the provided expert demonstrations should be normalized by the state and action spaces provided to the solver.
+### Adversarial RL
+* <a href="./src/model_free/adversarial/rarl.jl">Robust Adversarial RL (RARL)</a>
+
 
 ## Installation
 

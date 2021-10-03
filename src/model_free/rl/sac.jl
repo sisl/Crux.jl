@@ -35,18 +35,32 @@ function SAC_temp_loss(π, 𝒫, 𝒟; info = Dict())
     -mean(exp(𝒫[:SAC_log_α][1]) .* target_α)
 end
 
-function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}}, ΔN=50, SAC_α::Float32=1f0, SAC_H_target::Float32 = Float32(-prod(dim(action_space(π)))), π_explore=GaussianNoiseExplorationPolicy(0.1f0), SAC_α_opt::NamedTuple=(;), a_opt::NamedTuple=(;), c_opt::NamedTuple=(;), log::NamedTuple=(;), 𝒫::NamedTuple=(;), param_optimizers=Dict(), kwargs...) where T
-    𝒫 = (SAC_log_α = [Base.log(SAC_α)], SAC_H_target = SAC_H_target, 𝒫...)
-    OffPolicySolver(;
-        π = π,
-        ΔN=ΔN,
-        𝒫 = 𝒫,
-        log = LoggerParams(;dir = "log/sac", log...),
-        param_optimizers = Dict(Flux.params(𝒫[:SAC_log_α]) => TrainingParams(;loss=SAC_temp_loss, name="temp_", SAC_α_opt...), param_optimizers...),
-        a_opt = TrainingParams(;loss=SAC_actor_loss, name="actor_", a_opt...),
-        c_opt = TrainingParams(;loss=double_Q_loss, name="critic_", epochs=ΔN, c_opt...),
-        π_explore = π_explore,
-        target_fn = SAC_target(π),
-        kwargs...)
+function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}}, 
+              ΔN=50, 
+              SAC_α::Float32=1f0, 
+              SAC_H_target::Float32 = Float32(-prod(dim(action_space(π)))), 
+              π_explore=GaussianNoiseExplorationPolicy(0.1f0), 
+              SAC_α_opt::NamedTuple=(;), 
+              a_opt::NamedTuple=(;), 
+              c_opt::NamedTuple=(;),
+              a_loss=SAC_actor_loss,
+              c_loss=double_Q_loss(),
+              target_fn=SAC_target(π),
+              prefix="",
+              log::NamedTuple=(;), 
+              𝒫::NamedTuple=(;), 
+              param_optimizers=Dict(), 
+              kwargs...) where T
+              
+    𝒫 = (SAC_log_α=[Base.log(SAC_α)], SAC_H_target=SAC_H_target, 𝒫...)
+    OffPolicySolver(;π=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
+                     ΔN=ΔN,
+                     𝒫=𝒫,
+                     log=LoggerParams(;dir = "log/sac", log...),
+                     param_optimizers=Dict(Flux.params(𝒫[:SAC_log_α]) => TrainingParams(;loss=SAC_temp_loss, name="temp_", SAC_α_opt...), param_optimizers...),
+                     a_opt=TrainingParams(;loss=a_loss, name=string(prefix, "actor_"), a_opt...),
+                     c_opt=TrainingParams(;loss=c_loss, name=string(prefix, "critic_"), epochs=ΔN, c_opt...),
+                     target_fn=target_fn,
+                     kwargs...)
 end
 

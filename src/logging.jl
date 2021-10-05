@@ -5,7 +5,7 @@ elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
     dir::String = "log/"
     period::Int64 = 500
     logger = TBLogger(dir, tb_increment)
-    fns = [log_undiscounted_return(10)]
+    fns = Any[log_undiscounted_return(10)]
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing
 end
@@ -17,7 +17,7 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
-    π_explore = (p.sampler isa Vector) ?  first(p.sampler).π_explore : p.sampler.π_explore
+    π_explore = (p.sampler isa Vector) ?  first(p.sampler).agent.π_explore : p.sampler.agent.π_explore
         
     for dict in [p.fns..., data..., log_exploration(π_explore)]
         d = dict isa Function ? dict(s=p.sampler, i=i) : dict
@@ -32,7 +32,11 @@ end
                         #t, solver.max_steps, nt[1], avg100_reward, loss_val, grad_val, scores_eval)
                         
 function aggregate_info(infos)
-    res = Dict(k => mean([info[k] for info in filter((x)->haskey(x, k), infos)]) for k in keys(infos[1]))
+    res = Dict()
+    for k in unique(vcat([collect(keys(info)) for info in infos]...))
+        res[k] = mean([info[k] for info in filter((x)->haskey(x, k), infos)])
+    end
+    res
 end
 
 # Built-in functions for logging common training things
@@ -55,7 +59,7 @@ end
 log_validation_error(loss, 𝒟_val; name="validation_error") = (;s, kwargs...) -> Dict(name => loss(s.π, 𝒟_val))
 
 log_exploration(policy) = (;kwargs...) -> Dict()
-log_exploration(policy::ϵGreedyPolicy; name = "eps") = (;i, kwargs...) -> Dict(name => policy.ϵ(i))
+log_exploration(policy::MixedPolicy; name = "eps") = (;i, kwargs...) -> Dict(name => policy.ϵ(i))
 log_exploration(policy::GaussianNoiseExplorationPolicy; name = "noise_std") = (;i, kwargs...) -> Dict(name => policy.σ(i))
 function log_exploration(policy::FirstExplorePolicy; name = "first_explore_on")
     (;i, kwargs...) -> begin

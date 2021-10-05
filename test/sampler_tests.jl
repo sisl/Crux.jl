@@ -23,9 +23,9 @@ end
 
 π_explore = ϵGreedyPolicy(Crux.LinearDecaySchedule(1., 0.1, Int(100/2)), actions(mdp))
 
-s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(actions(mdp)), max_steps=500)
-s2 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(actions(mdp)), max_steps=50, π_explore = π_explore)
-s3 = Sampler(pomdp, FunctionPolicy((s)-> 0), A=DiscreteSpace(actions(pomdp)))
+s1 = Sampler(mdp, PolicyParams(π=FunctionPolicy((s) -> [:up]), space=DiscreteSpace(actions(mdp))), max_steps=500)
+s2 = Sampler(mdp, PolicyParams(π=DistributionPolicy(ObjectCategorical([:up, :down, :left, :right])), space=DiscreteSpace(actions(mdp)), π_explore = π_explore), max_steps=50, )
+s3 = Sampler(pomdp, PolicyParams(π=FunctionPolicy((s)-> 0), space=DiscreteSpace(actions(pomdp))))
 
 ## Steps! function
 data = steps!(s1, Nsteps = 10)
@@ -89,7 +89,7 @@ fill_returns!(b, 1:5, 0.7f0)
 ## Test sampling with a vector of mdps
 mdps = [mdp, mdp, mdp]
 
-samplers = Sampler(mdps, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(actions(mdp)))
+samplers = Sampler(mdps, PolicyParams(π=FunctionPolicy((s) -> [:up]), space=DiscreteSpace(actions(mdp))))
 @test length(samplers) == 3
 
 data = steps!(samplers, Nsteps = 5)
@@ -98,7 +98,7 @@ data[:s]
 
 ## Test episodes
 mdp = GridWorldMDP()
-s1 = Sampler(mdp, FunctionPolicy((s) -> [:up]), A=DiscreteSpace(actions(mdp)), required_columns =[:episode_end], max_steps = 500,)
+s1 = Sampler(mdp, PolicyParams(π=FunctionPolicy((s) -> [:up]), space=DiscreteSpace(actions(mdp))), required_columns =[:episode_end], max_steps = 500,)
 data, eps = episodes!(s1, Neps = 10, return_episodes = true,)
 buffer = ExperienceBuffer(data)
 eps2 = Crux.episodes(buffer)
@@ -108,9 +108,8 @@ eps2 = Crux.episodes(buffer)
 ## Test the adversarial MDP stuff
 amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], [1,1]))
 G() = GaussianPolicy(ContinuousNetwork(Chain(Dense(4,2))), zeros(2))
-apol = AdversarialPolicy(G(), G())
 
-s = Sampler(amdp, apol)
+s = Sampler(amdp, G(), adversary=PolicyParams(G()))
 @test :x in s.required_columns
 
 d = steps!(s, Nsteps=100)

@@ -4,68 +4,30 @@ using POMDPModels
 using Flux
 using LinearAlgebra
 using CUDA
+using Distributions
 
-## Spaces
-mdp = SimpleGridWorld()
+# Constant Layer
+c1 = ConstantLayer(ones(10))
+@test Crux.device(c1) == cpu
+@test c1(rand(100)) == c1.vec
+@test Flux.params(c1)[1] == c1.vec
 
-s1 = DiscreteSpace(5)
-@test s1 isa AbstractSpace
-@test s1 isa DiscreteSpace
-@test s1.N == 5
-@test type(s1) == Bool
-@test Crux.dim(s1) == (5,)
-@test s1.vals == [1,2,3,4,5]
-@test tovec(4, s1) == Bool[0,0,0,1,0]
+c2 = c1 |> gpu
+@test Crux.device(c2) == gpu
+@test c2(rand(100)) == c2.vec
 
-s2 = DiscreteSpace(5, [:a, :b, :c, :d, :e])
-@test s2 isa AbstractSpace
-@test s2 isa DiscreteSpace
-@test s2.N == 5
-@test type(s2) == Bool
-@test Crux.dim(s2) == (5,)
-@test s2.vals == [:a, :b, :c, :d, :e]
-@test tovec(:d, s2) == Bool[0,0,0,1,0]
+# Distribution stuff
+objs = [:up, :down]
+o = ObjectCategorical(objs)
+@test o.objs == objs
+@test o.cat.p == Categorical(2).p
 
-s3 = ContinuousSpace((3,4), Float64)
-@test s3 isa AbstractSpace
-@test s3 isa ContinuousSpace
-@test s3.dims == (3,4)
-@test type(s3) == Float64
-@test Crux.dim(s3) == (3,4)
-@test tovec(zeros(3,4), s3) == zeros(3, 4)
 
-s3 = ContinuousSpace((3,4), Float64, 1f0, 2f0)
-@test s3 isa AbstractSpace
-@test s3 isa ContinuousSpace
-@test s3.dims == (3,4)
-@test type(s3) == Float64
-@test Crux.dim(s3) == (3,4)
-@test tovec(zeros(3,4),s3) == -0.5*ones(3, 4)
+@test rand(o) in objs
+@test size(rand(o, 10)) == (10,)
 
-s4 = state_space(mdp)
-@test s4 isa ContinuousSpace
-@test Crux.dim(s4) == (2,)
-
-## Gpu stuff
-vcpu = zeros(Float32, 10, 10)
-vgpu = cu(zeros(Float32, 10, 10))
-@test Crux.device(vcpu) == cpu
-@test Crux.device(vgpu) == gpu
-@test Crux.device(view(vcpu,:,1)) == cpu
-@test Crux.device(view(vgpu,:,1)) == gpu
-
-c_cpu = Chain(Dense(5,2))
-c_gpu = Chain(Dense(5,2)) |> gpu
-@test Crux.device(c_cpu) == cpu
-@test Crux.device(c_gpu) == gpu
-
-@test Crux.device(mdcall(c_cpu, rand(5), cpu)) == cpu
-@test Crux.device(mdcall(c_gpu, rand(5), gpu)) == cpu
-@test Crux.device(mdcall(c_cpu, cu(rand(5)), cpu)) == gpu
-@test Crux.device(mdcall(c_gpu, cu(rand(5)), gpu)) == gpu
-
-v = zeros(4,4,4)
-@test size(bslice(v, 2)) == (4,4)
+@test logpdf(o, :up) == logpdf(o, :down)
+@test size(logpdf(o, rand(o,10))) == (1,10)
 
 ## Flux Stuff
 W = rand(2, 5)
@@ -82,6 +44,39 @@ grads = Flux.gradient(() -> loss(x, y), θ)
 
 @test norm(grads) > 1
 
+
+##  MultitaskDecay Schedule
+m = MultitaskDecaySchedule(10, [1,2,3])
+l = Crux.LinearDecaySchedule(1.0, 0.1, 10)
+
+for i=1:10
+    @test m(i) == l(i)
+end
+
+for i=11:20
+    @test m(i) == l(i-10)
+end
+
+for i=21:30
+    @test m(i) == l(i-20)
+end
+
+m = MultitaskDecaySchedule(10, [1,2,1])
+
+for i=1:10
+    @test m(i) == l(i)
+end
+
+for i=11:20
+    @test m(i) == l(i-10)
+end
+
+for i=21:30
+    @test m(i) == l(i-10)
+end
+
+@test m(31) == 0.1
+@test m(0) == 1
 
 
 

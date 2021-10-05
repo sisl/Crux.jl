@@ -22,6 +22,7 @@ V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, rel
 
 # Solve with DQN (~12 seconds)
 𝒮_dqn = DQN(π=A(), S=S, N=10000)
+𝒮_dqn.c_opt
 @time π_dqn = solve(𝒮_dqn, mdp)
 
 # Plot the learning curve

@@ -23,28 +23,39 @@ module Crux
     using Statistics
     using Base.Iterators: partition
     
-    export ScalarParams, AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, 
-           state_space, device, cpucall, gpucall, mdcall, bslice, whiten, to2D, tovec
+    extra_functions = Dict()
+    function set_function(key, val)
+        extra_functions[key] = val
+    end
+    
+    export device, cpucall, gpucall, mdcall, bslice
+    include("devices.jl")
+    
+    export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, state_space
+    include("spaces.jl")
+    
+    export ObjectCategorical, ConstantLayer, whiten, to2D, tovec, 
+           LinearDecaySchedule, MultitaskDecaySchedule
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!, capacity, normalize!, extra_columns
+           prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
     include("training.jl")
     
-    export NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
+    export PolicyParams, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
-           DistributionPolicy, AdversarialPolicy, protagonist, antagonist,
-           GaussianNoiseExplorationPolicy, FirstExplorePolicy, ϵGreedyPolicy, LinearDecaySchedule,
+           DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
+           GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
            entropy, logpdf, action_space, exploration, layers, actor, critic
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
-           episodes!, fillto!, metric_by_key, metrics_by_key, undiscounted_return, discounted_return, failure, 
-           fill_gae!, fill_returns!, trime!
+           episodes!, fillto!, metric_by_key, metrics_by_key, undiscounted_return, 
+           discounted_return, failure, fill_gae!, fill_returns!, trim!
     include("sampler.jl")
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
@@ -75,7 +86,7 @@ module Crux
     export OrthogonalRegularizer
     include("extras/orthogonal_regularization.jl")
     
-    export MultitaskDecaySchedule, log_multitask_performances!, continual_learning
+    export log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
     export OnPolicySolver, OffPolicySolver, BatchSolver
@@ -109,9 +120,9 @@ module Crux
     include("model_free/batch/cql.jl")
     include("model_free/batch/sac.jl")
     
-    export AdversarialOffPolicySolver, RARL, ISARL
+    export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")
     include("model_free/adversarial/rarl.jl")
-    include("model_free/adversarial/is.jl")
+    include("model_free/adversarial/isarl.jl")
 end
 

@@ -11,11 +11,17 @@ function reinforce_loss(π, 𝒫, 𝒟; info = Dict())
 end
 
 # Build a REINFORCE solver
-REINFORCE(;a_opt::NamedTuple=(;), log::NamedTuple=(;), kwargs...) = 
-    OnPolicySolver(;
-        log = LoggerParams(;dir = "log/reinforce", log...),
-        a_opt = TrainingParams(;loss = reinforce_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
-        kwargs...)
+function REINFORCE(;π,
+                    a_opt::NamedTuple=(;), 
+                    log::NamedTuple=(;), 
+                    kwargs...)
+                    
+    OnPolicySolver(;agent=PolicyParams(π),
+                    log = LoggerParams(;dir = "log/reinforce", log...),
+                    a_opt = TrainingParams(;loss = reinforce_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
+                    kwargs...)
+end
+        
     
 
 

@@ -3,6 +3,7 @@ struct ObjectCategorical
     cat::Categorical
     objs
     ObjectCategorical(objs::T) where {T <: AbstractArray} = new(Categorical(length(objs)), objs)
+    ObjectCategorical(objs::T) where {T <: Tuple} = new(Categorical(length(objs)), [objs...])
 end
 
 Base.rand(d::ObjectCategorical, sz::Int...) = d.objs[rand(d.cat, sz...)]
@@ -16,6 +17,16 @@ function Distributions.logpdf(d::ObjectCategorical, x)
     end
     
 end
+
+# Constant Layer
+struct ConstantLayer{T}
+    vec::T
+end
+
+Flux.@functor ConstantLayer
+(m::ConstantLayer)(x::AbstractArray) = m.vec
+
+
 
 ## Useful functions
 whiten(v) = whiten(v, mean(v), std(v))
@@ -55,7 +66,7 @@ end
 ## Losses
 function td_loss(;loss=Flux.mse, name=:Qavg, s_key=:s, a_key=:a, weight=nothing)
     (π, 𝒫, 𝒟, y; info=Dict()) -> begin
-        Q = value(π, 𝒟[skey], 𝒟[akey]) 
+        Q = value(π, 𝒟[s_key], 𝒟[a_key]) 
         
         # Store useful information
         ignore() do

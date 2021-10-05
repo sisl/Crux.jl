@@ -24,7 +24,7 @@ function AdVIL(;π,
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
     
-    BatchSolver(;π=PolicyParams(π),
+    BatchSolver(;agent=PolicyParams(π),
                  S=S,
                  𝒫=(λ_GP=λ_GP, λ_BC=λ_BC,),
                  𝒟_train = 𝒟_demo,

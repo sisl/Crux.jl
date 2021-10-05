@@ -13,7 +13,7 @@ function DQN(;π::DiscreteNetwork,
               prefix="",
               kwargs...)
               
-     OffPolicySolver(;π=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
+     OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
                       log=LoggerParams(;dir="log/dqn", log...),
                       N=N,
                       ΔN=ΔN,

@@ -17,7 +17,8 @@ Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=Pol
 Sampler(mdp, agent::T; kwargs...) where {T <: PolicyParams} = Sampler(;mdp=mdp, agent=agent, kwargs...)
 
 # Construct a vector of samplers from a vector of mdps
-Sampler(mdps::AbstractVector, agent; kwargs...) = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)
     sampler.s = rand(initialstate(sampler.mdp))
@@ -43,25 +44,26 @@ end
     
 function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     a, logprob = explore ? exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i) : (action(sampler.agent.π, sampler.svec), NaN)
-    length(a) == 1 && (a = a[1],) # actions always come out as an array
+    (a isa AbstractArray || a isa Tuple) && length(a) == 1 && (a = a[1])
     
     # This implements the ability to get cost information from safety gym
     info = Dict()
     kwargs = haskey(data, :cost) ? (info=info,) : () 
     
+    args = (a,)
     if !isnothing(sampler.adversary)
         x, xlogprob = explore ? exploration(sampler.adversary.π_explore, sampler.svec, π_on=sampler.adversary.π, i=i) : (action(sampler.adversary.π, sampler.svec), NaN)
-        length(x) == 1 && (x = x[1]) # disturbances always come out as an array
+        (x isa AbstractArray || x isa Tuple) && length(x) == 1 && (x = x[1]) # disturbances always come out as an array
         data[:x][:, j:j] .= tovec(x, sampler.adversary.space)
         haskey(data, :xlogprob) && (data[:xlogprob][:, j] .= xlogprob)
-        a = (a..., x)
+        args = (a, x)
     end
     
     if sampler.mdp isa POMDP
-        sp, o, r = gen(sampler.mdp, sampler.s, a...; kwargs...)
+        sp, o, r = gen(sampler.mdp, sampler.s, args...; kwargs...)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
     else
-        sp, r = gen(sampler.mdp, sampler.s, a...; kwargs...)
+        sp, r = gen(sampler.mdp, sampler.s, args...; kwargs...)
         spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
     spvec = tovec(spvec, sampler.S)
@@ -119,7 +121,8 @@ end
 
 function episodes!(sampler::Sampler; Neps=1, explore=false, i=0, return_episodes=false)
     reset_sampler!(sampler)
-    data = mdp_data(sampler.S, sampler.A, Neps*sampler.max_steps, sampler.required_columns)
+    data = mdp_data(sampler.S, sampler.agent.space,
+     Neps*sampler.max_steps, sampler.required_columns)
     episode_starts = zeros(Int, Neps)
     episode_ends = zeros(Int, Neps)
     j, k = 0, 1

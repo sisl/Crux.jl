@@ -53,7 +53,7 @@ function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetw
               kwargs...) where T
               
     𝒫 = (SAC_log_α=[Base.log(SAC_α)], SAC_H_target=SAC_H_target, 𝒫...)
-    OffPolicySolver(;π=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
+    OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
                      ΔN=ΔN,
                      𝒫=𝒫,
                      log=LoggerParams(;dir = "log/sac", log...),

@@ -6,6 +6,16 @@ using LinearAlgebra
 using CUDA
 using Distributions
 
+# Constant Layer
+c1 = ConstantLayer(ones(10))
+@test Crux.device(c1) == cpu
+@test c1(rand(100)) == c1.vec
+@test Flux.params(c1)[1] == c1.vec
+
+c2 = c1 |> gpu
+@test Crux.device(c2) == gpu
+@test c2(rand(100)) == c2.vec
+
 # Distribution stuff
 objs = [:up, :down]
 o = ObjectCategorical(objs)

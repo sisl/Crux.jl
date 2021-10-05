@@ -17,7 +17,7 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
-    π_explore = (p.sampler isa Vector) ?  first(p.sampler).π_explore : p.sampler.π_explore
+    π_explore = (p.sampler isa Vector) ?  first(p.sampler).agent.π_explore : p.sampler.agent.π_explore
         
     for dict in [p.fns..., data..., log_exploration(π_explore)]
         d = dict isa Function ? dict(s=p.sampler, i=i) : dict

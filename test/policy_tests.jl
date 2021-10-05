@@ -68,6 +68,9 @@ s = rand(2,100)
 
 @test action_space(p) == ContinuousSpace(4)
 
+p2 = ContinuousNetwork(ConstantLayer(rand(10)), 10)
+@test size(p2(rand(1))) == (10,)
+
 ## Discrete Network
 p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4)), [1,2, 3, 4])
 
@@ -198,80 +201,18 @@ a = rand([1,], 100)
 @test action_space(p) == action_space(p.A)
 
 
-## AdversarialPolicy    
-Pro_Anet = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
-Pro_Cnet = ContinuousNetwork(Chain(Dense(6,32, relu), Dense(32, 1)))
-Ant_Anet = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
-Ant_Cnet = ContinuousNetwork(Chain(Dense(6,32, relu), Dense(32, 1)))
-p = AdversarialPolicy(ActorCritic(Pro_Anet,Pro_Cnet), ActorCritic(Ant_Anet, Ant_Cnet))
-
-@test protagonist(p) == p.P
-@test antagonist(p) == p.A
-
-@test action_space(p) == action_space(p.A)
-@test action_space(p) == action_space(p.P)
-
-p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test Crux.device(p_gpu.A) == gpu
-@test Crux.device(p_gpu.P) == gpu
-
-@test length(Flux.params(p)) == 16
-@test length(layers(p)) == 8
-
-sfull = rand(6, 100)
-s = rand(2,100)
-a = rand(4, 100)
-@test all(value(p, sfull) .≈ value(p_gpu, sfull))
-@test value(p, sfull) == value(p.P, sfull)
-@test value(p, s, a) == value(p.P, s, a)
-@test action(p, s) == action(p.P, s)
-
-# Make sure the protagonist and antagonist are different
-@test all(value(p, sfull) .!= value(p.A, sfull))
-@test all(value(p, s, a) .!= value(p.A, s, a))
-@test all(action(p, s) .!= action(p.A, s))
-
-@test value(antagonist(p), sfull) == value(p.A, sfull)
-@test value(antagonist(p), s, a) == value(p.A, s, a)
-@test action(antagonist(p), s) == action(p.A, s)
-
-@test all(action(p, s) .≈ action(p_gpu, s))
-
-Anet = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 2)), [1,2,])
-Pnet = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 2)), [1,2,])
-p = AdversarialPolicy(Pnet, Anet)
-
-Random.seed!(1)
-e1 = exploration(p, s)
-Random.seed!(1)
-e2 = exploration(p.P, s)
-@test e1 == e2 
-
-a = rand([1,2], 100)
-
-@test logpdf(p, s, Flux.onehotbatch(a, [1,2])) == logpdf(p.P, s, Flux.onehotbatch(a, [1,2]))
-@test all(logpdf(p, s, Flux.onehotbatch(a, [1,2])) .!= logpdf(p.A, s, Flux.onehotbatch(a, [1,2])))
-@test value(p, s) == value(p.P, s)
-@test !(value(p, s) == value(p.A, s))
-
-@test entropy(p, s) == entropy(p.P, s)
-@test entropy(p, s) != entropy(p.A, s)
-
-@test action_space(p) == action_space(p.P)
-
 ## Gaussian Policy
 μnet = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 4)))
 logΣnet = ones(Float32, 4)
 p = GaussianPolicy(μnet, logΣnet)
 @test Crux.device(p) == cpu
-@test all(p.logΣ .== 1)
+@test all(value(p.logΣ, rand(2)) .== 1)
 
 p_gpu = p |> gpu
 @test Crux.device(p_gpu) == gpu
 @test Crux.device(p_gpu.μ) == gpu
 @test Crux.device(p_gpu.logΣ) == gpu
-@test all(p.logΣ .== 1)
+@test all(value(p.logΣ, rand(2)) .== 1)
 
 @test length(Flux.params(p)) == 5
 @test length(layers(p)) == 3
@@ -375,19 +316,12 @@ a, logprob = exploration(p, s)
 @test action_space(p) == ContinuousSpace(6)
 
 ## ϵGreedyPolicy
-p_on = DiscreteNetwork((s)->[0.5, 1.0], [2,3])
-p = ϵGreedyPolicy(0f0, [1,])
+p_on = DiscreteNetwork(Dense(2,2), [2,3])
+p = ϵGreedyPolicy(0f0, [2,3])
 a, logprob = exploration(p, s0; π_on=p_on, i=1)
-@test a==[3] && isnan(logprob)
 
-p = ϵGreedyPolicy(1f0, [1,])
-a, logprob = exploration(p, s0; π_on=p_on, i=1)
-@test a==[1] && isnan(logprob)
-
-p = ϵGreedyPolicy(Crux.LinearDecaySchedule(1f0, 0f0, 10), [1,])
-@test exploration(p, s0; π_on=p_on, i=0)[1] == [1]
-@test exploration(p, s0; π_on=p_on, i=10)[1] == [3]
-@test p.ϵ(5) == 0.5
+@test a[1] in [2,3]
+@test logprob[1] < 0
 
 
 ## GaussianNoiseExplorationPolicy

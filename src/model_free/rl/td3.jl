@@ -19,7 +19,7 @@ function TD3(;π::ActorCritic{A, C},
               𝒫::NamedTuple=(;), 
               kwargs...) where {A, C<:DoubleNetwork}
      
-    OffPolicySolver(;π=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
+    OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
                      ΔN=ΔN,
                      𝒫=(π_smooth=π_smooth, 𝒫...),
                      log=LoggerParams(;dir = "log/td3", log...),

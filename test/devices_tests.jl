@@ -1,3 +1,4 @@
+using Crux, Flux
 ## Gpu stuff
 vcpu = zeros(Float32, 10, 10)
 vgpu = cu(zeros(Float32, 10, 10))

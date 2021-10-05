@@ -19,7 +19,7 @@ end
 
 function POMDPs.solve(𝒮::OnPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
-    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.A, 𝒮.ΔN, 𝒮.required_columns, device=device(𝒮.agent.π))
+    𝒟 = ExperienceBuffer(𝒮.S, 𝒮.agent.space, 𝒮.ΔN, 𝒮.required_columns, device=device(𝒮.agent.π))
     γ, λ = Float32(discount(mdp)), 𝒮.λ_gae
     s = Sampler(mdp, 𝒮.agent, S=𝒮.S, required_columns=𝒮.required_columns, λ=λ, max_steps=𝒮.max_steps)
     isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)

@@ -25,7 +25,7 @@
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
 end
 
-function train_step(𝒮::OffPolicySolver, 𝒟)
+function train_step(𝒮::OffPolicySolver, 𝒟, γ)
     infos = []
     # Loop over the desired number of training steps
     for epoch in 1:𝒮.c_opt.epochs
@@ -97,7 +97,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         𝒮.post_experience_callback(𝒮.buffer) 
         
         # Train the networks
-        infos = train_step(𝒮, 𝒟)
+        infos = train_step(𝒮, 𝒟, γ)
         
         # Log the results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos))

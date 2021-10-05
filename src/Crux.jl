@@ -34,7 +34,8 @@ module Crux
     export AbstractSpace, DiscreteSpace, ContinuousSpace, type, dim, state_space
     include("spaces.jl")
     
-    export ObjectCategorical, whiten, to2D, tovec, LinearDecaySchedule, MultitaskDecaySchedule
+    export ObjectCategorical, ConstantLayer, whiten, to2D, tovec, 
+           LinearDecaySchedule, MultitaskDecaySchedule
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,

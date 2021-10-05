@@ -64,8 +64,8 @@ function POMDPs.solve(𝒮::AdversarialOffPolicySolver, mdp)
         
         # Train the networks
         infos = []
-        elapsed(𝒮.i + 1:𝒮.i + ΔN, 𝒮.train_pro_every) && merge!(infos, train_step(𝒮.𝒮_pro, 𝒟_pro))
-        elapsed(𝒮.i + 1:𝒮.i + ΔN, 𝒮.train_ant_every) && merge!(infos, train_step(𝒮.𝒮_ant, 𝒟_ant))
+        elapsed(𝒮.i + 1:𝒮.i + ΔN, 𝒮.train_pro_every) && merge!(infos, train_step(𝒮.𝒮_pro, 𝒟_pro, γ))
+        elapsed(𝒮.i + 1:𝒮.i + ΔN, 𝒮.train_ant_every) && merge!(infos, train_step(𝒮.𝒮_ant, 𝒟_ant, γ))
         
         # Log the results
         log(𝒮.log, 𝒮.i + 1:𝒮.i + ΔN, aggregate_info(infos))

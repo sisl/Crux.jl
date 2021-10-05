@@ -40,7 +40,7 @@ function BC(;π,
     #TODO: We should include a validation loss, then early stopping should just analyze the history of the validation loss. 
     
     𝒫 = (λe=λe,)
-    BatchSolver(;π=PolicyParams(π), 
+    BatchSolver(;agent=PolicyParams(π), 
                  S=S,
                  𝒫=𝒫,
                  𝒟_train=𝒟_train, 

@@ -1,5 +1,5 @@
 function ASAF_actor_loss(πG, 𝒟_demo)
-    (π, 𝒟; info=Dict()) -> begin
+    (π, 𝒫, 𝒟,; info=Dict()) -> begin
         πsa_G = logpdf(π, 𝒟[:s], 𝒟[:a])
         πsa_E = logpdf(π, 𝒟_demo[:s], 𝒟_demo[:a])
         πGsa_G = logpdf(πG, 𝒟[:s], 𝒟[:a])
@@ -32,13 +32,14 @@ function ASAF(;π,
                log::NamedTuple=(;), 
                kwargs...)
                
-    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
+    normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
-    OnPolicySolver(;π=PolicyParams(π), 
+    OnPolicySolver(;agent=PolicyParams(π), 
                     S=S,
                     ΔN=ΔN,
-                    loop_start_callback=(𝒮) -> 𝒮.a_opt.loss = ASAF_actor_loss(deepcopy(𝒮.π), 𝒟_demo),
+                    loop_start_callback=(𝒮) -> 𝒮.a_opt.loss = ASAF_actor_loss(deepcopy(𝒮.agent.π), 𝒟_demo),
                     log=LoggerParams(;dir="log/ASAF", period=100, log...),
                     a_opt=TrainingParams(;name="actor_", loss=nothing, a_opt...), 
                     kwargs...)
 end
+

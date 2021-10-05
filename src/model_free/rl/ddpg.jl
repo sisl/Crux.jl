@@ -24,7 +24,7 @@ function DDPG(;π::ActorCritic,
                log::NamedTuple=(;), 
                π_smooth=GaussianNoiseExplorationPolicy(0.1f0, ϵ_min=-0.5f0, ϵ_max=0.5f0), kwargs...)
                
-    OffPolicySolver(;π=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
+    OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
                      ΔN=ΔN,
                      𝒫=(π_smooth=π_smooth,),
                      log=LoggerParams(;dir = "log/ddpg", log...),

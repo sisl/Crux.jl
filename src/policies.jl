@@ -190,7 +190,7 @@ mutable struct GaussianPolicy <: NetworkPolicy
     logΣ::ContinuousNetwork
     always_stochastic::Bool
     GaussianPolicy(μ::ContinuousNetwork, logΣ::ContinuousNetwork, always_stochastic=false) = new(μ, logΣ, always_stochastic)
-    GaussianPolicy(μ::ContinuousNetwork, logΣ::AbstractArray, always_stochastic=false) = new(μ, ContinuousNetwork((x) -> logΣ, size(logΣ), device(logΣ)), always_stochastic)
+    GaussianPolicy(μ::ContinuousNetwork, logΣ::AbstractArray, always_stochastic=false) = new(μ, ContinuousNetwork(Chain(ConstantLayer(logΣ)), length(logΣ)), always_stochastic)
 end
 
 Flux.@functor GaussianPolicy
@@ -202,6 +202,11 @@ layers(π::GaussianPolicy) = (layers(π.μ)..., layers(π.logΣ))
 device(π::GaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) : error("Mismatched devices")
 
 POMDPs.action(π::GaussianPolicy, s) = π.always_stochastic ? exploration(π, s)[1] : π.μ(s)
+
+function gaussian_logpdf(μ, logΣ, a)
+    σ² = exp.(logΣ).^2
+    sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.9189385332046727f0 .- logΣ, dims = 1) # 0.9189385332046727f0 = log(sqrt(2π))
+end 
 
 function exploration(π::GaussianPolicy, s; kwargs...) 
     μ, logΣ = π.μ(s), π.logΣ(s)
@@ -275,12 +280,14 @@ layers(π::DistributionPolicy) = ()
 
 device(π::DistributionPolicy) = cpu
 actor(π::DistributionPolicy) = π
-action(π::DistributionPolicy, s) = exploration(π, s)[1]
+POMDPs.action(π::DistributionPolicy, s) = exploration(π, s)[1]
 
 function exploration(π::DistributionPolicy, s; kwargs...)
-    @assert ndims(s) == 2
     B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
-    a = Float32.(rand(π.distribution, B...))
+    a = rand(π.distribution, B...)
+    if a isa Float64 || a isa AbstractArray{Float64}
+        a = Float32.(a)
+    end
     a |> device(s), logpdf(π, s, a)
 end
 
@@ -305,15 +312,12 @@ MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
 
 function exploration(π::MixedPolicy, s; π_on, i,)
     ϵ = π.ϵ(i)
-    x = rand() < ϵ ? rand(π.policy) : action(π_on, s)
-    size(x) == () && (x=fill(x, 1))
+    x = rand() < ϵ ? action(π.policy, s) : action(π_on, s)
     
-    if π.policy isa UnivariateDistribution
-        logp1 = Base.log(ϵ) .+ logpdf.(π.policy, x)
-    else
-        logp1 = Base.log(ϵ) .+ logpdf(π.policy, x)
-    end
+    # Turn the action into an array if it is a value
+    !(x isa AbstractArray || x isa Tuple) && (x=fill(x, 1))
     
+    logp1 = Base.log(ϵ) .+ logpdf(π.policy, s, x)
     logp2 = Base.log(1-ϵ) .+ logpdf(π_on, s, x)
     
     x, logsumexp(vcat(logp1, logp2), dims=1)

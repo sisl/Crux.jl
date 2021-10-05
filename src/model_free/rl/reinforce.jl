@@ -16,7 +16,7 @@ function REINFORCE(;π,
                     log::NamedTuple=(;), 
                     kwargs...)
                     
-    OnPolicySolver(;π=PolicyParams(π),
+    OnPolicySolver(;agent=PolicyParams(π),
                     log = LoggerParams(;dir = "log/reinforce", log...),
                     a_opt = TrainingParams(;loss = reinforce_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
                     kwargs...)

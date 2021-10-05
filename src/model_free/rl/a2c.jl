@@ -19,7 +19,7 @@ function A2C(;π::ActorCritic,
               λp::Float32=1f0, 
               λe::Float32=0.1f0, kwargs...)
               
-    OnPolicySolver(;π=PolicyParams(π),
+    OnPolicySolver(;agent=PolicyParams(π),
                     𝒫=(λp=λp, λe=λe),
                     log=LoggerParams(;dir = "log/a2c", log...),
                     a_opt=TrainingParams(;loss=a2c_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),

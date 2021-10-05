@@ -25,7 +25,7 @@ function PPO(;π::ActorCritic,
      log::NamedTuple=(;), 
      kwargs...)
      
-     OnPolicySolver(;π=PolicyParams(π),
+     OnPolicySolver(;agent=PolicyParams(π),
                     𝒫=(ϵ=ϵ, λp=λp, λe=λe),
                     log = LoggerParams(;dir = "log/ppo", log...),
                     a_opt = TrainingParams(;loss = ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),

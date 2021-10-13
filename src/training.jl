@@ -24,7 +24,7 @@ function Flux.Optimise.train!(θ, loss::Function, p::TrainingParams; info = Dict
 end
 
 # Train with minibatches and epochs
-function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; info=Dict(), max_batches=Inf)
+function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; info=Dict(), max_batches=Inf, π_loss=π)
     infos = [] # stores the aggregated info for each epoch
     for epoch in 1:p.epochs
         minibatch_infos = [] # stores the info from each minibatch
@@ -39,7 +39,7 @@ function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; in
         batch_num = 1
         for indices in zip(partitions...)
             mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
-            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π, 𝒫, mbs...; kwargs...), p))
+            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π_loss, 𝒫, mbs...; kwargs...), p))
             batch_num > max_batches && break 
             batch_num += 1    
         end

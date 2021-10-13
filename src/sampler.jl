@@ -11,6 +11,10 @@
     λ::Float32 = NaN32
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
+    
+    # Parameters for cost constraints
+    Vc::Union{ContinuousNetwork, Nothing} = nothing
+    λcost::Float32 = NaN32
 end
 
 Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=PolicyParams(π), kwargs...)
@@ -39,6 +43,11 @@ function terminate_episode!(sampler::Sampler, data, j)
     ep = j - sampler.episode_length + 1 : j
     haskey(data, :advantage) && fill_gae!(data, ep, sampler.agent.π, sampler.λ, sampler.γ)
     haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
+
+    # Dealing with cost constraints
+    haskey(data, :cost_advantage) && fill_gae!(data, ep, sampler.Vc, sampler.λ, sampler.γ, source=:cost, target=:cost_advantage)
+    haskey(data, :cost_return) && fill_returns!(data, ep, sampler.γ, source=:cost, target=:cost_return)
+    
     reset_sampler!(sampler)
 end
     
@@ -199,24 +208,24 @@ function fill_gae!(d::ExperienceBuffer, V, λ::Float32, γ::Float32)
     end
 end
 
-function fill_gae!(d, episode_range, V, λ::Float32, γ::Float32)
+function fill_gae!(d, episode_range, V, λ::Float32, γ::Float32; source = :r, target = :advantage)
     A, c = 0f0, λ*γ
     nd = ndims(d[:s])
     for i in reverse(episode_range)
         Vsp = value(V, bslice(d[:sp], i:i))
         Vs = value(V, bslice(d[:s], i:i))
         @assert length(Vs) == 1
-        A = c*A + d[:r][1,i] + (1.f0 - d[:done][1,i])*γ*Vsp[1] - Vs[1]
+        A = c*A + d[source][1,i] + (1.f0 - d[:done][1,i])*γ*Vsp[1] - Vs[1]
         @assert !isnan(A)
-        d[:advantage][:, i] .= A
+        d[target][:, i] .= A
     end
 end
 
-function fill_returns!(data, episode_range, γ::Float32)
+function fill_returns!(data, episode_range, γ::Float32; source=:r, target=:return)
     r = 0f0
     for i in reverse(episode_range)
-        r = data[:r][1, i] + γ*r
-        data[:return][:, i] .= r
+        r = data[source][1, i] + γ*r
+        data[target][:, i] .= r
     end
 end
 

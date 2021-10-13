@@ -94,7 +94,7 @@ module Crux
     include("model_free/off_policy.jl")
     include("model_free/batch.jl")
     
-    export REINFORCE, A2C, PPO, DQN, DDPG, TD3, SAC
+    export REINFORCE, A2C, PPO, LagrangePPO, DQN, DDPG, TD3, SAC
     include("model_free/rl/reinforce.jl")
     include("model_free/rl/a2c.jl")
     include("model_free/rl/ppo.jl")

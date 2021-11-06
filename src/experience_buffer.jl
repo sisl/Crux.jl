@@ -29,7 +29,7 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :done => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return]
+        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
@@ -67,6 +67,7 @@ PriorityParams(N::Int, pp::PriorityParams) = PriorityParams(N, α=pp.α, β=pp.�
     next_ind::Int64
     indices::Vector{Int}
     priority_params::Union{Nothing, PriorityParams}
+    total_count::Int
 end
 
 function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_ind=1, indices=[], prioritized::Bool=false, priority_params::NamedTuple=(;)) where {T <: AbstractArray}
@@ -75,7 +76,7 @@ function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_i
         !haskey(data, :weight) && (data[:weight] = device(data)((ones(Float32, 1, capacity(data)))))
         pp = PriorityParams(capacity(data); priority_params...)
     end
-    ExperienceBuffer(data, elements, next_ind, indices, pp)
+    ExperienceBuffer(data, elements, next_ind, indices, pp, elements)
 end
 
 function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol}=Symbol[]; device=cpu, 
@@ -87,23 +88,24 @@ end
 
 function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
     data = Dict(k=>device(Array{eltype(v)}(undef, size(v)[1:end-1]..., capacity)) for (k,v) in b.data)
-    ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing)
+    ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing, 0)
 end
 
 function Flux.gpu(b::ExperienceBuffer)
     data = Dict{Symbol, CuArray}(k => v |> gpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params, b.total_count)
 end
 
 function Flux.cpu(b::ExperienceBuffer)
     data = Dict{Symbol, Array}(k => v |> cpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params, b.total_count)
 end
 
 function clear!(b::ExperienceBuffer)
     b.elements = 0
     b.next_ind = 1
     b.indices = Int[]
+    b.total_count = 0
     isprioritized(b) && (b.priority_params = PriorityParams(capacity(b), b.priority_params))
     b
 end 
@@ -211,6 +213,7 @@ end
 function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids
     N, C = length(ids), capacity(b)
+    b.total_count += N
     I = mod1.(b.next_ind:b.next_ind + N - 1, C)
     for k in keys(b)
         if !haskey(data, k)
@@ -229,6 +232,35 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     I
 end
 
+
+function push_reservoir!(buffer, data; weighted=false)
+    N = capacity(data)
+    for i=1:N
+        element = Dict(k => bslice(v, i:i) for (k,v) in data)
+        
+        # Only add samples according to their weight
+        if weighted && haskey(element, :weight) && rand() > element[:weight][1]
+            continue
+        end
+        
+        buffer.total_count += 1
+        # Add the element to the buffer and return if we haven't hit our max
+        if length(buffer) < capacity(buffer)
+            push!(buffer, element)
+        else
+            # Choose a random number up to count
+            j = rand(1:buffer.total_count)
+            
+            # If its within the buffer replace the element
+            if j <= capacity(buffer)
+                for k in keys(buffer)
+                    bslice(buffer[k], j:j) .= element[k]
+                end
+            end
+        end
+    end
+end
+
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     for i = 1:length(I)
         val = v[i] + eps(Float32)
@@ -239,6 +271,11 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
 end
 
 function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1, fracs = ones(length(source))./length(source))
+    lens = [length.(source) ...]
+    if any(lens .== 0)
+        fracs[lens .== 0] .= 0
+        fracs ./= sum(fracs)
+    end
     batches = split_batches(capacity(target), fracs)
     for (b, B) in zip(source, batches)
         B == 0 && continue

@@ -1,7 +1,7 @@
 module Crux
     CRUX_WARNINGS = true
     
-    set_crux_warnings(val::Bool) = CRUX_WARNINGS = val
+    set_crux_warnings(val::Bool) = global CRUX_WARNINGS = val
     
     using Random
     using Distributions
@@ -40,7 +40,8 @@ module Crux
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices
+           prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices, 
+           push_reservoir!
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
@@ -50,7 +51,8 @@ module Crux
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
            DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
-           entropy, logpdf, action_space, exploration, layers, actor, critic
+           entropy, logpdf, action_space, exploration, layers, actor, critic,
+           LatentConditionedNetwork
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
@@ -60,13 +62,17 @@ module Crux
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
-           log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error
+           log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error,
+           log_episode_averages, log_experience_sums
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
            find_crossing, plot_jumpstart, directories, plot_peak_performance, 
            plot_learning, plot_cumulative_rewards, plot_steps_to_threshold
     include("analysis.jl")
+    
+    export BatchAdjacentBuffer
+    include("extras/batch_adjacent_buffer.jl")
     
     export DenseSN, ConvSN
     include("extras/spectral_normalization.jl")
@@ -103,8 +109,8 @@ module Crux
     include("model_free/rl/td3.jl")
     include("model_free/rl/sac.jl")
     
-    export TIER, LatentConditionedNetwork
-    include("model_free/rl/tier.jl")
+    # export TIER, LatentConditionedNetwork
+    # include("model_free/rl/tier.jl")
     
     export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
     export mse_action_loss, logpdf_bc_loss, mse_value_loss

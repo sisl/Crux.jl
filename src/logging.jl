@@ -69,3 +69,28 @@ function log_exploration(policy::FirstExplorePolicy; name = "first_explore_on")
     end
 end
 
+
+function log_episode_averages(buffer, keys, period)
+    (;kwargs...) -> begin
+        d = Dict()
+        indices = get_last_N_indices(buffer, period)
+        for k in keys
+            avg_val = sum(buffer[k][indices]) / sum(buffer[:episode_end][indices])
+            d[Symbol(string("avg_", k))] = avg_val
+        end
+        d
+    end
+end
+
+function log_experience_sums(buffer, keys, period)
+    (;kwargs...) -> begin
+        d = Dict()
+        indices = get_last_N_indices(buffer, period)
+        for k in keys
+            avg_val = sum(buffer[k][indices])
+            d[Symbol(string("sum_", k))] = avg_val
+        end
+        d
+    end
+end
+

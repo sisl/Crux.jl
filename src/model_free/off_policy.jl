@@ -9,17 +9,18 @@
     param_optimizers::Dict{Any, TrainingParams} = Dict() # Training parameters for the parameters
     a_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the actor
     c_opt::TrainingParams # Training parameters for the critic
+    post_sample_callback = (D; kwargs...) -> nothing
     post_experience_callback = (buffer) -> nothing
     post_batch_callback = (𝒟; kwargs...) -> nothing
     loop_start_callback = (𝒮) -> nothing # Callback that happens at the beginning of each experience gathering iteration
-    𝒫::NamedTuple = (;) # Parameters of the algorithm
+    𝒫::NamedTuple = (;) # Parameters orequired_f the algorithm
     
     # Off-policy-specific parameters
     target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0) # Function for updating the target network
     target_fn # Target for critic regression with input signature (π⁻, 𝒟, γ; i)
     buffer_size = 1000 # Size of the buffer
     required_columns = Symbol[]
-    buffer::ExperienceBuffer = ExperienceBuffer(S, agent.space, buffer_size, required_columns) # The replay buffer
+    buffer = ExperienceBuffer(S, agent.space, buffer_size, required_columns) # The replay buffer
     buffer_init::Int = max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
     extra_buffers = [] # extra buffers (i.e. for experience replay in continual learning)
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
@@ -91,7 +92,9 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         𝒮.loop_start_callback(𝒮)
         
         # Sample transitions into the replay buffer
-        push!(𝒮.buffer, steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i))
+        D = steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i)
+        𝒮.post_sample_callback(D, 𝒮=𝒮)
+        push!(𝒮.buffer, D)
         
         # callback for potentially updating the buffer
         𝒮.post_experience_callback(𝒮.buffer) 
@@ -105,6 +108,4 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π
 end
-
-
 

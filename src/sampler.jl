@@ -21,7 +21,7 @@ Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=Pol
 Sampler(mdp, agent::T; kwargs...) where {T <: PolicyParams} = Sampler(;mdp=mdp, agent=agent, kwargs...)
 
 # Construct a vector of samplers from a vector of mdps
-Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
 Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)

@@ -184,6 +184,29 @@ actor(π::AC) where AC<:ActorCritic = π.A
 critic(π::AC) where AC<:ActorCritic = π.C
 
 
+## Network for concatentaing a latent vector to states
+mutable struct LatentConditionedNetwork <: NetworkPolicy
+    policy
+    z
+end
+
+device(π::LatentConditionedNetwork) = device(π.policy)
+
+Flux.@functor LatentConditionedNetwork 
+
+Flux.trainable(π::LatentConditionedNetwork) = Flux.trainable(π.policy)
+
+layers(π::LatentConditionedNetwork) = layers(π.policy)
+
+POMDPs.action(π::LatentConditionedNetwork, s) = action(π.policy, vcat(s, π.z))
+POMDPs.value(π::LatentConditionedNetwork, s, args...) = value(π.policy, vcat(s, π.z), args...)
+
+action_space(π::LatentConditionedNetwork) = action_space(π.policy)
+actor(π::LatentConditionedNetwork) = actor(π.policy)
+critic(π::LatentConditionedNetwork) = critic(π.policy)
+
+
+
 ## Gaussian Policy
 mutable struct GaussianPolicy <: NetworkPolicy
     μ::ContinuousNetwork

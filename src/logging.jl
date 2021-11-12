@@ -70,7 +70,7 @@ function log_exploration(policy::FirstExplorePolicy; name = "first_explore_on")
 end
 
 
-function log_episode_averages(buffer, keys, period)
+function log_episode_averages(buffer::ExperienceBuffer, keys, period)
     (;kwargs...) -> begin
         d = Dict()
         indices = get_last_N_indices(buffer, period)

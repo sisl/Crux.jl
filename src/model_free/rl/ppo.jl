@@ -44,7 +44,10 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
     p_loss = -mean(min.(r .* A, clamp.(r, (1f0 - 𝒫[:ϵ]), (1f0 + 𝒫[:ϵ])) .* A))
     e_loss = -mean(entropy(π, 𝒟[:s]))
     
-    penalty = ignore(() -> Flux.softplus(𝒫[:penalty_param][1])) 
+    penalty = ignore() do
+        𝒫[:penalty_param][1] = clamp(𝒫[:penalty_param][1], -7, 10)
+        Flux.softplus(𝒫[:penalty_param][1])
+    end
     cost_loss = (penalty /  (1+penalty)) * mean(r .* 𝒟[:cost_advantage])
     
     # Log useful information

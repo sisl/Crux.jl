@@ -111,7 +111,8 @@ function clear!(b::ExperienceBuffer)
 end 
 
 function Base.hcat(buffers::ExperienceBuffer...; kwargs...)
-    data = Dict(k=>typeof(v)(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
+    T(v) = v isa SubArray ? Array{typeof(v[1])} : typeof(v)
+    data = Dict(k=>T(v)(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
     for b in buffers[1:end]
         @assert keys(data) == keys(b)
         for k in keys(b)
@@ -153,6 +154,14 @@ function normalize!(b::ExperienceBuffer, S::AbstractSpace, A::AbstractSpace)
     b
 end
 
+function get_episodes(b::ExperienceBuffer, episodes)
+    mbs = []
+    for e in episodes
+        push!(mbs, ExperienceBuffer(minibatch(b, collect(e[1]:e[2]))))
+    end
+    hcat(mbs...)
+end
+
 function trim!(b::ExperienceBuffer, range)
     for k in keys(b)
         b.data[k] = bslice(b.data[k], range)
@@ -188,17 +197,27 @@ device(b::Dict{Symbol, CuArray}) = gpu
 device(b::ExperienceBuffer{Array}) = cpu
 device(b::Dict{Symbol, Array}) = cpu
 
-function episodes(b::ExperienceBuffer)
+function episodes(b::ExperienceBuffer, use_done=false, episode_checker=nothing)
     if haskey(b, :episode_end)
         ep_ends = findall(b[:episode_end][1,:])
         ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
     elseif haskey(b, :t)
         ep_starts = findall(b[:t][1,:] .== 1)
         ep_ends = [ep_starts[2:end] .- 1 ..., length(b)]
+    elseif use_done
+        ep_ends = findall(b[:done][1,:])
+        ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
     else
         error("Need :episode_end flag or :t column to determine episodes")
     end
-    zip(ep_starts, ep_ends)
+    
+    # If an episode checker is supplied use it to pull out those that return true
+    if !isnothing(episode_checker)
+        episodes = collect(zip(ep_starts, ep_ends))
+        return episodes[[episode_checker(b, ep) for ep in episodes]]
+    else
+        zip(ep_starts, ep_ends)
+    end 
 end
 
 function get_last_N_indices(b::ExperienceBuffer, N)

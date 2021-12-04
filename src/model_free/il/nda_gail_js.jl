@@ -1,4 +1,3 @@
-using Zygote:ignore
 function NDA_GAIL_JS(;π, 
                        S, 
                        𝒟_demo,
@@ -41,7 +40,6 @@ function NDA_GAIL_JS(;π,
         c = max.(0, r_nda .- r)
         ignore() do
             info["disc_nda_cost"] = sum(c) / sum(𝒟[:episode_end])
-            info["max_cost"] = maximum(c)
         end
         𝒟[:cost] .= c
         

@@ -72,7 +72,7 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
         𝒫[:Jc_prev][1] = 𝒫[:smooth_Jc][1]
         
         # PID update
-        penalty = max(0, 𝒫[:Kp] * 𝒫[:smooth_Δ][1] + 𝒫[:I][1] + 𝒫[:Kd]*∂)
+        penalty = clamp(𝒫[:Kp] * 𝒫[:smooth_Δ][1] + 𝒫[:I][1] + 𝒫[:Kd]*∂, 0, 𝒫[:penalty_max])
         
         info["penalty"] = penalty
         info["cur_cost"] = Jc
@@ -120,6 +120,7 @@ function LagrangePPO(;π::ActorCritic,
      penalty_init = 1f0,
      target_cost = 0.025f0,
      penalty_scale = 1f0,
+     penalty_max = Inf32,
      Ki = 1f-3,
      Kp = 1,
      Kd = 0, 
@@ -135,6 +136,7 @@ function LagrangePPO(;π::ActorCritic,
         penalty_param=Float32[Base.log(exp(penalty_init)-1)], 
         target_cost=target_cost, 
         penalty_scale=penalty_scale,
+        penalty_max=penalty_max,
         I = [0f0],
         Jc_prev = [0f0],
         Ki=Ki,

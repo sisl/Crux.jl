@@ -254,6 +254,7 @@ mutable struct SquashedGaussianPolicy <: NetworkPolicy
     ascale::Float32
     always_stochastic::Bool
     SquashedGaussianPolicy(μ, logΣ, ascale=1f0, always_stochastic=false) = new(μ, logΣ, ascale, always_stochastic)
+    SquashedGaussianPolicy(μ, logΣ::Array, ascale=1f0, always_stochastic=false) = new(μ, ContinuousNetwork(Chain(ConstantLayer(logΣ)), length(logΣ)), ascale, always_stochastic)
 end
 
 Flux.@functor SquashedGaussianPolicy

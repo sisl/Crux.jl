@@ -41,7 +41,7 @@ module Crux
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
            prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices, 
-           push_reservoir!
+           push_reservoir!, get_episodes
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
@@ -113,7 +113,7 @@ module Crux
     # include("model_free/rl/tier.jl")
     
     export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
-    export mse_action_loss, logpdf_bc_loss, mse_value_loss
+    export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
     include("model_free/il/on_policy_gail.jl")
@@ -121,6 +121,7 @@ module Crux
     include("model_free/il/asaf.jl")
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
+    include("model_free/il/nda_gail_js.jl")
     
     export CQL, BatchSAC
     include("model_free/batch/cql.jl")

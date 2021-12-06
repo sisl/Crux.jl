@@ -88,12 +88,13 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     
     # Loop over the desired number of environment interactions
     for 𝒮.i in range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
+		info = Dict()
         # Call the loop start callback function
         𝒮.loop_start_callback(𝒮)
         
         # Sample transitions into the replay buffer
         D = steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i)
-        𝒮.post_sample_callback(D, 𝒮=𝒮)
+        𝒮.post_sample_callback(D, 𝒮=𝒮, info=info)
         push!(𝒮.buffer, D)
         
         # callback for potentially updating the buffer
@@ -103,7 +104,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         infos = train_step(𝒮, 𝒟, γ)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos))
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), info)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π

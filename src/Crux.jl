@@ -21,6 +21,7 @@ module Crux
     using ColorSchemes
     import Images: save
     using Statistics
+    using StatsBase
     using Base.Iterators: partition
     
     extra_functions = Dict()
@@ -95,6 +96,12 @@ module Crux
     export log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
+    export DeepEnsemble, training_loss
+    include("extras/deep_ensembles.jl")
+    
+    export cross_entropy, mcmc
+    include("extras/bayesian_inference.jl")
+    
     export OnPolicySolver, OffPolicySolver, BatchSolver
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
@@ -108,9 +115,6 @@ module Crux
     include("model_free/rl/ddpg.jl")
     include("model_free/rl/td3.jl")
     include("model_free/rl/sac.jl")
-    
-    # export TIER, LatentConditionedNetwork
-    # include("model_free/rl/tier.jl")
     
     export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
     export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS
@@ -126,6 +130,10 @@ module Crux
     export CQL, BatchSAC
     include("model_free/batch/cql.jl")
     include("model_free/batch/sac.jl")
+    
+    export ExperienceReplay, TIER
+    include("model_free/cl/experience_replay.jl")
+    include("model_free/cl/tier.jl")
     
     export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")

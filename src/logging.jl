@@ -12,7 +12,8 @@ end
     use_wandb::Bool = false
     config::Union{Dict, Nothing} = nothing
     project::Union{AbstractString, Nothing} = nothing
-    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project) : TBLogger(dir, tb_increment)
+    entity::Union{AbstractString, Nothing} = nothing
+    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10)]
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing

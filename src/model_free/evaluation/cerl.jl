@@ -84,7 +84,7 @@ end
 ISARL_DQN(;kwargs...) = DQN(;c_loss=td_loss(name=:x_Qavg, a_key=:x), prefix="x_", target_fn=IS_DQN_target)
 ISARL_DDPG(;kwargs...) = DQN(;a_loss=IS_L_KL, c_loss=td_loss(name=:x_Qavg, a_key=:x), prefix="x_", target_fn=IS_Continuous_target, )
 
-function CERL(;𝒮_pro,
+function ISARL(;𝒮_pro,
                𝒮_ant,
                px,
                log::NamedTuple=(;), 

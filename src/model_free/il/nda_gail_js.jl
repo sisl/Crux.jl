@@ -30,6 +30,8 @@ function NDA_GAIL_JS(;π,
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
         r = Base.log.(sigmoid.(D_out) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out) .+ 1f-5)
         ignore() do
+            minval, maxval = extrema(D_out)
+            println("minval: $minval, maxval: $maxval")
             info["disc_reward"] = mean(r)
         end
         𝒟[discriminator_signal] .= r 

@@ -1,10 +1,19 @@
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
+function log_value(logger::WBLogger, name::AbstractString, value::Real; step=0)
+    info_dict = Dict(string(name) => value)
+    wandb.log(info_dict, step=step)
+end
+
 @with_kw mutable struct LoggerParams
     dir::String = "log/"
     period::Int64 = 500
-    logger = TBLogger(dir, tb_increment)
+    use_wandb::Bool = false
+    config::Union{Dict, Nothing} = nothing
+    project::Union{AbstractString, Nothing} = nothing
+    entity::Union{AbstractString, Nothing} = nothing
+    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10)]
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing

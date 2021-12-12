@@ -1,7 +1,7 @@
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
-function log_value(logger::WBLogger, name::AbstractString, value::Real; step=0)
+function TensorBoardLogger.log_value(logger::WBLogger, name::AbstractString, value::Real; step=0)
     info_dict = Dict(string(name) => value)
     wandb.log(info_dict, step=step)
 end

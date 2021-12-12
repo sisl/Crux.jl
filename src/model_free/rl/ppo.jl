@@ -23,7 +23,8 @@ function PPO(;π::ActorCritic,
      target_kl = 0.012f0,
      a_opt::NamedTuple=(;), 
      c_opt::NamedTuple=(;), 
-     log::NamedTuple=(;), 
+     log::NamedTuple=(;),
+     required_columns=[],
      kwargs...)
      
      OnPolicySolver(;agent=PolicyParams(π),
@@ -32,6 +33,7 @@ function PPO(;π::ActorCritic,
                     a_opt = TrainingParams(;loss = ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > target_kl), name = "actor_", a_opt...),
                     c_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
                     post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+                    required_columns = unique([required_columns..., :return, :logprob, :advantage]),
                     kwargs...)
 end
 
@@ -76,12 +78,9 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
         
         info["penalty"] = penalty
         info["cur_cost"] = Jc
-        info["smooth_delta"] = 𝒫[:smooth_Δ][1]
+        info["prop_term"] = 𝒫[:Kp] * 𝒫[:smooth_Δ][1]
         info["deriv_term"] = ∂
-        info["Kd"] = 𝒫[:Kd]
-        info["Kp"] = 𝒫[:Kp]
         info["integral term"] = 𝒫[:I][1]
-        
         
         penalty
     end
@@ -94,20 +93,10 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
         info[:entropy] = -e_loss
         info[:kl] = mean(𝒟[:logprob] .- new_probs)
         info[:clip_fraction] = sum((r .> 1 + 𝒫[:ϵ]) .| (r .< 1 - 𝒫[:ϵ])) / length(r)
+        info["p_loss"] = 𝒫[:λp]*p_loss
+        info["cost_loss"] = cost_loss
     end 
     (𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss + cost_loss) / (1 + penalty)
-end
-
-function lagrange_ppo_penalty_loss(π, 𝒫, 𝒟; info = Dict())
-    penalty = Flux.softplus(𝒫[:penalty_param][1])
-    cur_cost = mean(𝒟[:cost])
-    
-    ignore() do
-        info["penalty"] = penalty
-        info["cur_cost"] = cur_cost
-    end
-    
-    -penalty * 𝒫[:penalty_scale] * (cur_cost - 𝒫[:target_cost])
 end
 
 function LagrangePPO(;π::ActorCritic,
@@ -117,7 +106,6 @@ function LagrangePPO(;π::ActorCritic,
      λe::Float32 = 0f0,
      λ_gae = 0.95f0,
      target_kl = 0.012f0,
-     penalty_init = 1f0,
      target_cost = 0.025f0,
      penalty_scale = 1f0,
      penalty_max = Inf32,
@@ -127,13 +115,12 @@ function LagrangePPO(;π::ActorCritic,
      ema_α = 0.95,    
      a_opt::NamedTuple=(;), 
      c_opt::NamedTuple=(;), 
-     penalty_opt::NamedTuple=(;),
      cost_opt::NamedTuple=(;),
      log::NamedTuple=(;), 
+     required_columns=[],
      kwargs...)
      
-     𝒫=(ϵ=ϵ, λp=λp, λe=λe, 
-        penalty_param=Float32[Base.log(exp(penalty_init)-1)], 
+     𝒫=(ϵ=ϵ, λp=λp, λe=λe,
         target_cost=target_cost, 
         penalty_scale=penalty_scale,
         penalty_max=penalty_max,
@@ -151,11 +138,10 @@ function LagrangePPO(;π::ActorCritic,
                     𝒫=𝒫,
                     Vc=Vc,
                     log = LoggerParams(;dir = "log/lagrange_ppo", log...),
-                    # param_optimizers = Dict(Flux.params(𝒫[:penalty_param]) => TrainingParams(;loss=lagrange_ppo_penalty_loss, name="penalty_", penalty_opt...)),
                     a_opt = TrainingParams(;loss = lagrange_ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > target_kl), name = "actor_", a_opt...),
                     c_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
                     cost_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:cost_return]), name = "cost_critic_", cost_opt...),
-                    required_columns = [:return, :advantage, :logprob, :cost_advantage, :cost, :cost_return],
+                    required_columns = unique([required_columns..., :return, :advantage, :logprob, :cost_advantage, :cost, :cost_return]),
                     post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
                     kwargs...)
 end

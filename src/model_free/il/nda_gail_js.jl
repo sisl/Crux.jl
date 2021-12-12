@@ -31,7 +31,6 @@ function NDA_GAIL_JS(;π,
         r = Base.log.(sigmoid.(D_out) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out) .+ 1f-5)
         ignore() do
             minval, maxval = extrema(D_out)
-            println("minval: $minval, maxval: $maxval")
             info["disc_reward"] = mean(r)
         end
         𝒟[discriminator_signal] .= r 

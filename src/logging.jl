@@ -15,6 +15,7 @@ end
     entity::Union{AbstractString, Nothing} = nothing
     logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10)]
+    writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing
 end
@@ -23,6 +24,15 @@ Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 
 #Note that i can be an int or a unitrange
 function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
+    
+    # Write things to disc
+    if p.logger isa TBLogger
+        for (period, fn) in p.writeout
+            elapsed(i, period) && fn(i=i, s=p.sampler, dir=p.logger.logdir)
+        end
+    end
+    
+    # Save other run information
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
@@ -100,6 +110,15 @@ function log_experience_sums(buffer, keys, period)
             d[Symbol(string("sum_", k))] = avg_val
         end
         d
+    end
+end
+
+function save_gif(;Neps=1, base_name="demo", log_at_zero = false)
+    (;i, s, dir) -> begin
+        !log_at_zero && i==0 && return
+        filename = string(dir,"/", base_name, "_$i.gif")
+        @info "writing gif to $filename"
+        Crux.gif(s.mdp, s.agent.π, filename, Neps=Neps)
     end
 end
 

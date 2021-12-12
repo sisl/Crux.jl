@@ -65,7 +65,7 @@ module Crux
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
            log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error,
-           log_episode_averages, log_experience_sums
+           log_episode_averages, log_experience_sums, save_gif
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
@@ -79,7 +79,7 @@ module Crux
     export DenseSN, ConvSN
     include("extras/spectral_normalization.jl")
     
-    export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ
+    export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ, GANLosses
     include("extras/gans.jl")
     
     export gradient_penalty

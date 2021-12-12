@@ -13,7 +13,7 @@
     
     # On-policy-specific parameters
     λ_gae::Float32 = 0.95 # Generalized advantage estimation parameter
-    required_columns = isnothing(c_opt) ? [:return, :logprob] : [:return, :advantage, :logprob] # Extra data columns to store
+    required_columns = Symbol[]# Extra data columns to store
     post_batch_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling a batch
     loop_start_callback = (𝒮) -> nothing # Callback that happens at the beginning of each experience gathering iteration
     

@@ -26,14 +26,15 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :a => ArrayType(fill(zero(type(A)), dim(A)..., capacity)), 
         :sp => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
         :r => ArrayType(fill(zero(R), 1, capacity)), 
-        :done => ArrayType(fill(zero(D), 1, capacity))
+        :done => ArrayType(fill(zero(D), 1, capacity)),
+        :episode_end => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
         if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
-        elseif k in [:episode_end, :fail]
+        elseif k in [:fail]
             data[k] = ArrayType(fill(false, 1, capacity))
         elseif k in [:t, :i]
             data[k] = ArrayType(fill(0, 1, capacity))
@@ -180,7 +181,7 @@ Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elemen
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
 
-extra_columns(b::ExperienceBuffer) = collect(setdiff(keys(b), [:s, :a, :sp, :r, :done]))
+extra_columns(b::ExperienceBuffer) = collect(setdiff(keys(b), [:s, :a, :sp, :r, :done, :episode_end]))
 
 Base.first(b::ExperienceBuffer) = first(b.data)
 

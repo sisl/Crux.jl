@@ -13,12 +13,14 @@ end
 # Build a REINFORCE solver
 function REINFORCE(;π,
                     a_opt::NamedTuple=(;), 
-                    log::NamedTuple=(;), 
+                    log::NamedTuple=(;),
+                    required_columns=[],
                     kwargs...)
                     
     OnPolicySolver(;agent=PolicyParams(π),
                     log = LoggerParams(;dir = "log/reinforce", log...),
                     a_opt = TrainingParams(;loss = reinforce_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
+                    required_columns = unique([required_columns..., :return, :logprob]),
                     kwargs...)
 end
         

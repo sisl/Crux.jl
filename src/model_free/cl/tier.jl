@@ -59,7 +59,7 @@ function TIER(;π,
                zprior=MvNormal(zeros(latent_dim), I),
                kwargs...)
                
-    required_columns = [:episode_end, :weight, required_columns...]
+    required_columns = unique([:episode_end, :weight, required_columns...])
     buffer = ExperienceBuffer(S, A, buffer_size, required_columns)
     buffer.data[:z] = zeros(Float32, latent_dim, capacity(buffer))
       

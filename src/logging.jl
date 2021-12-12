@@ -113,12 +113,12 @@ function log_experience_sums(buffer, keys, period)
     end
 end
 
-function save_gif(;Neps=1, base_name="demo", log_at_zero = false)
+function save_gif(;Neps=1, max_steps=100, base_name="demo", log_at_zero = false)
     (;i, s, dir) -> begin
         !log_at_zero && i==0 && return
         filename = string(dir,"/", base_name, "_$i.gif")
         @info "writing gif to $filename"
-        Crux.gif(s.mdp, s.agent.π, filename, Neps=Neps)
+        Crux.gif(s.mdp, s.agent.π, filename, Neps=Neps, max_steps=max_steps)
     end
 end
 

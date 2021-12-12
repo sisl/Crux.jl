@@ -28,7 +28,7 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     # Write things to disc
     if p.logger isa TBLogger
         for (period, fn) in p.writeout
-            elapsed(i, period) && fn(i=i, s=p.sampler, dir=p.logger.logdir)
+            elapsed(i, period) && fn(i=i[end], s=p.sampler, dir=p.logger.logdir)
         end
     end
     

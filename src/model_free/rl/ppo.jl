@@ -60,7 +60,7 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
         Δ = Jc - 𝒫[:target_cost]
         
         # Update integral term
-        𝒫[:I][1] = max(0, 𝒫[:I][1] + 𝒫[:Ki]*Δ)
+        𝒫[:I][1] = clamp(𝒫[:I][1] + 𝒫[:Ki]*Δ, 0, 𝒫[:Ki_max])
         
         # Smooth out the values
         α = 𝒫[:ema_α]
@@ -109,6 +109,7 @@ function LagrangePPO(;π::ActorCritic,
      target_cost = 0.025f0,
      penalty_scale = 1f0,
      penalty_max = Inf32,
+     Ki_max = 10f0,
      Ki = 1f-3,
      Kp = 1,
      Kd = 0, 
@@ -124,6 +125,7 @@ function LagrangePPO(;π::ActorCritic,
         target_cost=target_cost, 
         penalty_scale=penalty_scale,
         penalty_max=penalty_max,
+        Ki_max=Ki_max,
         I = [0f0],
         Jc_prev = [0f0],
         Ki=Ki,

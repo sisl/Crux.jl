@@ -6,7 +6,7 @@
     S::T1 = state_space(initial_observation(mdp, s)) # State space
     svec::AbstractArray = tovec(initial_observation(mdp, s), S) # Current observation
     max_steps::Int = 100
-    required_columns::Array{Symbol} = !isnothing(adversary) ? [:x] : []
+    required_columns::Array{Symbol} = []
     γ::Float32 = discount(mdp)
     λ::Float32 = NaN32
     episode_length::Int64 = 0
@@ -21,7 +21,7 @@ Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=Pol
 Sampler(mdp, agent::T; kwargs...) where {T <: PolicyParams} = Sampler(;mdp=mdp, agent=agent, kwargs...)
 
 # Construct a vector of samplers from a vector of mdps
-Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
+Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
 Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)
@@ -39,7 +39,7 @@ function initial_observation(mdp, s)
 end
 
 function terminate_episode!(sampler::Sampler, data, j)
-    haskey(data, :episode_end) && (data[:episode_end][1,j] = true)
+    data[:episode_end][1,j] = true
     ep = j - sampler.episode_length + 1 : j
     haskey(data, :advantage) && fill_gae!(data, ep, sampler.agent.π, sampler.λ, sampler.γ)
     haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
@@ -103,7 +103,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
 end
 
 function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, return_episodes=false, return_at_episode_end=false)
-    data = mdp_data(sampler.S, sampler.agent.space, Nsteps, return_episodes ? [sampler.required_columns..., :episode_end] : sampler.required_columns)
+    data = mdp_data(sampler.S, sampler.agent.space, Nsteps, sampler.required_columns)
     for j=1:Nsteps
         step!(data, j, sampler, explore=explore, i=i + (j-1))
         if return_at_episode_end && sampler.episode_length == 0 
@@ -116,7 +116,7 @@ function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, r
 end
 
 function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, reset = false, return_episodes = false) where {T<:Sampler}
-    data = mdp_data(samplers[1].S, samplers[1].agent.space, Nsteps*length(samplers), return_episodes ? [samplers[1].required_columns..., :episode_end] : samplers[1].required_columns)
+    data = mdp_data(samplers[1].S, samplers[1].agent.space, Nsteps*length(samplers), samplers[1].required_columns)
     j = 1
     for s=1:Nsteps
         for sampler in samplers

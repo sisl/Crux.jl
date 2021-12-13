@@ -1,7 +1,7 @@
 module Crux
     CRUX_WARNINGS = true
     
-    set_crux_warnings(val::Bool) = CRUX_WARNINGS = val
+    set_crux_warnings(val::Bool) = global CRUX_WARNINGS = val
     
     using Random
     using Distributions
@@ -21,7 +21,9 @@ module Crux
     using ColorSchemes
     import Images: save
     using Statistics
+    using StatsBase
     using Base.Iterators: partition
+    using WeightsAndBiasLogger
     
     extra_functions = Dict()
     function set_function(key, val)
@@ -40,7 +42,8 @@ module Crux
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
            clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
-           prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices
+           prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices, 
+           push_reservoir!, get_episodes
     include("experience_buffer.jl")
     
     export TrainingParams, batch_train!
@@ -50,7 +53,8 @@ module Crux
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
            DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
-           entropy, logpdf, action_space, exploration, layers, actor, critic
+           entropy, logpdf, action_space, exploration, layers, actor, critic,
+           LatentConditionedNetwork
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
@@ -60,7 +64,8 @@ module Crux
     
     export elapsed, LoggerParams, aggregate_info, log_performance, 
            log_discounted_return, log_undiscounted_return, log_failure, 
-           log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error
+           log_exploration, log_metric_by_key, log_metrics_by_key, log_validation_error,
+           log_episode_averages, log_experience_sums, save_gif
     include("logging.jl")
     
     export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
@@ -68,10 +73,13 @@ module Crux
            plot_learning, plot_cumulative_rewards, plot_steps_to_threshold
     include("analysis.jl")
     
+    export BatchAdjacentBuffer
+    include("extras/batch_adjacent_buffer.jl")
+    
     export DenseSN, ConvSN
     include("extras/spectral_normalization.jl")
     
-    export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ
+    export GAN_BCELoss, GAN_LSLoss, GAN_HingeLoss, GAN_WLossGP, GAN_WLoss, Lᴰ, Lᴳ, GANLosses
     include("extras/gans.jl")
     
     export gradient_penalty
@@ -89,6 +97,12 @@ module Crux
     export log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
+    export DeepEnsemble, training_loss
+    include("extras/deep_ensembles.jl")
+    
+    export cross_entropy, mcmc
+    include("extras/bayesian_inference.jl")
+    
     export OnPolicySolver, OffPolicySolver, BatchSolver
     include("model_free/on_policy.jl")
     include("model_free/off_policy.jl")
@@ -103,11 +117,8 @@ module Crux
     include("model_free/rl/td3.jl")
     include("model_free/rl/sac.jl")
     
-    export TIER, LatentConditionedNetwork
-    include("model_free/rl/tier.jl")
-    
     export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
-    export mse_action_loss, logpdf_bc_loss, mse_value_loss
+    export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
     include("model_free/il/on_policy_gail.jl")
@@ -115,10 +126,15 @@ module Crux
     include("model_free/il/asaf.jl")
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
+    include("model_free/il/nda_gail_js.jl")
     
     export CQL, BatchSAC
     include("model_free/batch/cql.jl")
     include("model_free/batch/sac.jl")
+    
+    export ExperienceReplay, TIER
+    include("model_free/cl/experience_replay.jl")
+    include("model_free/cl/tier.jl")
     
     export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")

@@ -26,14 +26,15 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :a => ArrayType(fill(zero(type(A)), dim(A)..., capacity)), 
         :sp => ArrayType(fill(zero(type(S)), dim(S)..., capacity)), 
         :r => ArrayType(fill(zero(R), 1, capacity)), 
-        :done => ArrayType(fill(zero(D), 1, capacity))
+        :done => ArrayType(fill(zero(D), 1, capacity)),
+        :episode_end => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return]
+        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
-        elseif k in [:episode_end, :fail]
+        elseif k in [:fail]
             data[k] = ArrayType(fill(false, 1, capacity))
         elseif k in [:t, :i]
             data[k] = ArrayType(fill(0, 1, capacity))
@@ -67,6 +68,7 @@ PriorityParams(N::Int, pp::PriorityParams) = PriorityParams(N, α=pp.α, β=pp.�
     next_ind::Int64
     indices::Vector{Int}
     priority_params::Union{Nothing, PriorityParams}
+    total_count::Int
 end
 
 function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_ind=1, indices=[], prioritized::Bool=false, priority_params::NamedTuple=(;)) where {T <: AbstractArray}
@@ -75,7 +77,7 @@ function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_i
         !haskey(data, :weight) && (data[:weight] = device(data)((ones(Float32, 1, capacity(data)))))
         pp = PriorityParams(capacity(data); priority_params...)
     end
-    ExperienceBuffer(data, elements, next_ind, indices, pp)
+    ExperienceBuffer(data, elements, next_ind, indices, pp, elements)
 end
 
 function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol}=Symbol[]; device=cpu, 
@@ -87,29 +89,31 @@ end
 
 function buffer_like(b::ExperienceBuffer; capacity=capacity(b), device=device(b))
     data = Dict(k=>device(Array{eltype(v)}(undef, size(v)[1:end-1]..., capacity)) for (k,v) in b.data)
-    ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing)
+    ExperienceBuffer(data, 0, 1, Int[], isprioritized(b) ? PriorityParams(capacity, b.priority_params) : nothing, 0)
 end
 
 function Flux.gpu(b::ExperienceBuffer)
     data = Dict{Symbol, CuArray}(k => v |> gpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params, b.total_count)
 end
 
 function Flux.cpu(b::ExperienceBuffer)
     data = Dict{Symbol, Array}(k => v |> cpu for (k,v) in b.data)
-    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params)
+    ExperienceBuffer(data, b.elements, b.next_ind, b.indices, b.priority_params, b.total_count)
 end
 
 function clear!(b::ExperienceBuffer)
     b.elements = 0
     b.next_ind = 1
     b.indices = Int[]
+    b.total_count = 0
     isprioritized(b) && (b.priority_params = PriorityParams(capacity(b), b.priority_params))
     b
 end 
 
 function Base.hcat(buffers::ExperienceBuffer...; kwargs...)
-    data = Dict(k=>typeof(v)(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
+    T(v) = v isa SubArray ? Array{typeof(v[1])} : typeof(v)
+    data = Dict(k=>T(v)(undef, size(v)[1:end-1]...,0) for (k,v) in buffers[1].data)
     for b in buffers[1:end]
         @assert keys(data) == keys(b)
         for k in keys(b)
@@ -151,6 +155,14 @@ function normalize!(b::ExperienceBuffer, S::AbstractSpace, A::AbstractSpace)
     b
 end
 
+function get_episodes(b::ExperienceBuffer, episodes)
+    mbs = []
+    for e in episodes
+        push!(mbs, ExperienceBuffer(minibatch(b, collect(e[1]:e[2]))))
+    end
+    hcat(mbs...)
+end
+
 function trim!(b::ExperienceBuffer, range)
     for k in keys(b)
         b.data[k] = bslice(b.data[k], range)
@@ -169,7 +181,7 @@ Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elemen
 
 Base.keys(b::ExperienceBuffer) = keys(b.data)
 
-extra_columns(b::ExperienceBuffer) = collect(setdiff(keys(b), [:s, :a, :sp, :r, :done]))
+extra_columns(b::ExperienceBuffer) = collect(setdiff(keys(b), [:s, :a, :sp, :r, :done, :episode_end]))
 
 Base.first(b::ExperienceBuffer) = first(b.data)
 
@@ -186,17 +198,27 @@ device(b::Dict{Symbol, CuArray}) = gpu
 device(b::ExperienceBuffer{Array}) = cpu
 device(b::Dict{Symbol, Array}) = cpu
 
-function episodes(b::ExperienceBuffer)
+function episodes(b::ExperienceBuffer, use_done=false, episode_checker=nothing)
     if haskey(b, :episode_end)
         ep_ends = findall(b[:episode_end][1,:])
         ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
     elseif haskey(b, :t)
         ep_starts = findall(b[:t][1,:] .== 1)
         ep_ends = [ep_starts[2:end] .- 1 ..., length(b)]
+    elseif use_done
+        ep_ends = findall(b[:done][1,:])
+        ep_starts = [1, ep_ends[1:end-1] .+ 1 ...]
     else
         error("Need :episode_end flag or :t column to determine episodes")
     end
-    zip(ep_starts, ep_ends)
+    
+    # If an episode checker is supplied use it to pull out those that return true
+    if !isnothing(episode_checker)
+        episodes = collect(zip(ep_starts, ep_ends))
+        return episodes[[episode_checker(b, ep) for ep in episodes]]
+    else
+        zip(ep_starts, ep_ends)
+    end 
 end
 
 function get_last_N_indices(b::ExperienceBuffer, N)
@@ -211,6 +233,7 @@ end
 function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     ids = isnothing(ids) ? UnitRange(1, size(data[first(keys(data))], 2)) : ids
     N, C = length(ids), capacity(b)
+    b.total_count += N
     I = mod1.(b.next_ind:b.next_ind + N - 1, C)
     for k in keys(b)
         if !haskey(data, k)
@@ -229,6 +252,35 @@ function Base.push!(b::ExperienceBuffer, data; ids = nothing)
     I
 end
 
+
+function push_reservoir!(buffer, data; weighted=false)
+    N = capacity(data)
+    for i=1:N
+        element = Dict(k => bslice(v, i:i) for (k,v) in data)
+        
+        # Only add samples according to their weight
+        if weighted && haskey(element, :weight) && rand() > element[:weight][1]
+            continue
+        end
+        
+        buffer.total_count += 1
+        # Add the element to the buffer and return if we haven't hit our max
+        if length(buffer) < capacity(buffer)
+            push!(buffer, element)
+        else
+            # Choose a random number up to count
+            j = rand(1:buffer.total_count)
+            
+            # If its within the buffer replace the element
+            if j <= capacity(buffer)
+                for k in keys(buffer)
+                    bslice(buffer[k], j:j) .= element[k]
+                end
+            end
+        end
+    end
+end
+
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     for i = 1:length(I)
         val = v[i] + eps(Float32)
@@ -239,6 +291,11 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
 end
 
 function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1, fracs = ones(length(source))./length(source))
+    lens = [length.(source) ...]
+    if any(lens .== 0)
+        fracs[lens .== 0] .= 0
+        fracs ./= sum(fracs)
+    end
     batches = split_batches(capacity(target), fracs)
     for (b, B) in zip(source, batches)
         B == 0 && continue

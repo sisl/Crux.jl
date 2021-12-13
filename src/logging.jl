@@ -1,11 +1,21 @@
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
+function TensorBoardLogger.log_value(logger::WBLogger, name::AbstractString, value::Real; step=0)
+    info_dict = Dict(string(name) => value)
+    wandb.log(info_dict, step=step)
+end
+
 @with_kw mutable struct LoggerParams
     dir::String = "log/"
     period::Int64 = 500
-    logger = TBLogger(dir, tb_increment)
+    use_wandb::Bool = false
+    config::Union{Dict, Nothing} = nothing
+    project::Union{AbstractString, Nothing} = nothing
+    entity::Union{AbstractString, Nothing} = nothing
+    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10)]
+    writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing
 end
@@ -14,6 +24,15 @@ Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 
 #Note that i can be an int or a unitrange
 function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
+    
+    # Write things to disc
+    if p.logger isa TBLogger
+        for (period, fn) in p.writeout
+            elapsed(i, period) && fn(i=i[end], s=p.sampler, dir=p.logger.logdir)
+        end
+    end
+    
+    # Save other run information
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
@@ -66,6 +85,40 @@ function log_exploration(policy::FirstExplorePolicy; name = "first_explore_on")
         d = Dict{String, Any}(name => i < policy.N)
         !isnothing(policy.after_policy) && merge!(d, log_exploration(policy.after_policy)(;i=1,kwargs...))
         d
+    end
+end
+
+
+function log_episode_averages(buffer::ExperienceBuffer, keys, period)
+    (;kwargs...) -> begin
+        d = Dict()
+        indices = get_last_N_indices(buffer, period)
+        for k in keys
+            avg_val = sum(buffer[k][indices]) / sum(buffer[:episode_end][indices])
+            d[Symbol(string("avg_", k))] = avg_val
+        end
+        d
+    end
+end
+
+function log_experience_sums(buffer, keys, period)
+    (;kwargs...) -> begin
+        d = Dict()
+        indices = get_last_N_indices(buffer, period)
+        for k in keys
+            avg_val = sum(buffer[k][indices])
+            d[Symbol(string("sum_", k))] = avg_val
+        end
+        d
+    end
+end
+
+function save_gif(;base_name="demo", log_at_zero = false, kwargs...)
+    (;i, s, dir) -> begin
+        !log_at_zero && i==0 && return
+        filename = string(dir,"/", base_name, "_$i.gif")
+        @info "writing gif to $filename"
+        Crux.gif(s.mdp, s.agent.π, filename; kwargs...)
     end
 end
 

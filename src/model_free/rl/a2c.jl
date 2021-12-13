@@ -17,7 +17,9 @@ function A2C(;π::ActorCritic,
               c_opt::NamedTuple=(;), 
               log::NamedTuple=(;), 
               λp::Float32=1f0, 
-              λe::Float32=0.1f0, kwargs...)
+              λe::Float32=0.1f0, 
+              required_columns=[],
+              kwargs...)
               
     OnPolicySolver(;agent=PolicyParams(π),
                     𝒫=(λp=λp, λe=λe),
@@ -25,6 +27,7 @@ function A2C(;π::ActorCritic,
                     a_opt=TrainingParams(;loss=a2c_loss, early_stopping = (infos) -> (infos[end][:kl] > 0.015), name = "actor_", a_opt...),
                     c_opt=TrainingParams(;loss=(π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
                     post_batch_callback=(𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+                    required_columns = unique([required_columns..., :return, :logprob, :advantage]),
                     kwargs...)
 end
         

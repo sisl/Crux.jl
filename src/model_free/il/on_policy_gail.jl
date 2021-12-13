@@ -25,9 +25,13 @@ function OnPolicyGAIL(;π,
         discriminator_signal = haskey(𝒟, :advantage) ? :advantage : :return
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
         r = Base.log.(sigmoid.(D_out) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out) .+ 1f-5)
+        ignore() do
+            info["disc_reward"] = mean(r)
+        end
         𝒟[discriminator_signal] .= r 
     end
     𝒮 = solver(;π=π, S=S, post_batch_callback=GAIL_callback, log=(dir="log/onpolicygail", period=500, log...), kwargs...)
     𝒮.c_opt = nothing # disable the critic 
     𝒮
 end
+

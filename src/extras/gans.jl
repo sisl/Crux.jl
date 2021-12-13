@@ -42,3 +42,4 @@ end
 Lᴳ(t::GAN_WLossGP, G, D, z; yG = ()) = -mean(D(vcat(G(vcat(z, yG...)), yG...))) 
 
 
+GANLosses = Dict("BCE" => GAN_BCELoss(), "LS" => GAN_LSLoss(), "Hinge" => GAN_HingeLoss(), "W" => GAN_WLoss(), "WGP" => GAN_WLossGP())

@@ -237,6 +237,20 @@ for k in keys(b)
     @test b[k][:, 1:4] == b[k][:, 5:8]
 end
 
+
+## Reservoir storage
+b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4), 10,)
+d3 = Dict(:s => 3*ones(2,3), :a => rand(4,3) .< 0.5, :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3), :weight=>zeros(1,3))
+d1 = Dict(:s => 2*ones(2,1), :a => ones(Bool, 4,1), :sp => ones(2,1), :r => ones(1,1), :done => zeros(1,1), :weight=>zeros(1,1))
+
+for i=1:10
+    push_reservoir!(b, d1)
+    @test length(b) == i
+end
+
+push_reservoir!(b, d3)
+
+
 ## clear!
 bcopy = deepcopy(b)
 clear!(bcopy)

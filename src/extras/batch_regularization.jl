@@ -16,14 +16,19 @@ end
 
 function (R::BatchRegularizer)(π)
     # sample a random batch for each buffer
+    ret0 = false
     ignore() do
-        isnothing(R.𝒟s) && (R.𝒟s = [buffer_like(b, capacity=R.batch_size, device=device(π)) for b in R.buffers])
-        for (𝒟, buffer) in zip(R.𝒟s, R.buffers)
-            rand!(𝒟, buffer)
+        if any([length(b) == 0 for b in R.buffers])
+            ret0 = true
+        else 
+            isnothing(R.𝒟s) && (R.𝒟s = [buffer_like(b, capacity=R.batch_size, device=device(π)) for b in R.buffers])
+            for (𝒟, buffer) in zip(R.𝒟s, R.buffers)
+                rand!(𝒟, buffer)
+            end
         end
     end
 
     # Return the mean
-    R.λ*mean([R.loss(π, 𝒟) for 𝒟 in R.𝒟s])
+    ret0 ? 0f0 : R.λ*mean([R.loss(π, 𝒟) for 𝒟 in R.𝒟s])
 end
 

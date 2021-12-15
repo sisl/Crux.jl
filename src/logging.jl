@@ -13,7 +13,7 @@ end
     config::Union{Dict, Nothing} = nothing
     project::Union{AbstractString, Nothing} = nothing
     entity::Union{AbstractString, Nothing} = nothing
-    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(name=dir, config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
+    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10)]
     writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
@@ -26,10 +26,8 @@ Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     
     # Write things to disc
-    if p.logger isa TBLogger
-        for (period, fn) in p.writeout
-            elapsed(i, period) && fn(i=i[end], s=p.sampler, dir=p.logger.logdir)
-        end
+    for (period, fn) in p.writeout
+        elapsed(i, period) && fn(i=i[end], s=p.sampler, dir=p.dir, logger=p.logger)
     end
     
     # Save other run information
@@ -113,12 +111,19 @@ function log_experience_sums(buffer, keys, period)
     end
 end
 
-function save_gif(;base_name="demo", log_at_zero = false, kwargs...)
-    (;i, s, dir) -> begin
+function save_gif(;base_name="demo", log_at_zero=false, log_wandb=true, append_rand=false, kwargs...)
+    (;i, s, dir, logger) -> begin
         !log_at_zero && i==0 && return
-        filename = string(dir,"/", base_name, "_$i.gif")
+        pref = append_rand ? replace(replace(string(now(), "_"), (":"=>"_")), "-"=>"_") : ""
+        filename = string(dir,"/", pref, base_name, "_$i.gif")
         @info "writing gif to $filename"
         Crux.gif(s.mdp, s.agent.π, filename; kwargs...)
+        
+        if log_wandb && logger isa WBLogger
+            vid = wandb.Video(filename, format="gif")
+            wandb.log(Dict("gif"=>vid))
+            rm(filename)
+        end
     end
 end
 

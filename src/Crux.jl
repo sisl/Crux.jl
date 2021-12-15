@@ -24,6 +24,7 @@ module Crux
     using StatsBase
     using Base.Iterators: partition
     using WeightsAndBiasLogger
+    using Dates
     
     extra_functions = Dict()
     function set_function(key, val)

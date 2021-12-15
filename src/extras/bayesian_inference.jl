@@ -13,12 +13,17 @@ function cross_entropy(f, P; k=1, m=50, m_extra=20, m_elite=m, base_dist=Uniform
         samples = hcat(samples, rand(base_dist, dim, m_extra))
         
         vals = [f(samples[:,i]) for i=1:size(samples,2)]
-        weights = exp.(-vals)
+        weights = softmax(-vals)
         
         
         order = sortperm(vals)
         elite_samples = Float64.(samples[:, order[1:m_elite]])
-        P = fit(MvNormal, elite_samples, weights[order[1:m_elite]])
+        try
+            P = fit(MvNormal, elite_samples, weights[order[1:m_elite]])
+        catch
+            println("weights: ", weights)
+            @error "Error in fitting MVNormal distribution"
+        end
     end
     P
 end

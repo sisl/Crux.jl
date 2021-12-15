@@ -94,12 +94,12 @@ function TIER(;π,
 
     function TIER_cb(D; 𝒮, info=Dict())
         # update the z distribution
-        𝒮.𝒫.z_dist[1] = bayesian_inference(observation_model, D, 𝒮.𝒫.z_dist[1])
+        𝒮.𝒫.z_dist[1] = bayesian_inference(observation_model, D, 𝒮.𝒫.z_dist[1], info=info)
         
         # Set the agent's best estimate and record
         zbest = mean(𝒮.𝒫.z_dist[1])
         𝒮.agent.π.z = zbest
-        push!(𝒮.𝒫[:zs], zbest)
+        push!(𝒮.𝒫[:zs], deepcopy(𝒮.𝒫.z_dist[1]))
         
         # Fill the buffer with latent estimate, value and computed weight
         D[:z] = repeat(zbest, 1, length(D[:r]))

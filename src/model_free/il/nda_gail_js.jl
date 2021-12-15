@@ -9,7 +9,8 @@ function NDA_GAIL_JS(;π,
                        gan_loss::Crux.GANLoss=GAN_BCELoss(), 
                        d_opt::NamedTuple=(;),
                        d_opt_nda::NamedTuple=(;), 
-                       log::NamedTuple=(;),  
+                       log::NamedTuple=(;), 
+                       discriminator_transform=sigmoid, 
                        kwargs...)
                        
     d_opt = TrainingParams(;loss = Crux.GAIL_D_loss(gan_loss), name="discriminator_", d_opt...)
@@ -28,7 +29,7 @@ function NDA_GAIL_JS(;π,
         # Set the reward
         discriminator_signal = haskey(𝒟, :advantage) ? :advantage : :return
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
-        r = Base.log.(sigmoid.(D_out) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out) .+ 1f-5)
+        r = Base.log.(discriminator_transform.(D_out) .+ 1f-5) .- Base.log.(1f0 .- discriminator_transform.(D_out) .+ 1f-5)
         ignore() do
             minval, maxval = extrema(D_out)
             info["disc_reward"] = mean(r)
@@ -37,7 +38,7 @@ function NDA_GAIL_JS(;π,
         
         # Set the cost
         D_out_nda = value(Dnda, 𝒟[:a], 𝒟[:s])
-        r_nda = Base.log.(sigmoid.(D_out_nda) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out_nda) .+ 1f-5)
+        r_nda = Base.log.(discriminator_transform.(D_out_nda) .+ 1f-5) .- Base.log.(1f0 .- discriminator_transform.(D_out_nda) .+ 1f-5)
         c = max.(0, r_nda .- r)
         ignore() do
             info["disc_nda_cost"] = sum(c) / sum(𝒟[:episode_end])

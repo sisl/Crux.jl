@@ -10,6 +10,7 @@
     a_opt::TrainingParams # Training parameters for the actor
     c_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the critic
     𝒫::NamedTuple = (;) # Parameters of the algorithm
+    interaction_storage = nothing # If this is initialized to an array then it will store all interactions
     
     # On-policy-specific parameters
     λ_gae::Float32 = 0.95 # Generalized advantage estimation parameter
@@ -30,7 +31,7 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
     isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
     # Log the pre-train performance
-    log(𝒮.log, 𝒮.i)
+    log(𝒮.log, 𝒮.i, 𝒮=𝒮)
 
     # Loop over the desired number of environment interactions
     for 𝒮.i = range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
@@ -38,7 +39,9 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         𝒮.loop_start_callback(𝒮)
         
         # Sample transitions into the batch buffer
-        push!(𝒟, steps!(s, Nsteps=𝒮.ΔN, reset=true, explore=true, i=𝒮.i))
+        D = steps!(s, Nsteps=𝒮.ΔN, reset=true, explore=true, i=𝒮.i)
+        push!(𝒟, D)
+        !isnothing(𝒮.interaction_storage) && push!(𝒮.interaction_storage, D)
         
         # Info to collect during training
         info = Dict()
@@ -64,7 +67,7 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         end
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info, 𝒮=𝒮)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π

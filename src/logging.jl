@@ -14,7 +14,7 @@ end
     project::Union{AbstractString, Nothing} = nothing
     entity::Union{AbstractString, Nothing} = nothing
     logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
-    fns = Any[log_undiscounted_return(10)]
+    fns = Any[log_undiscounted_return(10), log_episode_averages([:r], period)]
     writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
     sampler::Union{Sampler, Nothing, Vector} = nothing
@@ -23,7 +23,7 @@ end
 Base.log(p::Nothing, i, data...; kwargs...)  = nothing
 
 #Note that i can be an int or a unitrange
-function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
+function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...; 𝒮=nothing)
     
     # Write things to disc
     for (period, fn) in p.writeout
@@ -37,7 +37,7 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...)
     π_explore = (p.sampler isa Vector) ?  first(p.sampler).agent.π_explore : p.sampler.agent.π_explore
         
     for dict in [p.fns..., data..., log_exploration(π_explore)]
-        d = dict isa Function ? dict(s=p.sampler, i=i) : dict
+        d = dict isa Function ? dict(s=p.sampler, i=i, 𝒮=𝒮) : dict
         for (k,v) in d
             p.verbose && print(", ", k, ": ", v)
             log_value(p.logger, string(k), v, step = i)
@@ -87,24 +87,24 @@ function log_exploration(policy::FirstExplorePolicy; name = "first_explore_on")
 end
 
 
-function log_episode_averages(buffer::ExperienceBuffer, keys, period)
-    (;kwargs...) -> begin
+function log_episode_averages(keys, period)
+    (;𝒮, kwargs...) -> begin
         d = Dict()
-        indices = get_last_N_indices(buffer, period)
+        indices = get_last_N_indices(𝒮.buffer, period)
         for k in keys
-            avg_val = sum(buffer[k][indices]) / sum(buffer[:episode_end][indices])
+            avg_val = sum(𝒮.buffer[k][indices]) / sum(𝒮.buffer[:episode_end][indices])
             d[Symbol(string("avg_", k))] = avg_val
         end
         d
     end
 end
 
-function log_experience_sums(buffer, keys, period)
-    (;kwargs...) -> begin
+function log_experience_sums(keys, period)
+    (;𝒮, kwargs...) -> begin
         d = Dict()
-        indices = get_last_N_indices(buffer, period)
+        indices = get_last_N_indices(𝒮.buffer, period)
         for k in keys
-            avg_val = sum(buffer[k][indices])
+            avg_val = sum(𝒮.buffer[k][indices])
             d[Symbol(string("sum_", k))] = avg_val
         end
         d

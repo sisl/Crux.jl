@@ -13,7 +13,8 @@
     post_experience_callback = (buffer) -> nothing
     post_batch_callback = (𝒟; kwargs...) -> nothing
     loop_start_callback = (𝒮) -> nothing # Callback that happens at the beginning of each experience gathering iteration
-    𝒫::NamedTuple = (;) # Parameters orequired_f the algorithm
+    𝒫::NamedTuple = (;) # Parameters of the algorithm
+	interaction_storage = nothing # If this is initialized to an array then it will store all interactions
     
     # Off-policy-specific parameters
     target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0) # Function for updating the target network
@@ -81,7 +82,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
     # Log the pre-train performance
-    log(𝒮.log, 𝒮.i)
+    log(𝒮.log, 𝒮.i, 𝒮=𝒮)
 
     # Fill the buffer with initial observations before training
     𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i=𝒮.i, explore=true)
@@ -96,6 +97,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         D = steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i)
         𝒮.post_sample_callback(D, 𝒮=𝒮, info=info)
         push!(𝒮.buffer, D)
+		!isnothing(𝒮.interaction_storage) && push!(𝒮.interaction_storage, D)
         
         # callback for potentially updating the buffer
         𝒮.post_experience_callback(𝒮.buffer) 
@@ -104,7 +106,7 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         infos = train_step(𝒮, 𝒟, γ)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), info)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), info, 𝒮=𝒮)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π

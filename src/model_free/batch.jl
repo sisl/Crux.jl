@@ -21,7 +21,7 @@ function POMDPs.solve(𝒮::BatchSolver, mdp)
     isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
     
     # Log initial performance
-    log(𝒮.log, 𝒮.epoch)
+    log(𝒮.log, 𝒮.epoch, 𝒮=𝒮)
     
     # Loop over the number of epochs
     infos = []
@@ -59,7 +59,7 @@ function POMDPs.solve(𝒮::BatchSolver, mdp)
             train!(actor(𝒮.agent.π), (;kwargs...)->𝒮.a_opt.loss(𝒮.agent.π, 𝒮.𝒫, mb; kwargs...), 𝒮.a_opt, info=info)
             
             grad_steps += 1
-            log(𝒮.log, grad_steps, info)
+            log(𝒮.log, grad_steps, info, 𝒮=𝒮)
             
             push!(minibatch_infos, info)
         end

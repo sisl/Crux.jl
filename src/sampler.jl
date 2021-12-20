@@ -102,7 +102,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     end
 end
 
-function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, return_episodes=false, return_at_episode_end=false)
+function steps!(sampler::Sampler, buffer=nothing; store=nothing, cb=(kwargs...)->nothing, Nsteps=1, explore=false, i=0, reset=false, return_episodes=false, return_at_episode_end=false)
     data = mdp_data(sampler.S, sampler.agent.space, Nsteps, sampler.required_columns)
     for j=1:Nsteps
         step!(data, j, sampler, explore=explore, i=i + (j-1))
@@ -112,10 +112,15 @@ function steps!(sampler::Sampler; Nsteps = 1, explore=false, i=0, reset=false, r
         end
     end
     reset && terminate_episode!(sampler, data, Nsteps)
+    
+    cb(data) # Run the callback on the dataset before adding it
+    !isnothing(store) && push!(store, data) # add it to the storage array if provided
+    !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer    
+    
     return_episodes ? (data, episodes(data)) : data
 end
 
-function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, reset = false, return_episodes = false) where {T<:Sampler}
+function steps!(samplers::Vector{T}, buffer=nothing; store=nothing, cb=(kwargs...)->nothing, Nsteps=1, explore=false, i=0, reset=false, return_episodes = false) where {T<:Sampler}
     data = mdp_data(samplers[1].S, samplers[1].agent.space, Nsteps*length(samplers), samplers[1].required_columns)
     j = 1
     for s=1:Nsteps
@@ -125,15 +130,19 @@ function steps!(samplers::Vector{T}; Nsteps = 1, explore = false, i = 0, reset =
         end
     end
     reset && terminate_episode!(sampler, data, Nsteps)
+    
+    cb(data) # Run the callback on the dataset before adding it
+    !isnothing(store) && push!(store, data) # add it to the storage array if provided
+    !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer
+    
     return_episodes ? (data, episodes(data)) : data
 end
 
-function episodes!(sampler::Sampler; Neps=1, explore=false, i=0, return_episodes=false)
+function episodes!(sampler::Sampler, buffer=nothing; store=nothing, cb=(kwargs...)->nothing, Neps=1, explore=false, i=0, return_episodes=false)
     reset_sampler!(sampler)
-    data = mdp_data(sampler.S, sampler.agent.space,
-     Neps*sampler.max_steps, sampler.required_columns)
-    episode_starts = zeros(Int, Neps)
-    episode_ends = zeros(Int, Neps)
+    data = mdp_data(sampler.S, sampler.agent.space, Neps*sampler.max_steps, sampler.required_columns)
+    episode_starts, episode_ends = zeros(Int, Neps), zeros(Int, Neps)
+
     j, k = 0, 1
     while k <= Neps
         episode_starts[k] = j+1
@@ -148,14 +157,14 @@ function episodes!(sampler::Sampler; Neps=1, explore=false, i=0, return_episodes
         end
     end
     trim!(data, j)
+    
+    cb(data) # Run the callback on the dataset before adding it
+    !isnothing(store) && push!(store, data) # add it to the storage array if provided
+    !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer
+    
     return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
-function fillto!(b::ExperienceBuffer, s::Union{Sampler, Vector{T}}, N::Int; i=1, explore=false) where {T <: Sampler}
-    Nfill = max(0, N - length(b))
-    Nfill > 0 && push!(b, steps!(s, i=i, Nsteps=Nfill, explore=explore))
-    Nfill
-end
 
 ## metric
 

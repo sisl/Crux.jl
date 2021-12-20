@@ -11,7 +11,7 @@ Lᴳ(t::GAN_BCELoss, G, D, z; yG = ()) = LBCE(D(vcat(G(vcat(z, yG...)), yG...)),
 
 ## Least Squares Loss
 struct GAN_LSLoss <: GANLoss end
-Lᴰ(t::GAN_LSLoss, D, x, xtilde; wD = 1f0, yG = (), yD = ()) = Flux.mse(D(vcat(x, yD...)), wD) + Flux.mse(D(vcat(xtilde, yG...)), 0f0)
+Lᴰ(t::GAN_LSLoss, D, x, xtilde; wD = 1f0, yG = (), yD = ()) = Flux.mse(sigmoid.(D(vcat(x, yD...))), wD) + Flux.mse(sigmoid.(D(vcat(xtilde, yG...))), 0f0)
 Lᴳ(t::GAN_LSLoss, G, D, z; yG = ()) = Flux.mse(D(vcat(G(vcat(z, yG...)), yG...)), 1f0)
 
 ## Hinge Loss

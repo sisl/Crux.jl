@@ -7,36 +7,29 @@ using Distributions
 ## Pendulum
 mdp = PendulumPOMDP(actions=[-2., -0.5, 0, 0.5, 2.])
 as = [actions(mdp)...]
-amin = [-1f0]
-amax = [1f0]
+amin = [-2f0]
+amax = [2f0]
 rand_policy = FunctionPolicy((s) -> Float32.(rand.(Uniform.(amin, amax))))
-S = state_space(mdp)
+S = state_space(mdp, σ=[3.14f0, 8f0])
 
 # Define the networks we will use
-QSA() = ContinuousNetwork(Chain(x -> x ./ [6.3f0, 8f0, 2f0], Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
-QS() = DiscreteNetwork(Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
-V() = ContinuousNetwork(Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
-A() = ContinuousNetwork(Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1, tanh), x -> 2f0 * x), 1)
-
-G() = GaussianPolicy(A(), zeros(Float32, 1))
-function SAC_A()
-    base = Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu))
-    mu = ContinuousNetwork(Chain(base..., Dense(64, 1)))
-    logΣ = ContinuousNetwork(Chain(base..., Dense(64, 1)))
-    SquashedGaussianPolicy(mu, logΣ)
-end
+QSA() = ContinuousNetwork(Chain(Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
+QS() = DiscreteNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
+V() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
+A() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1, tanh), x -> 2f0 * x), 1)
+SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1))), zeros(Float32, 1), 2f0)
 
 
 # Solve with REINFORCE (Generally doesn't learn much, ~15 secs)
-𝒮_reinforce = REINFORCE(π=G(), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
+𝒮_reinforce = REINFORCE(π=SG(), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
 @time π_reinforce = solve(𝒮_reinforce, mdp)
 
 # Solve with A2C (Generally doesn't learn much, ~1 min)
-𝒮_a2c = A2C(π=ActorCritic(G(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
+𝒮_a2c = A2C(π=ActorCritic(SG(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
 @time π_a2c = solve(𝒮_a2c, mdp)
 
 # Solve with PPO (gets to > -200 reward, ~1.5 min)
-𝒮_ppo = PPO(π=ActorCritic(G(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
+𝒮_ppo = PPO(π=ActorCritic(SG(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,), λe=0f0)
 @time π_ppo = solve(𝒮_ppo, mdp)
 
 # Solve with DQN (gets to > -200 reward, ~30 sec)
@@ -61,7 +54,7 @@ off_policy = (S=S,
 @time π_td3 = solve(𝒮_td3, mdp)
 
 # Solve with SAC
-𝒮_sac = SAC(;π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), off_policy...)
+𝒮_sac = SAC(;π=ActorCritic(SG(), DoubleNetwork(QSA(), QSA())), off_policy...)
 @time π_sac = solve(𝒮_sac, mdp)
 
 

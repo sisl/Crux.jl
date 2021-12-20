@@ -11,10 +11,10 @@ as = [actions(mdp)...]
 amin = [-2f0]
 amax = [2f0]
 rand_policy = FunctionPolicy((s) -> Float32.(rand.(Uniform.(amin, amax))))
-S = state_space(mdp, σ=[6.3f0, 8f0])
+S = state_space(mdp, σ=[3.14f0, 8f0])
 
 # get expert trajectories
-expert_trajectories = BSON.load("/home/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
+expert_trajectories = BSON.load("/Users/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
 expert_perf = sum(expert_trajectories[:r]) / length(episodes(expert_trajectories))
 expert_trajectories[:r] .= 1
 
@@ -22,22 +22,28 @@ expert_trajectories[:r] .= 1
 QSA() = ContinuousNetwork(Chain(Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 QSA_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 64, relu), DenseSN(64, 64, relu), DenseSN(64, 2), Dense(2,output)))
 V() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
-A() = ContinuousNetwork(Chain(Dense(2, 64, relu, init=Flux.orthogonal), Dense(64, 64, relu, init=Flux.orthogonal), Dense(64, 1, tanh, init=Flux.orthogonal), x -> 2f0 * x), 1)
+A() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1, tanh), x -> 2f0 * x), 1)
+SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1))), zeros(Float32, 1), 2f0)
 G() = GaussianPolicy(A(), zeros(Float32, 1))
 
-
-D_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 12, relu), DenseSN(12, 2), Dense(2,output)))
-
-function SAC_A()
-    base = Chain(x -> x ./ [6.3f0, 8f0], Dense(2, 64, relu), Dense(64, 64, relu))
-    mu = ContinuousNetwork(Chain(base..., Dense(64, 1)))
-    logΣ = ContinuousNetwork(Chain(base..., Dense(64, 1)))
-    SquashedGaussianPolicy(mu, logΣ)
-end
+D_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 100, tanh), DenseSN(100,100, tanh), DenseSN(100,output)))
 
 ## On-Policy GAIL - This currently doesn't work for some reason
-𝒮_gail_on = OnPolicyGAIL(D=QSA_SN(), gan_loss=GAN_BCELoss(), 𝒟_demo=expert_trajectories, solver=REINFORCE, π=ActorCritic(G(), V()), S=S, N=1000000, ΔN=1024)
+𝒮_gail_on = OnPolicyGAIL(D=QSA(),
+                         γ=discount(mdp),
+                         gan_loss=GAN_BCELoss(), 
+                         𝒟_demo=expert_trajectories, 
+                         solver=PPO, 
+                         π=ActorCritic(G(), V()), 
+                         S=S, 
+                         N=1000000,
+                         d_opt=(batch_size=1024, epochs=80),
+                         ΔN=1024)
 solve(𝒮_gail_on, mdp)
+
+𝒮_gail_on.agent.π.C(D[:s])
+
+D = steps!(Sampler(mdp, 𝒮_gail_on.agent.π, S=S), Nsteps=1)
 
 ## Off-Policy GAIL
 𝒮_gail = OffPolicyGAIL(D=D_SN(2), 
@@ -57,7 +63,7 @@ solve(𝒮_gail, mdp)
 
 
 ## Behavioral Cloning 
-𝒮_bc = BC(π=A(), 𝒟_demo=expert_trajectories, S=S, opt=(epochs=100,), log=(period=100,))
+𝒮_bc = BC(π=G(), 𝒟_demo=expert_trajectories, S=S, opt=(epochs=100,), log=(period=100,))
 solve(𝒮_bc, mdp)
 
 ## Advil
@@ -78,7 +84,6 @@ solve(𝒮_advil, mdp)
 solve(𝒮_sqil, mdp)
 
 ## Adril
-Crux.set_crux_warnings(false)
 𝒮_adril = AdRIL(π=ActorCritic(SAC_A(), DoubleNetwork(QSA(), QSA())), 
               S=S,
               𝒟_demo=expert_trajectories,
@@ -92,7 +97,7 @@ solve(𝒮_adril, mdp)
 
 
 ## ASAF
-𝒮_ASAF = ASAF(π=G(), 
+𝒮_ASAF = ASAF(π=SG(), 
               S=S, 
               ΔN=2000, 
               𝒟_demo=expert_trajectories,

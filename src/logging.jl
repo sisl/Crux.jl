@@ -90,10 +90,12 @@ end
 function log_episode_averages(keys, period)
     (;𝒮, kwargs...) -> begin
         d = Dict()
-        indices = get_last_N_indices(𝒮.buffer, period)
-        for k in keys
-            avg_val = sum(𝒮.buffer[k][indices]) / sum(𝒮.buffer[:episode_end][indices])
-            d[Symbol(string("avg_", k))] = avg_val
+        if hasproperty(𝒮, :buffer)
+            indices = get_last_N_indices(𝒮.buffer, period)
+            for k in keys
+                avg_val = sum(𝒮.buffer[k][indices]) / sum(𝒮.buffer[:episode_end][indices])
+                d[Symbol(string("avg_", k))] = avg_val
+            end
         end
         d
     end
@@ -102,10 +104,12 @@ end
 function log_experience_sums(keys, period)
     (;𝒮, kwargs...) -> begin
         d = Dict()
-        indices = get_last_N_indices(𝒮.buffer, period)
-        for k in keys
-            avg_val = sum(𝒮.buffer[k][indices])
-            d[Symbol(string("sum_", k))] = avg_val
+        if hasproperty(𝒮, :buffer)
+            indices = get_last_N_indices(𝒮.buffer, period)
+            for k in keys
+                avg_val = sum(𝒮.buffer[k][indices])
+                d[Symbol(string("sum_", k))] = avg_val
+            end
         end
         d
     end

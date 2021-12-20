@@ -9,7 +9,7 @@ A() = DiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu)
 V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 
 # Solve with REINFORCE (~2 seconds)
-𝒮_reinforce = REINFORCE(π=A(), S=S, N=10000, ΔN=500, a_opt=(epochs=5,))
+𝒮_reinforce = REINFORCE(π=A(), S=S, N=10000, ΔN=500, a_opt=(epochs=5,), interaction_storage=[])
 @time π_reinforce = solve(𝒮_reinforce, mdp)
 
 # Solve with A2C (~8 seconds)
@@ -21,8 +21,7 @@ V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, rel
 @time π_ppo = solve(𝒮_ppo, mdp)
 
 # Solve with DQN (~12 seconds)
-𝒮_dqn = DQN(π=A(), S=S, N=10000)
-𝒮_dqn.c_opt
+𝒮_dqn = DQN(π=A(), S=S, N=10000, interaction_storage=[])
 @time π_dqn = solve(𝒮_dqn, mdp)
 
 # Plot the learning curve

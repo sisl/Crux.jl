@@ -11,12 +11,12 @@
     c_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the critic
     𝒫::NamedTuple = (;) # Parameters of the algorithm
     interaction_storage = nothing # If this is initialized to an array then it will store all interactions
+    post_sample_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling experience
+    post_batch_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling a batch
     
     # On-policy-specific parameters
     λ_gae::Float32 = 0.95 # Generalized advantage estimation parameter
     required_columns = Symbol[]# Extra data columns to store
-    post_batch_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling a batch
-    loop_start_callback = (𝒮) -> nothing # Callback that happens at the beginning of each experience gathering iteration
     
     # Parameters specific to cost constraints (a separete value network)
     Vc::Union{ContinuousNetwork, Nothing} = nothing # Cost value approximator
@@ -35,19 +35,14 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
 
     # Loop over the desired number of environment interactions
     for 𝒮.i = range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
-        # Call the loop start callback function
-        𝒮.loop_start_callback(𝒮)
-        
-        # Sample transitions into the batch buffer
-        D = steps!(s, Nsteps=𝒮.ΔN, reset=true, explore=true, i=𝒮.i)
-        push!(𝒟, D)
-        !isnothing(𝒮.interaction_storage) && push!(𝒮.interaction_storage, D)
-        
         # Info to collect during training
         info = Dict()
         
-        # Call the post-batch callback function
-        𝒮.post_batch_callback(𝒟, info=info)
+        # Sample transitions into the batch buffer
+        steps!(s, 𝒟, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D) -> 𝒮.post_sample_callback(D, info=info, 𝒮=𝒮))
+        
+        # Post-batch callback, often used for additional training
+        𝒮.post_batch_callback(𝒟, info=info, 𝒮=𝒮)
         
         # Train parameters
         for (θs, p_opt) in 𝒮.param_optimizers

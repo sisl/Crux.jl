@@ -56,11 +56,9 @@ function POMDPs.solve(𝒮::AdversarialOffPolicySolver, mdp)
         𝒮.𝒮_ant.i = 𝒮.i
         
         # Sample transitions into the replay buffer
-        push!(buffer, steps!(s_pro, Nsteps=𝒮.𝒮_pro.ΔN, explore=true, i=𝒮.i))
-        push!(buffer, steps!(s_ant, Nsteps=𝒮.𝒮_ant.ΔN, explore=true, i=𝒮.i))
+        steps!(s_pro, buffer, Nsteps=𝒮.𝒮_pro.ΔN, explore=true, i=𝒮.i)
+        steps!(s_ant, buffer, Nsteps=𝒮.𝒮_ant.ΔN, explore=true, i=𝒮.i)
         
-        # callback for potentially updating the buffer
-        𝒮.post_experience_callback(buffer) 
         
         # Train the networks
         infos = []

@@ -37,7 +37,7 @@ function ASAF(;π,
     OnPolicySolver(;agent=PolicyParams(π), 
                     S=S,
                     ΔN=ΔN,
-                    loop_start_callback=(𝒮) -> 𝒮.a_opt.loss = ASAF_actor_loss(deepcopy(𝒮.agent.π), 𝒟_demo),
+                    post_batch_callback=(D; 𝒮, kwargs...) -> 𝒮.a_opt.loss = ASAF_actor_loss(deepcopy(𝒮.agent.π), 𝒟_demo),
                     log=LoggerParams(;dir="log/ASAF", period=100, log...),
                     a_opt=TrainingParams(;name="actor_", loss=nothing, a_opt...), 
                     kwargs...)

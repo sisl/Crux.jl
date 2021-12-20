@@ -9,14 +9,12 @@
     param_optimizers::Dict{Any, TrainingParams} = Dict() # Training parameters for the parameters
     a_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the actor
     c_opt::TrainingParams # Training parameters for the critic
-    post_sample_callback = (D; kwargs...) -> nothing
-    post_experience_callback = (buffer) -> nothing
-    post_batch_callback = (𝒟; kwargs...) -> nothing
-    loop_start_callback = (𝒮) -> nothing # Callback that happens at the beginning of each experience gathering iteration
     𝒫::NamedTuple = (;) # Parameters of the algorithm
 	interaction_storage = nothing # If this is initialized to an array then it will store all interactions
+	post_sample_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling experience
     
     # Off-policy-specific parameters
+	post_batch_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling a batch
     target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0) # Function for updating the target network
     target_fn # Target for critic regression with input signature (π⁻, 𝒟, γ; i)
     buffer_size = 1000 # Size of the buffer
@@ -38,7 +36,7 @@ function train_step(𝒮::OffPolicySolver, 𝒟, γ)
         info = Dict()
         
         # Callack for potentially updating the buffer
-        𝒮.post_batch_callback(𝒟, info=info)
+        𝒮.post_batch_callback(𝒟, 𝒮=𝒮, info=info)
         
         # Compute target
         y = 𝒮.target_fn(𝒮.agent.π⁻, 𝒮.𝒫, 𝒟, γ, i=𝒮.i)
@@ -81,26 +79,22 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     s = Sampler(mdp, 𝒮.agent, S=𝒮.S, max_steps=𝒮.max_steps, required_columns=extra_columns(𝒮.buffer))
     isnothing(𝒮.log.sampler) && (𝒮.log.sampler = s)
 
-    # Log the pre-train performance
-    log(𝒮.log, 𝒮.i, 𝒮=𝒮)
-
     # Fill the buffer with initial observations before training
-    𝒮.i += fillto!(𝒮.buffer, s, 𝒮.buffer_init, i=𝒮.i, explore=true)
+	info = Dict()
+	Nfill = max(0, 𝒮.buffer_init - length(𝒮.buffer))
+	𝒮.i += Nfill
+	steps!(s, 𝒮.buffer, Nsteps=Nfill, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D)->𝒮.post_sample_callback(D, 𝒮=𝒮, info=info))
+	
+	# Log the pre-train performance
+	log(𝒮.log, 𝒮.i, info, 𝒮=𝒮)
     
     # Loop over the desired number of environment interactions
     for 𝒮.i in range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
+		# Store info here
 		info = Dict()
-        # Call the loop start callback function
-        𝒮.loop_start_callback(𝒮)
         
         # Sample transitions into the replay buffer
-        D = steps!(s, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i)
-        𝒮.post_sample_callback(D, 𝒮=𝒮, info=info)
-        push!(𝒮.buffer, D)
-		!isnothing(𝒮.interaction_storage) && push!(𝒮.interaction_storage, D)
-        
-        # callback for potentially updating the buffer
-        𝒮.post_experience_callback(𝒮.buffer) 
+		steps!(s, 𝒮.buffer, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D)->𝒮.post_sample_callback(D, 𝒮=𝒮, info=info))
         
         # Train the networks
         infos = train_step(𝒮, 𝒟, γ)

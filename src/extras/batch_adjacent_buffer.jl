@@ -12,17 +12,6 @@ isprioritized(b::BatchAdjacentBuffer) = false
 
 extra_columns(b::BatchAdjacentBuffer) = extra_columns(b.reference_buffer)
 
-function fillto!(b::BatchAdjacentBuffer, s::Union{Sampler, Vector{T}}, N::Int; i=1, explore=false) where {T <: Sampler}
-    Nfill = max(0, N - length(b))
-    
-    if Nfill > 0
-        D = steps!(s, i=i, Nsteps=Nfill, explore=explore)
-        D[:z] = repeat(b.default_z_dist.μ, 1, length(D[:r]))
-        push!(b, D, deepcopy(b.default_z_dist))
-    end
-    Nfill
-end
-
 DataStructures.capacity(b::BatchAdjacentBuffer) = b.elements
 
 Base.length(buffer::BatchAdjacentBuffer) = length(buffer.batches) > 0 ? sum([length(b) for b in buffer.batches]) : 0

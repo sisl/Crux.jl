@@ -5,7 +5,9 @@ function GAIL_D_loss(gan_loss)
 end
 
 function OnPolicyGAIL(;π, 
-                       S, 
+                       S,
+                       γ,
+                       λ_gae::Float32 = 0.95f0,
                        𝒟_demo, 
                        normalize_demo::Bool=true, 
                        D::ContinuousNetwork, 
@@ -20,19 +22,28 @@ function OnPolicyGAIL(;π,
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
     
-    function GAIL_callback(𝒟; info=Dict())
-        batch_train!(D, d_opt, (;), 𝒟_demo, 𝒟, info=info)
+    function GAIL_callback(𝒟; info=Dict(), 𝒮)
+        batch_train!(D, d_opt, (;), 𝒟_demo, deepcopy(𝒟), info=info)
         
         discriminator_signal = haskey(𝒟, :advantage) ? :advantage : :return
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
-        r = Base.log.(discriminator_transform.(D_out) .+ 1f-5) .- Base.log.(1f0 .- discriminator_transform.(D_out) .+ 1f-5)
+        # r = Base.log.(discriminator_transform.(D_out) .+ 1f-5) .- Base.log.(1f0 .- discriminator_transform.(D_out) .+ 1f-5)
+        r =  -Base.log.(1f0 .- discriminator_transform.(D_out) .+ 1f-5)
         ignore() do
             info["disc_reward"] = mean(r)
         end
-        𝒟[discriminator_signal] .= r 
+        
+        𝒟[:r] .= r
+        
+        eps = episodes(𝒟)
+        for ep in eps
+            eprange = ep[1]:ep[2]
+            fill_gae!(𝒟, eprange, 𝒮.agent.π, λ_gae, γ)
+            fill_returns!(𝒟, eprange, γ)
+            𝒟[:advantage] .= whiten(𝒟[:advantage])
+        end
+        
     end
-    𝒮 = solver(;π=π, S=S, post_batch_callback=GAIL_callback, log=(dir="log/onpolicygail", period=500, log...), kwargs...)
-    𝒮.c_opt = nothing # disable the critic 
-    𝒮
+    solver(;π=π, S=S, post_batch_callback=GAIL_callback, log=(dir="log/onpolicygail", period=500, log...), λ_gae=λ_gae, kwargs...)
 end
 

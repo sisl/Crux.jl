@@ -69,13 +69,6 @@ end
 @test discounted_return(s1) < 3
 @test failure(s1) < 1.
 
-## fillto!
-b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4, Int), 100)
-d = Dict(:s => 3*ones(2,3), :a => fill(1, 4,3), :sp => 5*ones(2,3), :r => 6*ones(1,3), :done => ones(1,3))
-push!(b, d)
-@test fillto!(b, s1, 3) == 0
-@test fillto!(b, s1, 5) == 2
-@test length(b) == 5
 
 ## Generalized Advantage Estimation
 b = ExperienceBuffer(ContinuousSpace(2), DiscreteSpace(4, Int), 100, [:advantage, :return])

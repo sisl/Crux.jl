@@ -59,7 +59,7 @@ module Crux
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 
-           episodes!, fillto!, metric_by_key, metrics_by_key, undiscounted_return, 
+           episodes!, metric_by_key, metrics_by_key, undiscounted_return, 
            discounted_return, failure, fill_gae!, fill_returns!, trim!
     include("sampler.jl")
     

@@ -30,7 +30,6 @@ function OffPolicyGAIL(;π,
     # Build the solver
     𝒮 = solver(;π=π, 
                 S=S,
-                post_experience_callback=(𝒟; kwargs...) -> 𝒟[:r] .= 0, # This zeros out the reward that is collected so we don't accidentally use it. 
                 log=(dir="log/offpolicygail", period=500, log...),
                 kwargs...)
             
@@ -44,7 +43,7 @@ function OffPolicyGAIL(;π,
     𝒟_ndas_batch = [deepcopy(𝒟_batch) for 𝒟_nda in 𝒟_ndas]
     𝒟_ndas_π_batch = [deepcopy(𝒟_batch) for 𝒟_nda in 𝒟_ndas]
     
-    function GAIL_callback(𝒟; info=Dict())
+    function GAIL_callback(𝒟; info=Dict(), kwargs...)
         for i=1:d_opt.epochs
             
             # Sample minibatchs

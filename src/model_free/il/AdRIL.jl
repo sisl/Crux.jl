@@ -16,20 +16,24 @@ function AdRIL(;π,
     𝒟_demo = 𝒟_demo |> device(π)
     
     
-    function AdRIL_callback(𝒟)
-        max_i = maximum(𝒟[:i])
-        k = Int((max_i - buffer_init) / ΔN) - 1
-        old_data = 𝒟[:i][:] .<= max_i - ΔN
-        new_data = 𝒟[:i][:] .> max_i - ΔN
-        𝒟[:r][1, old_data] .= -1/k
-        𝒟[:r][1, new_data] .= 0
+    function AdRIL_callback(𝒟; 𝒮, kwargs...)
+        𝒟[:r] .= 0
+        
+        if length(𝒮.buffer) > 0 
+            max_i = max(maximum(𝒟[:i]), maximum(𝒮.buffer[:i]))
+            k = Int((max_i - buffer_init) / ΔN) - 1
+            old_data = 𝒮.buffer[:i][:] .<= max_i - ΔN
+            new_data = 𝒮.buffer[:i][:] .> max_i - ΔN
+            𝒮.buffer[:r][1, old_data] .= -1/k
+            𝒮.buffer[:r][1, new_data] .= 0
+        end
     end
     
     
     solver(;π=π, 
             S=S, 
             ΔN=ΔN, 
-            post_experience_callback=AdRIL_callback, 
+            post_sample_callback=AdRIL_callback, 
             extra_buffers=[𝒟_demo], 
             buffer_fractions=[1-expert_frac, expert_frac], 
             buffer_size=buffer_size,

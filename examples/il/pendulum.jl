@@ -41,10 +41,6 @@ D_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 100, tanh), DenseSN(100,100,
                          ΔN=1024)
 solve(𝒮_gail_on, mdp)
 
-𝒮_gail_on.agent.π.C(D[:s])
-
-D = steps!(Sampler(mdp, 𝒮_gail_on.agent.π, S=S), Nsteps=1)
-
 ## Off-Policy GAIL
 𝒮_gail = OffPolicyGAIL(D=D_SN(2), 
                        𝒟_demo=expert_trajectories, 

@@ -1,7 +1,7 @@
 using Distributions, StatsBase
 
 function cross_entropy(f, P; k=1, m=50, m_extra=20, m_elite=m, base_dist=Uniform(-1,1))
-    for i=1:k
+    for _=1:k
         # Sample from the current distribution
         samples = clamp.(rand(P, m), -1f0, 1f0)
         dim = size(samples, 1)
@@ -28,20 +28,21 @@ function cross_entropy(f, P; k=1, m=50, m_extra=20, m_elite=m, base_dist=Uniform
     P
 end
 
-function mcmc(f, P; Q = (sz...)->0.1*randn(sz...), m_extra = 20, base_dist = Uniform(-1,1))
-    dim, Npart = size(P)
-    
-    # Perturb particles and add some additional ones
-    P = Float32.(clamp.(P .+ Q(dim, Npart), -1, 1))
-    P = hcat(P, rand(base_dist, dim, m_extra))
+function mcmc(f, P; Q=(sz...)->0.01*randn(sz...), k=1, m_extra=20, base_dist = Uniform(-1,1))
+    dim, Npart=size(P)
+    for _=1:k
+        # Perturb particles and add some additional ones
+        P = Float32.(clamp.(P .+ Q(dim, Npart), -1, 1))
+        P = hcat(P, rand(base_dist, dim, m_extra))
 
-    # compute the particle values
-    vals = [f(P[:,i]) for i=1:size(P,2)]
-    weights = exp.(-vals)
-    
-    # resample
-    samples = sample(1:Npart+m_extra, Weights(weights), Npart)
-    P[:, samples]
+        # compute the particle values
+        vals = [f(P[:,i]) for i=1:size(P,2)]
+        weights = exp.(-vals)
+        
+        # resample
+        samples = sample(1:Npart+m_extra, Weights(weights), Npart)
+        P = P[:, samples]
+    end
 end
 
 best_estimate(d::MvNormal) = d.μ
@@ -79,4 +80,3 @@ uncertainty(P::Array) = mean(std(P, dims=2))
 # plot(p1, p2, p3, p4)
 # 
 # println("best estimate: ", best_estimate(P))
-

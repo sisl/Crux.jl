@@ -12,6 +12,30 @@ function readtb(logdir::String, key)
     h.iterations, h.values
 end
 
+
+function tb2dict(logdir)
+    hist = readtb(logdir)
+    iterations = hist[first(keys(hist))].iterations
+    d = Dict{Symbol, Vector{Any}}(:iterations => iterations)
+    for k in keys(hist)
+        @assert hist[k].iterations == iterations
+        d[k] = hist[k].values
+    end
+    d
+end
+
+
+function Base.vcat(datas::Dict{Symbol, T}...) where T
+    data_ret = datas[1]
+    for k in keys(data_ret)
+        for data in datas[2:end]
+            data_ret[k] = vcat(data_ret[k], data[k])
+        end
+    end
+    data_ret
+end
+
+
 # Convert various inputs to an arrow of directories for plotting
 directories(input::String) = [input]
 directories(input::T) where {T <: Solver} = [input.log.logger.logdir ]

@@ -69,7 +69,7 @@ module Crux
            log_episode_averages, log_experience_sums, save_gif
     include("logging.jl")
     
-    export smooth, readtb, plot_learning, episode_frames, gif, percentile, 
+    export smooth, readtb, tb2dict, plot_learning, episode_frames, gif, percentile, 
            find_crossing, plot_jumpstart, directories, plot_peak_performance, 
            plot_learning, plot_cumulative_rewards, plot_steps_to_threshold
     include("analysis.jl")

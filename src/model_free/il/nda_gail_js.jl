@@ -40,7 +40,7 @@ function NDA_GAIL_JS(;π,
         
         # Set the cost
         D_out_nda = value(Dnda, 𝒟[:a], 𝒟[:s])
-        r_nda = αr * logσ.(D_out_nda) .- (1f0 - αr) * logσ.(-D_out_nda)
+        r_nda = αr * logσ.(D_out_nda) .- (1f0 - αr) * logcompσ.(-D_out_nda)
         c = max.(0, r_nda .- r)
         # c = max.(0, σ.(D_out_nda) .- σ.(D_out))
         ignore() do

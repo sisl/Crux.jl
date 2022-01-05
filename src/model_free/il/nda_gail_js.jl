@@ -26,8 +26,8 @@ function NDA_GAIL_JS(;π,
     𝒟_nda = 𝒟_nda |> device(π)
     
     function GAIL_callback(𝒟; info=Dict(), 𝒮)
-        batch_train!(D, d_opt, (;), 𝒟_demo, 𝒟, info=info)
-        batch_train!(Dnda, d_opt_nda, (;), 𝒟_nda, 𝒟, info=info)
+        batch_train!(D, d_opt, (;), 𝒟_demo, deepcopy(𝒟), info=info)
+        batch_train!(Dnda, d_opt_nda, (;), 𝒟_nda, deepcopy(𝒟), info=info)
         
         # Set the reward
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)

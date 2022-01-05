@@ -103,7 +103,7 @@ function LagrangePPO(;π::ActorCritic,
      Vc::ContinuousNetwork, # value network for estimating cost
      ϵ::Float32 = 0.2f0, 
      λp::Float32 = 1f0, 
-     λe::Float32 = 0f0,
+     λe::Float32 = 0.1f0,
      λ_gae = 0.95f0,
      target_kl = 0.012f0,
      target_cost = 0.025f0,

@@ -9,7 +9,7 @@ function NDA_GAIL_JS(;π,
                        normalize_demo::Bool=true, 
                        D::ContinuousNetwork,
                        Dnda::ContinuousNetwork,
-                       solver=PPO, 
+                       solver=LagrangePPO, 
                        gan_loss::Crux.GANLoss=GAN_BCELoss(), 
                        d_opt::NamedTuple=(;),
                        d_opt_nda::NamedTuple=(;), 
@@ -40,7 +40,7 @@ function NDA_GAIL_JS(;π,
         
         # Set the cost
         D_out_nda = value(Dnda, 𝒟[:a], 𝒟[:s])
-        r_nda = αr * logσ.(D_out_nda) .- (1f0 - αr) * logcompσ.(-D_out_nda)
+        r_nda = αr * logσ.(D_out_nda) .- (1f0 - αr) * logcompσ.(D_out_nda)
         c = max.(0, r_nda .- r)
         # c = max.(0, σ.(D_out_nda) .- σ.(D_out))
         ignore() do
@@ -61,6 +61,6 @@ function NDA_GAIL_JS(;π,
         𝒟[:cost_advantage] .= whiten(𝒟[:cost_advantage])
         
     end
-    solver(;π=π, S=S, post_batch_callback=GAIL_callback, Vc=Vc, λ_gae=λ_gae, log=(dir="log/onpolicygail", period=500, log...), kwargs...)
+    solver(;π=π, S=S, post_batch_callback=GAIL_callback, Vc=Vc, λ_gae=λ_gae, log=(dir="log/ndagail", period=500, log...), kwargs...)
 end
 

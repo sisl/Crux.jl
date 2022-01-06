@@ -28,11 +28,12 @@ function cross_entropy(f, P; k=1, m=50, m_extra=20, m_elite=m, base_dist=Uniform
     P
 end
 
-function mcmc(f, P; Q=(sz...)->0.01*randn(sz...), k=1, m_extra=20, base_dist = Uniform(-1,1))
+function mcmc(f, P; Q=(sz...)->0.01*randn(sz...), k=1, m=size(P,2), m_extra=20, base_dist = Uniform(-1,1))
     dim, Npart=size(P)
+    @assert Npart == m
     for _=1:k
         # Perturb particles and add some additional ones
-        P = Float32.(clamp.(P .+ Q(dim, Npart), -1, 1))
+        # P = Float32.(clamp.(P .+ Q(dim, Npart), -1, 1))
         P = hcat(P, rand(base_dist, dim, m_extra))
 
         # compute the particle values
@@ -43,6 +44,7 @@ function mcmc(f, P; Q=(sz...)->0.01*randn(sz...), k=1, m_extra=20, base_dist = U
         samples = sample(1:Npart+m_extra, Weights(weights), Npart)
         P = P[:, samples]
     end
+    P
 end
 
 best_estimate(d::MvNormal) = d.μ

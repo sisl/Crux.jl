@@ -12,6 +12,8 @@ function ppo_loss(π, 𝒫, 𝒟; info = Dict())
         info[:entropy] = -e_loss
         info[:kl] = mean(𝒟[:logprob] .- new_probs)
         info[:clip_fraction] = sum((r .> 1 + 𝒫[:ϵ]) .| (r .< 1 - 𝒫[:ϵ])) / length(r)
+        info[:avg_advantage] = mean(A)
+        info[:avg_return] = mean(𝒟[:return])
     end 
     𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss
 end
@@ -27,13 +29,18 @@ function PPO(;π::ActorCritic,
      required_columns=[],
      kwargs...)
      
+     function record_avgr(𝒟; info=Dict(), 𝒮)
+         info[:avg_r] = sum(𝒟[:r]) / sum(𝒟[:episode_end])
+     end
+     
      OnPolicySolver(;agent=PolicyParams(π),
                     𝒫=(ϵ=ϵ, λp=λp, λe=λe),
                     log = LoggerParams(;dir = "log/ppo", log...),
                     a_opt = TrainingParams(;loss = ppo_loss, early_stopping = (infos) -> (infos[end][:kl] > target_kl), name = "actor_", a_opt...),
                     c_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:return]), name = "critic_", c_opt...),
-                    post_sample_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+                    post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
                     required_columns = unique([required_columns..., :return, :logprob, :advantage]),
+                    post_sample_callback=record_avgr,
                     kwargs...)
 end
 
@@ -95,6 +102,8 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
         info[:clip_fraction] = sum((r .> 1 + 𝒫[:ϵ]) .| (r .< 1 - 𝒫[:ϵ])) / length(r)
         info["p_loss"] = 𝒫[:λp]*p_loss
         info["cost_loss"] = cost_loss
+        info[:avg_advantage] = mean(A)
+        info[:avg_return] = mean(𝒟[:return])
     end 
     (𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss + cost_loss) / (1 + penalty)
 end
@@ -121,6 +130,10 @@ function LagrangePPO(;π::ActorCritic,
      required_columns=[],
      kwargs...)
      
+     function record_avgr(𝒟; info=Dict(), 𝒮)
+         info[:avg_r] = sum(𝒟[:r]) / sum(𝒟[:episode_end])
+     end
+     
      𝒫=(ϵ=ϵ, λp=λp, λe=λe,
         target_cost=target_cost, 
         penalty_scale=penalty_scale,
@@ -145,6 +158,7 @@ function LagrangePPO(;π::ActorCritic,
                     cost_opt = TrainingParams(;loss = (π, 𝒫, D; kwargs...) -> Flux.mse(value(π, D[:s]), D[:cost_return]), name = "cost_critic_", cost_opt...),
                     required_columns = unique([required_columns..., :return, :advantage, :logprob, :cost_advantage, :cost, :cost_return]),
                     post_batch_callback = (𝒟; kwargs...) -> (𝒟[:advantage] .= whiten(𝒟[:advantage])),
+                    post_sample_callback=record_avgr,
                     kwargs...)
 end
 

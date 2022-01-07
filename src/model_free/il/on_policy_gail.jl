@@ -16,6 +16,7 @@ function OnPolicyGAIL(;π,
                        gan_loss::GANLoss=GAN_BCELoss(), 
                        d_opt::NamedTuple=(;), 
                        log::NamedTuple=(;),
+                       Rscale=1f0,
                        kwargs...)
                        
     d_opt = TrainingParams(;loss = GAIL_D_loss(gan_loss), name="discriminator_", d_opt...)
@@ -31,7 +32,7 @@ function OnPolicyGAIL(;π,
             info["disc_reward"] = mean(r)
         end
         
-        𝒟[:r] .= r
+        𝒟[:r] .= r.*Rscale
         
         eps = episodes(𝒟)
         for ep in eps

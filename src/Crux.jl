@@ -98,7 +98,7 @@ module Crux
     export log_multitask_performances!, continual_learning
     include("extras/multitask_learning.jl")
     
-    export DeepEnsemble, training_loss
+    export DeepEnsemble, DeepClassificationEnsemble, training_loss
     include("extras/deep_ensembles.jl")
     
     export cross_entropy, mcmc

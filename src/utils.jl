@@ -113,3 +113,8 @@ function MultitaskDecaySchedule(steps::Int, task_ids; start = 1.0, stop = 0.1)
         schedule(used_steps + mod1(i, steps))
     end
 end
+
+function logcompσ(x::Real)
+    # Computes log(1 - sigmoid(x)) in a numerically stable way
+    return logσ(x) - x
+end

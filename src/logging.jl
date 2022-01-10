@@ -13,7 +13,8 @@ end
     config::Union{Dict, Nothing} = nothing
     project::Union{AbstractString, Nothing} = nothing
     entity::Union{AbstractString, Nothing} = nothing
-    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(config=config, project=project, entity=entity) : TBLogger(dir, tb_increment)
+	notes::Union{AbstractString, Nothing} = nothing
+    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(config=config, project=project, entity=entity, notes=notes) : TBLogger(dir, tb_increment)
     fns = Any[log_undiscounted_return(10), log_episode_averages([:r], period)]
     writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
@@ -34,7 +35,7 @@ function Base.log(p::LoggerParams, i::Union{Int, UnitRange}, data...; 𝒮=nothi
     !elapsed(i, p.period) && return
     i = i[end]
     p.verbose && print("Step: $i")
-	dicts = [p.fns..., data...]
+	dicts = Any[p.fns..., data...]
 	
 	if !isnothing(p.sampler)
     	π_explore = (p.sampler isa Vector) ?  first(p.sampler).agent.π_explore : p.sampler.agent.π_explore

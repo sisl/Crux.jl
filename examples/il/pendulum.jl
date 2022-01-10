@@ -11,12 +11,16 @@ as = [actions(mdp)...]
 amin = [-2f0]
 amax = [2f0]
 rand_policy = FunctionPolicy((s) -> Float32.(rand.(Uniform.(amin, amax))))
-S = state_space(mdp, σ=[3.14f0, 8f0])
+S = state_space(mdp)#, σ=[3.14f0, 8f0])
 
 # get expert trajectories
-expert_trajectories = BSON.load("/Users/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
+expert_trajectories = BSON.load("/home/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
 expert_perf = sum(expert_trajectories[:r]) / length(episodes(expert_trajectories))
 expert_trajectories[:r] .= 1
+
+μ_s = mean(expert_trajectories[:s], dims=2)[:]
+σ_s = std(expert_trajectories[:s], dims=2)[:] .+ 1f-3
+S = ContinuousSpace(length(μ_s), μ=μ_s, σ=σ_s)
 
 # Define the networks we will use
 QSA() = ContinuousNetwork(Chain(Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
@@ -29,17 +33,20 @@ G() = GaussianPolicy(A(), zeros(Float32, 1))
 D_SN(output=1) = ContinuousNetwork(Chain(DenseSN(3, 100, tanh), DenseSN(100,100, tanh), DenseSN(100,output)))
 
 ## On-Policy GAIL - This currently doesn't work for some reason
-𝒮_gail_on = OnPolicyGAIL(D=QSA(),
+𝒮_gail_on = OnPolicyGAIL(D=QSA_SN(),
                          γ=discount(mdp),
                          gan_loss=GAN_BCELoss(), 
                          𝒟_demo=expert_trajectories, 
                          solver=PPO, 
                          π=ActorCritic(G(), V()), 
-                         S=S, 
-                         N=1000000,
+                         S=S,
+                         αr=0.5f0,
+                         λe=0f0,
+                         N=200000,
                          d_opt=(batch_size=1024, epochs=80),
                          ΔN=1024)
 solve(𝒮_gail_on, mdp)
+
 
 ## Off-Policy GAIL
 𝒮_gail = OffPolicyGAIL(D=D_SN(2), 

@@ -8,13 +8,15 @@ function OnPolicyGAIL(;π,
                        S,
                        γ,
                        λ_gae::Float32 = 0.95f0,
-                       𝒟_demo, 
+                       𝒟_demo,
+                       αr::Float32 = 0.5f0,
                        normalize_demo::Bool=true, 
                        D::ContinuousNetwork, 
                        solver=PPO, 
                        gan_loss::GANLoss=GAN_BCELoss(), 
                        d_opt::NamedTuple=(;), 
                        log::NamedTuple=(;),
+                       Rscale=1f0,
                        kwargs...)
                        
     d_opt = TrainingParams(;loss = GAIL_D_loss(gan_loss), name="discriminator_", d_opt...)
@@ -25,20 +27,20 @@ function OnPolicyGAIL(;π,
         batch_train!(D, d_opt, (;), 𝒟_demo, deepcopy(𝒟), info=info)
         
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
-        r = Base.log.(sigmoid.(D_out) .+ 1f-5) .- Base.log.(1f0 .- sigmoid.(D_out) .+ 1f-5)
+        r = αr * logσ.(D_out) .- (1f0 - αr) * logcompσ.(D_out)
         ignore() do
             info["disc_reward"] = mean(r)
         end
         
-        𝒟[:r] .= r
+        𝒟[:r] .= r.*Rscale
         
         eps = episodes(𝒟)
         for ep in eps
             eprange = ep[1]:ep[2]
             fill_gae!(𝒟, eprange, 𝒮.agent.π, λ_gae, γ)
             fill_returns!(𝒟, eprange, γ)
-            𝒟[:advantage] .= whiten(𝒟[:advantage])
         end
+        𝒟[:advantage] .= whiten(𝒟[:advantage])
         
     end
     solver(;π=π, S=S, post_batch_callback=GAIL_callback, log=(dir="log/onpolicygail", period=500, log...), λ_gae=λ_gae, kwargs...)

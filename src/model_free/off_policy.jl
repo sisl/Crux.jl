@@ -82,14 +82,17 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
     # Fill the buffer with initial observations before training
 	info = Dict()
 	Nfill = max(0, 𝒮.buffer_init - length(𝒮.buffer))
-	𝒮.i += Nfill
-	steps!(s, 𝒮.buffer, Nsteps=Nfill, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D)->𝒮.post_sample_callback(D, 𝒮=𝒮, info=info))
+	istart = 𝒮.i
+	if Nfill > 0
+		𝒮.i += Nfill
+		steps!(s, 𝒮.buffer, Nsteps=Nfill, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D)->𝒮.post_sample_callback(D, 𝒮=𝒮, info=info))
+	end 
 	
 	# Log the pre-train performance
 	log(𝒮.log, 𝒮.i, info, 𝒮=𝒮)
     
     # Loop over the desired number of environment interactions
-    for 𝒮.i in range(𝒮.i, stop=𝒮.i + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
+    for 𝒮.i in range(𝒮.i, stop=istart + 𝒮.N - 𝒮.ΔN, step=𝒮.ΔN)
 		# Store info here
 		info = Dict()
         

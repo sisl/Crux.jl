@@ -45,7 +45,8 @@ function TIER(;π,
                buffer_size=1000, 
                latent_dim, 
                N_experience_replay, 
-               N_experience_obs, 
+               N_experience_obs,
+               ER_frac = 0.5,
                replay_store_weight = (D)->1f0,
                bayesian_inference,
                solver=TD3, 
@@ -58,8 +59,9 @@ function TIER(;π,
                target_fn=TIER_TD3_target,
                zprior=MvNormal(zeros(latent_dim), I),
                kwargs...)
-               
-    required_columns = unique([:episode_end, :weight, required_columns...])
+    # if args["bayesian_inference"]=="mcmc"
+   	# 	z_dist = rand(z_dist, args["N_BI_samples"]) # prior for mcmc
+    required_columns = unique([:weight, required_columns...])
     buffer = ExperienceBuffer(S, A, buffer_size, required_columns)
     buffer.data[:z] = zeros(Float32, latent_dim, capacity(buffer))
       
@@ -81,11 +83,13 @@ function TIER(;π,
     𝒮 = solver(;π=π,
               S=S,
               𝒫=𝒫,
+              ΔN=ΔN,
               buffer=buffer,
-              c_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_value_regularization, c_opt...)),
-              a_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_regularization, a_opt...)),
+              required_columns=required_columns,
+              c_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_value_regularization), c_opt...),
+              a_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_regularization), a_opt...),
               extra_buffers = [buffer_er],
-              buffer_fractions = [0.5, 0.5],
+              buffer_fractions = [1.0 - ER_frac, ER_frac],
               a_loss=a_loss,
               c_loss=c_loss,
               target_fn=target_fn,
@@ -97,7 +101,7 @@ function TIER(;π,
         𝒮.𝒫.z_dist[1] = bayesian_inference(observation_model, D, 𝒮.𝒫.z_dist[1], info=info)
         
         # Set the agent's best estimate and record
-        zbest = mean(𝒮.𝒫.z_dist[1])
+        zbest = Crux.best_estimate(𝒮.𝒫.z_dist[1])
         𝒮.agent.π.z = zbest
         push!(𝒮.𝒫[:zs], deepcopy(𝒮.𝒫.z_dist[1]))
         

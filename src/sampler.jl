@@ -25,6 +25,10 @@ Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(m
 Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)
+    if sampler.agent.π isa LatentConditionedNetwork && hasproperty(sampler.mdp, :z)
+        sampler.agent.π.z = sampler.mdp.z
+    end
+    
     sampler.s = rand(initialstate(sampler.mdp))
     sampler.svec = tovec(initial_observation(sampler.mdp, sampler.s), sampler.S)
     sampler.episode_length = 0
@@ -57,7 +61,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     
     # This implements the ability to get cost information from safety gym
     info = Dict()
-    kwargs = haskey(data, :cost) ? (info=info,) : () 
+    kwargs = (haskey(data, :cost) || haskey(data, :z)) ? (info=info,) : () 
     
     args = (a,)
     if !isnothing(sampler.adversary)
@@ -90,6 +94,17 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     haskey(data, :i) && (data[:i][1, j] = i+1)
     haskey(data, :cost) && (data[:cost][1,j] = info["cost"])
+    if haskey(data, :z) && haskey(info, "z")
+        z = info["z"]
+        if sampler.agent.π isa LatentConditionedNetwork
+            sampler.agent.π.z = z
+        end
+        
+        if size(data[:z], 1) == 0
+            data[:z] = fill(z[1], length(z), size(data[:s], 2))
+        end
+        data[:z][:, j] = z
+    end 
     haskey(data, :fail) && (data[:fail][1,j] = extra_functions["isfailure"](sampler.mdp, sp)) #TODO Changed this to "s" instead of "sp" for the continuum world
     
     # Cut the episode short if needed

@@ -13,13 +13,27 @@ function readtb(logdir::String, key)
 end
 
 
-function tb2dict(logdir)
+function tb2dict(logdir, select_keys=:all; exclude_zero=false)
     hist = readtb(logdir)
-    iterations = hist[first(keys(hist))].iterations
-    d = Dict{Symbol, Vector{Any}}(:iterations => iterations)
-    for k in keys(hist)
-        @assert hist[k].iterations == iterations
-        d[k] = hist[k].values
+    select_keys == :all && (select_keys=keys(hist))
+    iterations = hist[first(select_keys)].iterations
+    
+    trim_first = exclude_zero && (iterations[1] == 0)
+    
+    d = Dict{Symbol, Vector{Any}}(:iterations =>  trim_first ? iterations[2:end] : iterations)
+    iterations = d[:iterations]
+    for k in select_keys
+        if haskey(hist, k)
+            # println(k)
+            # 
+            if exclude_zero && hist[k].iterations[1] == 0
+                @assert hist[k].iterations[2:end] == iterations
+                d[k] = hist[k].values[2:end]
+            else
+                @assert hist[k].iterations == iterations
+                d[k] = hist[k].values
+            end
+        end
     end
     d
 end

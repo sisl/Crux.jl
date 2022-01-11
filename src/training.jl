@@ -39,7 +39,7 @@ function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; in
         batch_num = 1
         for indices in zip(partitions...)
             mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
-            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π_loss, 𝒫, mbs...; kwargs...), p))
+            push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π_loss, 𝒫, mbs...; kwargs...), p, info=info))
             batch_num > max_batches && break 
             batch_num += 1    
         end

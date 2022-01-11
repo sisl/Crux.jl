@@ -114,7 +114,7 @@ function log_experience_sums(keys, period)
             indices = get_last_N_indices(𝒮.buffer, period)
             for k in keys
                 avg_val = sum(𝒮.buffer[k][indices])
-                d[Symbol(string("sum_", k))] = avg_val
+                d[Symbol(string("avg_", k))] = avg_val #TODO: Switch back to sum!
             end
         end
         d

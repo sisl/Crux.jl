@@ -61,7 +61,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     
     # This implements the ability to get cost information from safety gym
     info = Dict()
-    kwargs = (haskey(data, :cost) || haskey(data, :z)) ? (info=info,) : () 
+    kwargs = (haskey(data, :cost) || haskey(data, :z) || haskey(data, :grasp_success)) ? (info=info,) : () 
     
     args = (a,)
     if !isnothing(sampler.adversary)
@@ -94,6 +94,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     haskey(data, :i) && (data[:i][1, j] = i+1)
     haskey(data, :cost) && (data[:cost][1,j] = info["cost"])
+    haskey(data, :grasp_success) && (data[:grasp_success][1,j] = info["grasp_success"])
     if haskey(data, :z) && haskey(info, "z")
         z = info["z"]
         if sampler.agent.π isa LatentConditionedNetwork

@@ -21,6 +21,7 @@ function ExperienceReplay(;π,
         end
         D[:weight] .= replay_store_weight(D)
         push_reservoir!(buffer_er, D, weighted=true)
+        info["Experience_size"] = length(buffer_er)
     end
     creg = action_value_regularization
     areg = action_regularization

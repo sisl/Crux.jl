@@ -46,7 +46,6 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
             data[k] = ArrayType(fill(zero(R), 0, capacity))
         else
             CRUX_WARNINGS && @error "Unrecognized key: $k"
-            Int(1.6)
         end
     end
     data
@@ -301,6 +300,7 @@ function update_priorities!(b, I::AbstractArray, v::AbstractArray)
 end
 
 function Random.rand!(target::ExperienceBuffer, source::ExperienceBuffer...; i = 1, fracs = ones(length(source))./length(source))
+    fracs = deepcopy(fracs)
     lens = [length.(source) ...]
     if any(lens .== 0)
         fracs[lens .== 0] .= 0

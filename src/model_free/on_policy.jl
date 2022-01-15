@@ -39,7 +39,7 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         info = Dict()
         
         # Sample transitions into the batch buffer
-        steps!(s, 𝒟, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D) -> 𝒮.post_sample_callback(D, info=info, 𝒮=𝒮))
+        steps!(s, 𝒟, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D) -> 𝒮.post_sample_callback(D, info=info, 𝒮=𝒮), reset=true)
         
         # Post-batch callback, often used for additional training
         𝒮.post_batch_callback(𝒟, info=info, 𝒮=𝒮)

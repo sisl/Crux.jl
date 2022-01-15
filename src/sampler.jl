@@ -188,7 +188,15 @@ end
 metrics_by_key(data, start, stop; keys) = [sum(data[key][1,start:stop]) for key in keys]
 
 function metrics_by_key(s::Sampler; keys, Neps=100, kwargs...)
+    if hasproperty(s.mdp, :logging)
+        s.mdp.logging = true
+    end
     data = episodes!(s, Neps=Neps; kwargs...)
+    
+    if hasproperty(s.mdp, :logging)
+        s.mdp.logging = false
+    end
+    
     [sum(data[key]) / Neps for key in keys]
 end
 

@@ -209,8 +209,8 @@ Flux.trainable(π::LatentConditionedNetwork) = Flux.trainable(π.policy)
 
 layers(π::LatentConditionedNetwork) = layers(π.policy)
 
-POMDPs.action(π::LatentConditionedNetwork, s) = action(π.policy, vcat(s, π.z))
-POMDPs.value(π::LatentConditionedNetwork, s, args...) = value(π.policy, vcat(s, π.z), args...)
+POMDPs.action(π::LatentConditionedNetwork, s) = action(π.policy, vcat(π.z, s))
+POMDPs.value(π::LatentConditionedNetwork, s, args...) = value(π.policy, vcat(π.z, s), args...)
 
 action_space(π::LatentConditionedNetwork) = action_space(π.policy)
 actor(π::LatentConditionedNetwork) = actor(π.policy)

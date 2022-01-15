@@ -1,6 +1,6 @@
 function TIER_td_loss(;loss=Flux.mse, name=:Qavg, s_key=:s, a_key=:a, weight=nothing)
     (π, 𝒫, 𝒟, y; info=Dict(), z) -> begin
-        Q = value(π, vcat(𝒟[s_key], z), 𝒟[a_key]) 
+        Q = value(π, vcat(z, 𝒟[s_key]), 𝒟[a_key]) 
         
         # Store useful information
         Zygote.ignore() do
@@ -21,16 +21,16 @@ function TIER_double_Q_loss(;name1=:Q1avg, name2=:Q2avg, kwargs...)
 end
 
 
-TIER_TD3_actor_loss(π, 𝒫, 𝒟; info = Dict()) = -mean(value(critic(π).N1, vcat(𝒟[:s], 𝒟[:z]), action(actor(π), vcat(𝒟[:s], 𝒟[:z]))))
+TIER_TD3_actor_loss(π, 𝒫, 𝒟; info = Dict()) = -mean(value(critic(π).N1, vcat(𝒟[:z], 𝒟[:s]), action(actor(π), vcat(𝒟[:z], 𝒟[:s]))))
 
 function TIER_TD3_target(π, 𝒫, 𝒟, γ::Float32; i, z=𝒟[:z]) 
-    ap, _ = exploration(𝒫[:π_smooth], vcat(𝒟[:sp], z), π_on=actor(π), i=i)
-    y = 𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* min.(value(critic(π), vcat(𝒟[:sp], z), ap)...)
+    ap, _ = exploration(𝒫[:π_smooth], vcat(z, 𝒟[:sp]), π_on=actor(π), i=i)
+    y = 𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* min.(value(critic(π), vcat(z, 𝒟[:sp]), ap)...)
 end
 
-TIER_action_regularization(π, 𝒟) = Flux.mse(action(actor(π), vcat(𝒟[:s], 𝒟[:z])), 𝒟[:a])
+TIER_action_regularization(π, 𝒟) = Flux.mse(action(actor(π), vcat(𝒟[:z], 𝒟[:s])), 𝒟[:a])
 TIER_action_value_regularization(π, 𝒟) = begin 
-    v = value(critic(π), vcat(𝒟[:s], 𝒟[:z]), 𝒟[:a])
+    v = value(critic(π), vcat(𝒟[:z], 𝒟[:s]), 𝒟[:a])
     v isa Tuple && (v = v[1])
     Flux.mse(v, 𝒟[:value])
 end
@@ -74,7 +74,7 @@ function TIER(;π,
     buffer_obs.data[:z] = zeros(Float32, latent_dim, capacity(buffer_obs))
 
     # Buffer used to train for latent
-    obs_opt = TrainingParams(;obs_opt...)
+    obs_opt = TrainingParams(;name="obs_", obs_opt...)
     𝒟obs = buffer_like(buffer_obs, capacity=obs_opt.batch_size)
     
     𝒫 = (;buffer_er, buffer_obs, obs_opt, z_dist=Any[zprior], zs=Any[zprior], observation_model, 𝒫...)
@@ -107,17 +107,20 @@ function TIER(;π,
         
         # Fill the buffer with latent estimate, value and computed weight
         D[:z] = repeat(zbest, 1, length(D[:r]))
-        D[:value] = mean(value(critic(𝒮.agent.π), vcat(D[:s], D[:z]), D[:a]))
+        D[:value] = mean(value(critic(𝒮.agent.π), vcat(D[:z], D[:s]), D[:a]))
         D[:weight] .= replay_store_weight(D)
         
         # Add this buffer to our experience replay and observation buffers
         push_reservoir!(buffer_er, D, weighted=true)
         push_reservoir!(buffer_obs, D)
         
+        info["Experience_size"] = length(buffer_er)
+        info["Experience_size_z"] = length(buffer_obs)
+        
         # Train the obs model
         for j=1:obs_opt.epochs
-                rand!(𝒟obs, buffer_obs, buffer, fracs=[0.5, 0.5])
-                train!(Flux.params(observation_model), (;kwargs...) -> obs_opt.loss(observation_model, 𝒟obs; kwargs...), obs_opt, info=info)
+            rand!(𝒟obs, buffer_obs, buffer, fracs=[0.5, 0.5])
+            train!(Flux.params(observation_model), (;kwargs...) -> obs_opt.loss(observation_model, 𝒟obs; kwargs...), obs_opt, info=info)
         end
     end
 

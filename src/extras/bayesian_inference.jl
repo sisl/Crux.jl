@@ -7,7 +7,7 @@ function cross_entropy(f, P; k=1, m=50, m_extra=20, m_elite=m, base_dist=Uniform
         dim = size(samples, 1)
         
         # Add some noise to avoid the distribution collapsing entirely
-        samples .+= rand(Uniform(-1f-3, 1f-3), size(samples)...)
+        # samples .+= rand(Uniform(-1f-3, 1f-3), size(samples)...)
         
         # Add some extra samples from an exploration policy to account for dramatic shifts from previous iterations
         samples = hcat(samples, rand(base_dist, dim, m_extra))

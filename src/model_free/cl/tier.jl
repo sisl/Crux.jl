@@ -64,6 +64,9 @@ function TIER(;π,
     required_columns = unique([:weight, required_columns...])
     buffer = ExperienceBuffer(S, A, buffer_size, required_columns)
     buffer.data[:z] = zeros(Float32, latent_dim, capacity(buffer))
+    
+    small_buffer = ExperienceBuffer(S, A, ΔN, required_columns)
+    small_buffer.data[:z] = zeros(Float32, latent_dim, capacity(buffer))
       
     # This experience buffer is for recalling behavior
     buffer_er = ExperienceBuffer(S, A, N_experience_replay, [required_columns..., :value])
@@ -88,8 +91,8 @@ function TIER(;π,
               required_columns=required_columns,
               c_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_value_regularization), c_opt...),
               a_opt=(;regularizer=BatchRegularizer(buffers=[buffer_er], batch_size=128, λ=0.5f0, loss=TIER_action_regularization), a_opt...),
-              extra_buffers = [buffer_er],
-              buffer_fractions = [1.0 - ER_frac, ER_frac],
+              extra_buffers = [small_buffer, buffer_er],
+              buffer_fractions = [(1.0 - ER_frac)/2.0, (1.0 - ER_frac)/2.0, ER_frac],
               a_loss=a_loss,
               c_loss=c_loss,
               target_fn=target_fn,
@@ -113,13 +116,15 @@ function TIER(;π,
         # Add this buffer to our experience replay and observation buffers
         push_reservoir!(buffer_er, D, weighted=true)
         push_reservoir!(buffer_obs, D)
+        push!(small_buffer, D)
         
         info["Experience_size"] = length(buffer_er)
         info["Experience_size_z"] = length(buffer_obs)
+        info["Experience_small_buff_size"] = length(small_buffer)
         
         # Train the obs model
         for j=1:obs_opt.epochs
-            rand!(𝒟obs, buffer_obs, buffer, fracs=[0.5, 0.5])
+            rand!(𝒟obs, buffer_obs, small_buffer, fracs=[0.5, 0.5])
             train!(Flux.params(observation_model), (;kwargs...) -> obs_opt.loss(observation_model, 𝒟obs; kwargs...), obs_opt, info=info)
         end
     end

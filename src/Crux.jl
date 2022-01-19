@@ -137,6 +137,10 @@ module Crux
     include("model_free/cl/experience_replay.jl")
     include("model_free/cl/tier.jl")
     
+    export CERL_Discrete, CERL_Continuous
+    include("model_free/evaluation/cerl_continuous.jl")
+    include("model_free/evaluation/cerl_discrete.jl")
+    
     export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")
     include("model_free/adversarial/rarl.jl")

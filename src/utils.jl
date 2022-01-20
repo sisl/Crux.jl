@@ -86,6 +86,14 @@ function double_Q_loss(;name1=:Q1avg, name2=:Q2avg, kwargs...)
     end
 end
 
+function multi_td_loss(;names, indices=1:length(names), kwargs...)
+    ls = [td_loss(;name=name, kwargs...) for name in names]
+    
+    (π, 𝒫, 𝒟, ys; info=Dict()) -> begin
+        mean([loss(net, 𝒫, 𝒟, y, info=info) for (loss, net, y) in zip(ls, π.networks[indices], ys)])
+    end
+end
+
 td_error(π, 𝒟, y) = abs.(value(π, 𝒟[:s], 𝒟[:a])  .- y)
 
 

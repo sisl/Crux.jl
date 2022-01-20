@@ -30,7 +30,7 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :episode_end => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value]
+        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value, :likelihoodweight]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))

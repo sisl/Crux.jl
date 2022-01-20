@@ -1,53 +1,70 @@
-function discrete_value_estimate(π, px, s)
+function value_estimate(π::DiscreteNetwork, px, s) where {T <: DiscreteNetwork}
         pdfs = exp.(logpdf(px, s))
         sum(value(π, s) .* pdfs, dims=1)
 end
 
-function CERL_double_loss(;name1=:Q1avg, name2=:Q2avg, kwargs...)
-    l1 = td_loss(;name=name1, kwargs...)
-    l2 = td_loss(;name=name2, kwargs...)
-    
-    (π, 𝒫, 𝒟, y; info=Dict()) -> begin
-        .5f0*(l1(π.C.N1, 𝒫, 𝒟, y[1], info=info) + l2(π.C.N2, 𝒫, 𝒟, y[2], info=info))
-    end
-end
-
 #NOTE: Currently all of these assume that we get a reward (cost) ONCE at the end of an episode
 
-function expected_reward_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+function E_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
         px = 𝒫[:px]
-        𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* discrete_value_estimate(π, px, 𝒟[:sp])
+        𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
+        # 𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
 end
 
-function expected_tail_reward_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
-        rα = 𝒫[:rα]
+function CDF_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+        rα = 𝒫[:rα][1]
         px = 𝒫[:px]
-        𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* discrete_value_estimate(π.C.N1, px, 𝒟[:sp]) #CDF
-        𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* discrete_value_estimate(π.C.N2, px, 𝒟[:sp]) #CVAR
+        
+        # println("larger than var: ", sum((𝒟[:r] .> rα)))
+        # 𝒟[:likelihoodweight] .* (𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])) 
+        𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+end
+
+function CVaR_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+        rα = 𝒫[:rα][1]
+        px = 𝒫[:px]
+        # 𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
+        𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+end
+
+function E_VaR_CVaR_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+        [CDF_target(π.networks[1], 𝒫, 𝒟, γ; kwargs...), CVaR_target(π.networks[2], 𝒫, 𝒟, γ; kwargs...), E_target(π.networks[3], 𝒫, 𝒟, γ; kwargs...)]
+end 
+
+function VaR_CVaR_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+        [CDF_target(π.networks[1], 𝒫, 𝒟, γ; kwargs...), CVaR_target(π.networks[2], 𝒫, 𝒟, γ; kwargs...)]
 end
 
 
-function CERL_Discrete(;π::DiscreteNetwork,
+function CERL_Discrete(;π::MixtureNetwork,
+                        S,
                         N, 
                         px,
+                        prioritized=true,
+                        α,
                         𝒫=(;),
                         buffer_size=N,
                         ΔN=4,
+                        pre_train_callback,
                         π_explore, 
                         c_opt::NamedTuple=(;), 
                         log::NamedTuple=(;),
-                        c_loss=CERL_double_loss(),
+                        c_loss,
                         kwargs...)
                
-                    𝒫 = (;px, rα=NaN, 𝒫...)
-                    OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
-                                     log=LoggerParams(;dir="log/cerl_dqn", log...),
+                    𝒫 = (;px, rα=[NaN], α, 𝒫...)
+                    required_columns=[:logprob, :likelihoodweight]
+                    agent = PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π), pa=px)
+                    OffPolicySolver(;agent=agent,
+                                     S=S,
+                                     log=LoggerParams(;dir="log/cerl_dqn", period=100, fns=[log_episode_averages([:r], 100)], log...),
                                      𝒫=𝒫,
                                      N=N,
                                      ΔN=ΔN,
-                                     buffer_size=buffer_size,
+                                     pre_train_callback=pre_train_callback,
+                                     buffer=ExperienceBuffer(S, agent.space, buffer_size, required_columns, prioritized=prioritized),
                                      c_opt = TrainingParams(;loss=c_loss, name="critic_", epochs=ΔN, c_opt...),
-                                     target_fn=expected_tail_reward_target,
+                                     target_fn=VaR_CVaR_target,
                                      kwargs...)
 end
 

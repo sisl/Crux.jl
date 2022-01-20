@@ -4,6 +4,7 @@
     space::T2 = action_space(π)
     π_explore = π
     π⁻ = nothing
+    pa = nothing # nominal action distribution
 end
 PolicyParams(π::T) where {T <: Policy} = PolicyParams(π=π)
 
@@ -17,6 +18,8 @@ end
 device(π::N) where N<:NetworkPolicy = π.device
 actor(π::N) where N<:NetworkPolicy = π
 critic(π::N) where N<:NetworkPolicy = π
+
+new_ep_reset!(π::N) where N<:NetworkPolicy = nothing
 
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
@@ -161,6 +164,48 @@ Distributions.logpdf(π::DoubleNetwork, s, a) = (logpdf(π.N1, s, a), logpdf(π.
 Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2, s))
 
 action_space(π::DoubleNetwork) = action_space(π.N1)
+
+## Mixture Network architecture
+mutable struct MixtureNetwork <: NetworkPolicy
+    networks::Array
+    weights::Array{Float64}
+    current_net::Int
+    MixtureNetwork(networks::Array, weights, current_net=rand(Categorical(weights))) = new(networks, weights, current_net)
+end
+
+
+
+function new_ep_reset!(π::MixtureNetwork)
+    π.current_net = rand(Categorical(π.weights))
+end
+    
+Flux.@functor MixtureNetwork
+
+Flux.trainable(π::MixtureNetwork) = collect(Iterators.flatten([Flux.trainable(n) for n in π.networks]))
+
+layers(π::MixtureNetwork) = unique(collect(Iterators.flatten([layers(n) for n in π.networks])))
+
+function device(π::MixtureNetwork)
+    dev = device(π.networks[1])
+    @assert all([device(n) == dev for n in π.networks])
+    dev
+end
+# 
+# valueall(π::MixtureNetwork, s) = [value(n, s) for n in π.networks]
+# valueall(π::MixtureNetwork, s, a) = [value(n, s, a) for n in π.networks]
+
+POMDPs.value(π::MixtureNetwork, s) = value(π.networks[π.current_net], s)
+POMDPs.value(π::MixtureNetwork, s, a) = value(π.networks[π.current_net], s, a)
+
+POMDPs.action(π::MixtureNetwork, s) = action(π.networks[π.current_net], s)
+
+exploration(π::MixtureNetwork, s; kwargs...) = exploration(π.networks[π.current_net], s; kwargs...)
+    
+Distributions.logpdf(π::MixtureNetwork, s, a) = logpdf(π.networks[π.current_net], s, a)
+
+Distributions.entropy(π::MixtureNetwork, s) = entropy(π.networks[π.current_net], s)
+
+action_space(π::MixtureNetwork) = action_space(π.networks[π.current_net])
 
 
 ## Actor Critic Architecture
@@ -307,8 +352,8 @@ Distributions.entropy(π::SquashedGaussianPolicy, s) = 1.4189385332046727f0 .+ s
 action_space(π::SquashedGaussianPolicy) = action_space(π.μ)
 
 ## Distribution policy -> For state-independent policies
-mutable struct DistributionPolicy <: Policy
-    distribution
+mutable struct DistributionPolicy{T} <: Policy
+    distribution::T
 end
 
 layers(π::DistributionPolicy) = ()
@@ -328,12 +373,25 @@ end
 
 Distributions.logpdf(π::DistributionPolicy, s, a) = Float32.(reshape([logpdf(π.distribution, a)...], 1, :)) |> device(s)
 
+Distributions.logpdf(π::DistributionPolicy{T}, s) where T<:DiscreteNonParametric = Base.log.(π.distribution.p)
+
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where T<:DiscreteNonParametric
+    # If a seems to be a one-hot encoding then we onecold it
+    size(a,1) ==  length(support(π.distribution)) && (a=Flux.onecold(a, support(π.distribution))) 
+    logpdfs = Float32.([logpdf.(π.distribution, a)...])
+    if length(logpdfs) > 1
+        logpdfs = reshape(logpdfs, 1, :)
+    end
+    logpdfs |> device(s)
+end
+
 function Distributions.entropy(π::DistributionPolicy, s)
     B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
     Float32(entropy(π.distribution)) * ones(Float32, 1, B...)
 end
 
 action_space(π::DistributionPolicy) = ContinuousSpace(length(π.distribution))
+action_space(π::DistributionPolicy{T}) where T<:DiscreteNonParametric = DiscreteSpace(support(π.distribution))
 
 
 ## Mixed policy

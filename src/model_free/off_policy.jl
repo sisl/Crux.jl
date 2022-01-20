@@ -15,11 +15,13 @@
     
     # Off-policy-specific parameters
 	post_batch_callback = (𝒟; kwargs...) -> nothing # Callback that that happens after sampling a batch
+	pre_train_callback = (𝒮; kwargs...) -> nothing # callback that gets called once prior to training
     target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0) # Function for updating the target network
     target_fn # Target for critic regression with input signature (π⁻, 𝒟, γ; i)
     buffer_size = 1000 # Size of the buffer
     required_columns = Symbol[]
     buffer = ExperienceBuffer(S, agent.space, buffer_size, required_columns) # The replay buffer
+	priority_fn = td_error  # function for prioritized replay
     buffer_init::Int = max(c_opt.batch_size, 200) # Number of observations to initialize the buffer with
     extra_buffers = [] # extra buffers (i.e. for experience replay in continual learning)
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
@@ -42,7 +44,7 @@ function train_step(𝒮::OffPolicySolver, 𝒟, γ)
         y = 𝒮.target_fn(𝒮.agent.π⁻, 𝒮.𝒫, 𝒟, γ, i=𝒮.i)
         
         # Update priorities (for prioritized replay)
-        isprioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(td_error(𝒮.agent.π, 𝒟, y)))
+        isprioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(𝒮.priority_fn(𝒮.agent.π, 𝒟, y)))
         
         # Train parameters
         for (θs, p_opt) in 𝒮.param_optimizers
@@ -98,6 +100,8 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
         
         # Sample transitions into the replay buffer
 		steps!(s, 𝒮.buffer, Nsteps=𝒮.ΔN, explore=true, i=𝒮.i, store=𝒮.interaction_storage, cb=(D)->𝒮.post_sample_callback(D, 𝒮=𝒮, info=info))
+		
+		𝒮.pre_train_callback(𝒮, info=info)
         
         # Train the networks
         infos = train_step(𝒮, 𝒟, γ)

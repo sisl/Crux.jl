@@ -126,6 +126,37 @@ lgts = Crux.logits(p, s)
 
 
 
+## Mixture Network
+Q1 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
+Q2 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
+p = MixtureNetwork([Q1, Q2], [0.1, 0.9])
+s = rand(2,100)
+a = rand([true, false], 3, 100)
+
+
+@test length(Flux.trainable(p)) == 4
+@test length(layers(p)) == 4
+@test device(p) == cpu
+
+@test p.current_net == 1
+@test action_space(p) == action_space(p.networks[1])
+
+p_gpu = p |> gpu
+@test Crux.device(p_gpu) == gpu
+@test all([Crux.device(n)== gpu for n in p_gpu.networks])
+
+@test length(Flux.params(p)) == 8
+@test length(layers(p)) == 4
+
+@test all(Crux.value(p, s) .≈ Crux.value(p_gpu, s))
+# @test Crux.valueall(p, s) == [Crux.value(p.networks[1], s), Crux.value(p.networks[2], s)]
+# @test Crux.valueall(p, s, a) == [Crux.value(p.networks[1], s, a), Crux.value(p.networks[2], s, a)]
+@test action(p, s) == action(p.networks[1], s)
+
+p.current_net=2
+@test action(p, s) == action(p.networks[2], s)
+
+
 ## Double Network
 Q1 = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 1)))
 Q2 = ContinuousNetwork(Chain(Dense(2,32, relu), Dense(32, 2)))

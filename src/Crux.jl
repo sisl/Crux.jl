@@ -38,7 +38,7 @@ module Crux
     include("spaces.jl")
     
     export ObjectCategorical, ConstantLayer, whiten, to2D, tovec, 
-           LinearDecaySchedule, MultitaskDecaySchedule
+           LinearDecaySchedule, MultitaskDecaySchedule, multi_td_loss
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
@@ -55,7 +55,7 @@ module Crux
            DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
            entropy, logpdf, action_space, exploration, layers, actor, critic,
-           LatentConditionedNetwork
+           LatentConditionedNetwork, MixtureNetwork
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 

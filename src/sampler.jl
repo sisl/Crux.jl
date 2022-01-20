@@ -29,6 +29,8 @@ function reset_sampler!(sampler::Sampler)
         sampler.agent.π.z = sampler.mdp.z
     end
     
+    new_ep_reset!(sampler.agent.π)
+    
     sampler.s = rand(initialstate(sampler.mdp))
     sampler.svec = tovec(initial_observation(sampler.mdp, sampler.s), sampler.S)
     sampler.episode_length = 0
@@ -90,7 +92,11 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     data[:done][1, j] = done
     
     # Handle optional data storage
-    haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)  
+    haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)
+    if haskey(data, :likelihoodweight)
+        nom_logprob = logpdf(sampler.agent.pa, sampler.svec, a)
+        data[:likelihoodweight][:, j] .= exp.(nom_logprob .- logprob)
+    end
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     haskey(data, :i) && (data[:i][1, j] = i+1)
     haskey(data, :cost) && (data[:cost][1,j] = info["cost"])

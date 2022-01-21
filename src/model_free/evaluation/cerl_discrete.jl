@@ -7,24 +7,32 @@ end
 
 function E_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
         px = 𝒫[:px]
-        𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
-        # 𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        if 𝒫[:use_likelihood_weights]
+                return 𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
+        else
+                return 𝒟[:done] .* 𝒟[:r] .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        end
 end
 
 function CDF_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
         rα = 𝒫[:rα][1]
         px = 𝒫[:px]
         
-        # println("larger than var: ", sum((𝒟[:r] .> rα)))
-        # 𝒟[:likelihoodweight] .* (𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])) 
-        𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        if 𝒫[:use_likelihood_weights]
+                return 𝒟[:likelihoodweight] .* (𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
+        else
+                return 𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        end
 end
 
 function CVaR_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
         rα = 𝒫[:rα][1]
         px = 𝒫[:px]
-        # 𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
-        𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        if 𝒫[:use_likelihood_weights]
+                return 𝒟[:likelihoodweight] .* (𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp]))
+        else
+                return 𝒟[:done] .* 𝒟[:r] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp])
+        end
 end
 
 function E_VaR_CVaR_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
@@ -41,6 +49,7 @@ function CERL_Discrete(;π::MixtureNetwork,
                         N, 
                         px,
                         prioritized=true,
+                        use_likelihood_weights=true, 
                         α,
                         𝒫=(;),
                         buffer_size=N,
@@ -52,7 +61,7 @@ function CERL_Discrete(;π::MixtureNetwork,
                         c_loss,
                         kwargs...)
                
-                    𝒫 = (;px, rα=[NaN], α, 𝒫...)
+                    𝒫 = (;px, rα=[NaN], α, use_likelihood_weights, 𝒫...)
                     required_columns=[:logprob, :likelihoodweight]
                     agent = PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π), pa=px)
                     OffPolicySolver(;agent=agent,

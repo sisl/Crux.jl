@@ -88,7 +88,7 @@ mutable struct DiscreteNetwork <: NetworkPolicy
     logit_conversion
     always_stochastic
     device
-    DiscreteNetwork(network, outputs, logit_conversion=softmax, always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+    DiscreteNetwork(network, outputs, logit_conversion=(vals, s)->softmax(vals), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
 end
 
 Flux.@functor DiscreteNetwork 
@@ -110,14 +110,15 @@ function Flux.onehotbatch(π::DiscreteNetwork, a)
     end
 end 
 
-logits(π::DiscreteNetwork, s) = π.logit_conversion(value(π, s))
+logits(π::DiscreteNetwork, s) = π.logit_conversion(value(π, s), s)
 
 categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1) .+ eps(Float32))
 
 function exploration(π::DiscreteNetwork, s; kwargs...)
     ps = logits(π, s) 
-    a = π.outputs[mapslices((v)->rand(Categorical(v)), ps, dims=1)]
-    a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
+    ai = mapslices((v)->rand(Categorical(v)), ps, dims=1)
+    π.outputs[ai], Base.log.(ps[ai])
+    # a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
 end
 
 function Distributions.logpdf(π::DiscreteNetwork, s, a)
@@ -206,6 +207,9 @@ Distributions.logpdf(π::MixtureNetwork, s, a) = logpdf(π.networks[π.current_n
 Distributions.entropy(π::MixtureNetwork, s) = entropy(π.networks[π.current_net], s)
 
 action_space(π::MixtureNetwork) = action_space(π.networks[π.current_net])
+
+actor(π::MixtureNetwork) = MixtureNetwork([actor(net) for net in π.networks], π.weights, π.current_net)
+critic(π::MixtureNetwork) = MixtureNetwork([critic(net) for net in π.networks], π.weights, π.current_net)
 
 
 ## Actor Critic Architecture
@@ -356,6 +360,8 @@ mutable struct DistributionPolicy{T} <: Policy
     distribution::T
 end
 
+new_ep_reset!(π::DistributionPolicy) = nothing
+
 layers(π::DistributionPolicy) = ()
 
 device(π::DistributionPolicy) = cpu
@@ -364,14 +370,20 @@ POMDPs.action(π::DistributionPolicy, s) = exploration(π, s)[1]
 
 function exploration(π::DistributionPolicy, s; kwargs...)
     B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
-    a = rand(π.distribution, B...)
+    a = rand(π.distribution, length(π.distribution), B...)
     if a isa Float64 || a isa AbstractArray{Float64}
         a = Float32.(a)
     end
     a |> device(s), logpdf(π, s, a)
 end
 
-Distributions.logpdf(π::DistributionPolicy, s, a) = Float32.(reshape([logpdf(π.distribution, a)...], 1, :)) |> device(s)
+function Distributions.logpdf(π::DistributionPolicy, s, a)
+    logpdf.(π.distribution, a)
+    # if length(logpdfs) > 1
+    #     logpdfs = reshape(logpdfs, 1, :)
+    # end
+    # logpdfs |> device(s)
+end
 
 Distributions.logpdf(π::DistributionPolicy{T}, s) where T<:DiscreteNonParametric = Base.log.(π.distribution.p)
 
@@ -405,15 +417,23 @@ MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
 
 function exploration(π::MixedPolicy, s; π_on, i,)
     ϵ = π.ϵ(i)
-    x = rand() < ϵ ? action(π.policy, s) : action(π_on, s)
+    if ϵ == 0 || (π_on isa MixtureNetwork && π_on.current_net==3)
+        return exploration(π_on, s)
+    end
+    x = (rand() < ϵ) ? exploration(π.policy, s)[1] : exploration(π_on, s)[1]
+    
     
     # Turn the action into an array if it is a value
-    !(x isa AbstractArray || x isa Tuple) && (x=fill(x, 1))
+    # !(x isa AbstractArray || x isa Tuple) && (x=fill(x, 1))
     
     logp1 = Base.log(ϵ) .+ logpdf(π.policy, s, x)
     logp2 = Base.log(1-ϵ) .+ logpdf(π_on, s, x)
     
-    x, logsumexp(vcat(logp1, logp2), dims=1)
+    p1 = ϵ .*  exp.(logpdf(π.policy, s, x))
+    p2 = (1-ϵ) .* exp.(logpdf(π_on, s, x))
+    
+    # logsumexp(vcat(logp1, logp2), dims=1)
+    x, Base.log.(p1 .+ p2)
 end
 
 

@@ -94,7 +94,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     # Handle optional data storage
     haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)
     if haskey(data, :likelihoodweight)
-        nom_logprob = logpdf(sampler.agent.pa, sampler.svec, a)
+        nom_logprob = logpdf(sampler.agent.pa, sampler.svec, tovec(a, sampler.agent.space))
         data[:likelihoodweight][:, j] .= exp.(nom_logprob .- logprob)
     end
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)

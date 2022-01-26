@@ -94,6 +94,12 @@ function multi_td_loss(;names, indices=1:length(names), kwargs...)
     end
 end
 
+function multi_actor_loss(actor_lf, N; indices=1:N, kwargs...)
+    (π, 𝒫, 𝒟; info=Dict()) -> begin
+        mean([actor_lf(net, 𝒫, 𝒟, info=info) for net in π.networks[indices]])
+    end
+end
+
 td_error(π, 𝒟, y) = abs.(value(π, 𝒟[:s], 𝒟[:a])  .- y)
 
 

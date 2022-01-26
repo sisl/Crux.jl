@@ -38,7 +38,7 @@ module Crux
     include("spaces.jl")
     
     export ObjectCategorical, ConstantLayer, whiten, to2D, tovec, 
-           LinearDecaySchedule, MultitaskDecaySchedule, multi_td_loss
+           LinearDecaySchedule, MultitaskDecaySchedule, multi_td_loss, multi_actor_loss
     include("utils.jl")
     
     export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
@@ -137,9 +137,8 @@ module Crux
     include("model_free/cl/experience_replay.jl")
     include("model_free/cl/tier.jl")
     
-    export CERL_Discrete, CERL_Continuous
-    include("model_free/evaluation/cerl_continuous.jl")
-    include("model_free/evaluation/cerl_discrete.jl")
+    export ISDRL_Discrete, ISDRL_Continuous
+    include("model_free/evaluation/isdrl.jl")
     
     export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")

@@ -30,7 +30,7 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         :episode_end => ArrayType(fill(zero(D), 1, capacity))
         )
     for k in extras
-        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value, :likelihoodweight]
+        if k in [:return, :logprob, :xlogprob, :advantage, :cost, :cost_advantage, :cost_return, :value, :likelihoodweight, :var_prob, :cvar_prob]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight]
             data[k] = ArrayType(fill(one(R), 1, capacity))
@@ -53,14 +53,19 @@ end
 
 ## Prioritized replay parameters
 @with_kw mutable struct PriorityParams
-    minsort_priorities::MinHeap
-    priorities::FenwickTree
+    # minsort_priorities::MinHeap
+    # priorities::FenwickTree
+    priorities::Vector{Float32}
+    cumsum::Vector{Float32} = Float32[]
+    cumsum_valid=false
     α::Float32 = 0.6
     β::Function = (i) -> 0.5f0
     max_priority::Float32 = 1.0
+    min_priority::Float32 = Inf
 end
 
-PriorityParams(N::Int; kwargs...) = PriorityParams(;minsort_priorities=MinHeap(fill(Inf32, N)), priorities=FenwickTree(fill(0f0, N)), kwargs...)
+# PriorityParams(N::Int; kwargs...) = PriorityParams(;minsort_priorities=MinHeap(fill(Inf32, N)), priorities=FenwickTree(fill(0f0, N)), kwargs...)
+PriorityParams(N::Int; kwargs...) = PriorityParams(;priorities=fill(0f0, N), kwargs...)
 PriorityParams(N::Int, pp::PriorityParams) = PriorityParams(N, α=pp.α, β=pp.β, max_priority=pp.max_priority)
     
 ## Experience Buffer stuff
@@ -293,9 +298,12 @@ end
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
     for i = 1:length(I)
         val = v[i] + eps(Float32)
-        update!(b.priority_params.priorities, I[i], val^b.priority_params.α)
-        update!(b.priority_params.minsort_priorities, I[i], val^b.priority_params.α)
+        b.priority_params.priorities[I[i]] = val^b.priority_params.α
+        # update!(b.priority_params.priorities, I[i], val^b.priority_params.α)
+        # update!(b.priority_params.minsort_priorities, I[i], val^b.priority_params.α)
         b.priority_params.max_priority = max(val, b.priority_params.max_priority)
+        b.priority_params.min_priority = min(val, b.priority_params.min_priority)
+        b.priority_params.cumsum_valid = false
     end
 end
 
@@ -323,14 +331,27 @@ end
 function prioritized_sample!(target::ExperienceBuffer, source::ExperienceBuffer; i = 1, B = capacity(target))
     @assert haskey(source, :weight) 
     N = length(source)
-    prs = source.priority_params.priorities
-    ptot = prefixsum(prs, N)
+    # prs = source.priority_params.priorities
+    prs = view(source.priority_params.priorities, 1:length(source))
+    if !source.priority_params.cumsum_valid
+        source.priority_params.cumsum = cumsum(prs)
+        source.priority_params.cumsum_valid = true
+    end
+    ptot = source.priority_params.cumsum[end]
+    # ptot = prefixsum(prs, N)
     Δp = ptot / B
-    target.indices = [inverse_query(prs, (j + rand() - 1) * Δp, N-1) for j=1:B]
-    pmin = first(source.priority_params.minsort_priorities) / ptot
+    # target.indices = [inverse_query(prs, (j + rand() - 1) * Δp, N-1) for j=1:B]
+    rands = rand(B)
+    target.indices = Array{Int}(undef, B)
+    for j=1:B
+        target.indices[j] = searchsortedfirst(source.priority_params.cumsum, (j + rands[j] - 1) * Δp)
+    end
+    # pmin = first(source.priority_params.minsort_priorities) / ptot
+    pmin = source.priority_params.min_priority / ptot
     max_w = (pmin*N)^(-source.priority_params.β(i))
-    source[:weight][1, target.indices] .= [(N * prs[id] / ptot)^source.priority_params.β(i) for id in target.indices] ./ max_w
-    
+    for id in target.indices
+        source[:weight][1, id] .= ((N * prs[id] / ptot)^source.priority_params.β(i)) / max_w
+    end
     push!(target, source, ids = target.indices)
 end
 

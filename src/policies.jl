@@ -248,6 +248,11 @@ critic(π::AC) where AC<:ActorCritic = π.C
 mutable struct LatentConditionedNetwork <: NetworkPolicy
     policy
     z
+    reset_fn = (π) -> nothing
+end
+
+function new_ep_reset!(π::LatentConditionedNetwork)
+    reset_fn(π)
 end
 
 device(π::LatentConditionedNetwork) = device(π.policy)

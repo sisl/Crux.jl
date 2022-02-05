@@ -19,12 +19,14 @@ function E_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
 end
 
 function CDF_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
-        rα = 𝒫[:rα][1]
+        # rα = 𝒫[:rα][1]
+        rs = 𝒫[:rs]
         # stdrα = 𝒫[:std_rα][1]
         # vard = Normal(rα, stdrα)
         px = 𝒫[:px]
+        B = length(𝒟[:r])
         
-        y = 𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, 𝒟[:sp], 𝒫)
+        y = hcat([𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, vcat(repeat(rα, 1, B), 𝒟[:sp]), 𝒫) for rα in rs]...)
         return y
         # return (𝒟[:var_prob] .+ y) ./ 2f0
         # return 𝒟[:var_prob] 
@@ -109,6 +111,7 @@ function ISDRL_Discrete(;π::MixtureNetwork,
                         S,
                         N, 
                         px,
+                        N_cdf=10,
                         prioritized=true,
                         use_likelihood_weights=true, 
                         α,
@@ -122,7 +125,7 @@ function ISDRL_Discrete(;π::MixtureNetwork,
                         c_loss,
                         kwargs...)
                
-                    𝒫 = (;px, rα=Float32[NaN], std_rα=Float32[NaN], α, use_likelihood_weights, 𝒫...)
+                    𝒫 = (;px, rα=Float32[NaN], rs=zeros(N_cdf), std_rα=Float32[NaN], α, use_likelihood_weights, 𝒫...)
                     required_columns=[:logprob, :likelihoodweight, :var_prob, :cvar_prob]
                     agent = PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π), pa=px)
                     OffPolicySolver(;agent=agent,

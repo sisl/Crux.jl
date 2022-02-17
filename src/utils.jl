@@ -100,7 +100,7 @@ function multi_actor_loss(actor_lf, N; indices=1:N, kwargs...)
     end
 end
 
-td_error(π, 𝒟, y) = abs.(value(π, 𝒟[:s], 𝒟[:a])  .- y)
+td_error(π, 𝒫, 𝒟, y) = abs.(value(π, 𝒟[:s], 𝒟[:a])  .- y)
 
 
 ## Scheduling

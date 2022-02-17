@@ -296,6 +296,7 @@ function push_reservoir!(buffer, data; weighted=false)
 end
 
 function update_priorities!(b, I::AbstractArray, v::AbstractArray)
+    @assert length(I) == length(v)
     for i = 1:length(I)
         val = v[i] + eps(Float32)
         b.priority_params.priorities[I[i]] = val^b.priority_params.α

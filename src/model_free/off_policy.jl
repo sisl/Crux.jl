@@ -44,7 +44,7 @@ function train_step(𝒮::OffPolicySolver, 𝒟, γ)
         y = 𝒮.target_fn(𝒮.agent.π⁻, 𝒮.𝒫, 𝒟, γ, i=𝒮.i)
         
         # Update priorities (for prioritized replay)
-        isprioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(𝒮.priority_fn(𝒮.agent.π, 𝒟, y)))
+        isprioritized(𝒮.buffer) && update_priorities!(𝒮.buffer, 𝒟.indices, cpu(𝒮.priority_fn(𝒮.agent.π, 𝒮.𝒫, 𝒟, y)))
         
         # Train parameters
         for (θs, p_opt) in 𝒮.param_optimizers

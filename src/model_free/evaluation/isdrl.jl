@@ -26,7 +26,7 @@ function CDF_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
         px = 𝒫[:px]
         B = length(𝒟[:r])
         
-        y = hcat([𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π, px, vcat(repeat(rα, 1, B), 𝒟[:sp]), 𝒫) for rα in rs]...)
+        y = hcat([𝒟[:done] .* (𝒟[:r] .> rα) .+ (1.f0 .- 𝒟[:done]) .* value_estimate(π.policy, px, vcat(repeat([rα], 1, B), 𝒟[:sp]), 𝒫) for rα in rs]...)
         return y
         # return (𝒟[:var_prob] .+ y) ./ 2f0
         # return 𝒟[:var_prob] 
@@ -107,14 +107,16 @@ end
 
 
 
-function ISDRL_Discrete(;π::MixtureNetwork,
+function ISDRL_Discrete(;π,
                         S,
                         N, 
                         px,
                         N_cdf=10,
+                        cdf_weights=ones(Float32, N_cdf) ./ N_cdf,
                         prioritized=true,
                         use_likelihood_weights=true, 
                         α,
+                        target_fn=VaR_CVaR_target,
                         𝒫=(;),
                         buffer_size=N,
                         ΔN=4,
@@ -125,7 +127,7 @@ function ISDRL_Discrete(;π::MixtureNetwork,
                         c_loss,
                         kwargs...)
                
-                    𝒫 = (;px, rα=Float32[NaN], rs=zeros(N_cdf), std_rα=Float32[NaN], α, use_likelihood_weights, 𝒫...)
+                    𝒫 = (;px, cdf_weights, rα=Float32[NaN], rs=zeros(Float32, N_cdf), std_rα=Float32[NaN], α, use_likelihood_weights, 𝒫...)
                     required_columns=[:logprob, :likelihoodweight, :var_prob, :cvar_prob]
                     agent = PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π), pa=px)
                     OffPolicySolver(;agent=agent,
@@ -138,7 +140,7 @@ function ISDRL_Discrete(;π::MixtureNetwork,
                                      pre_train_callback=pre_train_callback,
                                      buffer=ExperienceBuffer(S, agent.space, buffer_size, required_columns, prioritized=prioritized),
                                      c_opt = TrainingParams(;loss=c_loss, name="critic_", epochs=ΔN, c_opt...),
-                                     target_fn=VaR_CVaR_target,
+                                     target_fn=target_fn,
                                      kwargs...)
 end
 

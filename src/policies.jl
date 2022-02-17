@@ -88,7 +88,7 @@ mutable struct DiscreteNetwork <: NetworkPolicy
     logit_conversion
     always_stochastic
     device
-    DiscreteNetwork(network, outputs, logit_conversion=(vals, s)->softmax(vals), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+    DiscreteNetwork(network, outputs, logit_conversion=(π, s)->softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
 end
 
 Flux.@functor DiscreteNetwork 
@@ -110,7 +110,7 @@ function Flux.onehotbatch(π::DiscreteNetwork, a)
     end
 end 
 
-logits(π::DiscreteNetwork, s) = π.logit_conversion(value(π, s), s)
+logits(π::DiscreteNetwork, s) = π.logit_conversion(π, s)
 
 categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1) .+ eps(Float32))
 
@@ -248,11 +248,12 @@ critic(π::AC) where AC<:ActorCritic = π.C
 mutable struct LatentConditionedNetwork <: NetworkPolicy
     policy
     z
-    reset_fn = (π) -> nothing
+    reset_fn
+    LatentConditionedNetwork(policy, z, reset_fn=(π) -> nothing) = new(policy, z, reset_fn)
 end
 
 function new_ep_reset!(π::LatentConditionedNetwork)
-    reset_fn(π)
+    π.reset_fn(π)
 end
 
 device(π::LatentConditionedNetwork) = device(π.policy)
@@ -265,6 +266,12 @@ layers(π::LatentConditionedNetwork) = layers(π.policy)
 
 POMDPs.action(π::LatentConditionedNetwork, s) = action(π.policy, vcat(π.z, s))
 POMDPs.value(π::LatentConditionedNetwork, s, args...) = value(π.policy, vcat(π.z, s), args...)
+
+exploration(π::LatentConditionedNetwork, s; kwargs...) = exploration(π.policy, vcat(π.z, s); kwargs...)
+Distributions.logpdf(π::LatentConditionedNetwork, s, a) = logpdf(π.policy, vcat(π.z, s), a)
+
+Distributions.entropy(π::LatentConditionedNetwork, s) = entropy(π.policy, vcat(π.z, s))
+
 
 action_space(π::LatentConditionedNetwork) = action_space(π.policy)
 actor(π::LatentConditionedNetwork) = actor(π.policy)

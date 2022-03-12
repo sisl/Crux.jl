@@ -19,7 +19,7 @@ device(π::N) where N<:NetworkPolicy = π.device
 actor(π::N) where N<:NetworkPolicy = π
 critic(π::N) where N<:NetworkPolicy = π
 
-new_ep_reset!(π::N) where N<:NetworkPolicy = nothing
+new_ep_reset!(π::N) where N<:Policy = nothing
 
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
@@ -112,13 +112,13 @@ end
 
 logits(π::DiscreteNetwork, s) = π.logit_conversion(π, s)
 
-categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1) .+ eps(Float32))
+categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1))
 
 function exploration(π::DiscreteNetwork, s; kwargs...)
     ps = logits(π, s) 
     ai = mapslices((v)->rand(Categorical(v)), ps, dims=1)
-    π.outputs[ai], Base.log.(ps[ai])
-    # a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
+    a = π.outputs[ai]
+    a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
 end
 
 function Distributions.logpdf(π::DiscreteNetwork, s, a)
@@ -173,8 +173,6 @@ mutable struct MixtureNetwork <: NetworkPolicy
     current_net::Int
     MixtureNetwork(networks::Array, weights, current_net=rand(Categorical(weights))) = new(networks, weights, current_net)
 end
-
-
 
 function new_ep_reset!(π::MixtureNetwork)
     π.current_net = rand(Categorical(π.weights))
@@ -378,38 +376,47 @@ layers(π::DistributionPolicy) = ()
 
 device(π::DistributionPolicy) = cpu
 actor(π::DistributionPolicy) = π
-POMDPs.action(π::DistributionPolicy, s) = exploration(π, s)[1]
 
-function exploration(π::DistributionPolicy{T}, s; kwargs...) where T
-    B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
-    a = rand(π.distribution, B...)
-    if size(a) == ()
-        a = [a]
-    end
-    if !(T isa ObjectCategorical || T isa Categorical) && (a isa Float64 || a isa AbstractArray{Float64})
-        a = Float32.(a)
-    end
-    a |> device(s), logpdf(π, s, a)
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: ContinuousMultivariateDistribution}
+    B = ndims(s) > 1 ? size(s)[end] : () # NOTE: This hack doesnt work for states with multiple dimensions (i.e. images)
+    Float32.(rand(π.distribution, B...)) |> device(s)
 end
 
-function Distributions.logpdf(π::DistributionPolicy, s, a)
-    logpdf.([π.distribution], a)
-    # if length(logpdfs) > 1
-    #     logpdfs = reshape(logpdfs, 1, :)
-    # end
-    # logpdfs |> device(s)
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: ContinuousUnivariateDistribution}
+    B = ndims(s) > 1 ? size(s)[end] : 1
+    a = Float32.(rand(π.distribution, B))
+    (length(a) > 1 ? reshape(a, 1, :) : a) |> device(s)
+end
+
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: DiscreteUnivariateDistribution}
+    B = ndims(s) > 1 ? size(s)[end] : 1
+    a = rand(π.distribution, B)
+    (length(a) > 1 ? reshape(a, 1, :) : a) |> device(s)
+end
+
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T <: ContinuousMultivariateDistribution}
+    ls = Float32.(logpdf(π.distribution, reshape(a, length(π.distribution), :))) 
+    (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
+end
+
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T <: ContinuousUnivariateDistribution}
+    ls = Float32.(logpdf.(π.distribution, a))
+    (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
+end
+
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where T<:DiscreteUnivariateDistribution
+    # If a seems to be a one-hot encoding then we onecold it
+    size(a,1) == length(support(π.distribution)) && (a=Flux.onecold(a, support(π.distribution))) 
+    
+    ls = Float32.(logpdf.(π.distribution, a))
+    (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
 end
 
 Distributions.logpdf(π::DistributionPolicy{T}, s) where T<:DiscreteNonParametric = Base.log.(π.distribution.p)
 
-function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where T<:DiscreteNonParametric
-    # If a seems to be a one-hot encoding then we onecold it
-    size(a,1) ==  length(support(π.distribution)) && (a=Flux.onecold(a, support(π.distribution))) 
-    logpdfs = Float32.([logpdf.(π.distribution, a)...])
-    if length(logpdfs) > 1
-        logpdfs = reshape(logpdfs, 1, :)
-    end
-    logpdfs |> device(s)
+function exploration(π::DistributionPolicy{T}, s; kwargs...) where T
+    a = action(π, s)
+    a, logpdf(π, s, a)
 end
 
 function Distributions.entropy(π::DistributionPolicy, s)
@@ -417,8 +424,8 @@ function Distributions.entropy(π::DistributionPolicy, s)
     Float32(entropy(π.distribution)) * ones(Float32, 1, B...)
 end
 
-action_space(π::DistributionPolicy) = ContinuousSpace(length(π.distribution))
-action_space(π::DistributionPolicy{T}) where T<:DiscreteNonParametric = DiscreteSpace(support(π.distribution))
+action_space(π::DistributionPolicy{T}) where T<:ContinuousDistribution = ContinuousSpace(length(π.distribution))
+action_space(π::DistributionPolicy{T}) where T<:DiscreteUnivariateDistribution = DiscreteSpace(support(π.distribution))
 
 
 ## Mixed policy

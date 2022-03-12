@@ -16,7 +16,6 @@ module Crux
     using CUDA
     using LinearAlgebra
     using ValueHistories
-    using DataStructures
     using Plots
     using ColorSchemes
     import Images: save

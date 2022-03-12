@@ -11,6 +11,7 @@ Supports CPU and GPU computation and implements the following algorithms:
   * Prioritized Experience Replay
 * <a href="./src/model_free/rl/reinforce.jl">REINFORCE</a>
 * <a href="./src/model_free/rl/ppo.jl">Proximal Policy Optimization (PPO)</a>
+* Lagrange-Constrained PPO
 * <a href="./src/model_free/rl/a2c.jl">Advantage Actor Critic</a>
 * <a href="./src/model_free/rl/ddpg.jl">Deep Deterministic Policy Gradient (DDPG)</a>
 * <a href="./src/model_free/rl/td3.jl">Twin Delayed DDPG (TD3)</a>
@@ -18,7 +19,7 @@ Supports CPU and GPU computation and implements the following algorithms:
 
 ### Imitation Learning
 * <a href="./src/model_free/il/bc.jl"> Behavioral Cloning </a>
-* <a href="./src/model_free/il/gail.jl">Generative Adversarial Imitation Learning (GAIL)</a>
+* <a href="./src/model_free/il/gail.jl">Generative Adversarial Imitation Learning (GAIL) w/ On-Policy and Off Policy Versions</a>
 * <a href="./src/model_free/il/AdVIL.jl">Adversarial value moment imitation learning (AdVIL)</a>
 * <a href="./src/model_free/il/AdRIL.jl">(AdRIL)</a>
 * <a href="./src/model_free/il/sqil.jl">(SQIL)</a>
@@ -30,6 +31,9 @@ Supports CPU and GPU computation and implements the following algorithms:
 
 ### Adversarial RL
 * <a href="./src/model_free/adversarial/rarl.jl">Robust Adversarial RL (RARL)</a>
+
+### Continual Learning
+* Experience Replay
 
 
 ## Installation

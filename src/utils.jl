@@ -1,5 +1,5 @@
 # Categorical distribution that works with arbitrary objects (Rather than consecutive ints)
-struct ObjectCategorical
+struct ObjectCategorical <: DiscreteUnivariateDistribution
     cat::Categorical
     objs
     ObjectCategorical(objs::T) where {T <: AbstractArray} = new(Categorical(length(objs)), objs)
@@ -8,16 +8,18 @@ end
 Base.length(d::ObjectCategorical) = length(d.cat)
 
 Base.rand(d::ObjectCategorical, sz::Int...) = d.objs[rand(d.cat, sz...)]
-function Distributions.logpdf(d::ObjectCategorical, x)
-    if x isa AbstractArray
-        x = mapslices(findfirst, d.objs .== reshape(x, 1,:), dims=1)
-        return logpdf.(d.cat, x)
-    else
-        x = findfirst(d.objs .== x)
-        return logpdf(d.cat, x)
-    end
-    
+function Distributions.logpdf(d::ObjectCategorical, x::AbstractArray)
+    x = mapslices(findfirst, d.objs .== reshape(x, 1,:), dims=1)
+    return logpdf.(d.cat, x)
 end
+
+function Distributions.logpdf(d::ObjectCategorical, x)
+    x = findfirst(d.objs .== x)
+    return logpdf(d.cat, x)
+end
+Distributions.support(d::ObjectCategorical) = d.objs
+
+Distributions.entropy(d::ObjectCategorical) = entropy(d.cat)
 
 # Constant Layer
 struct ConstantLayer{T}

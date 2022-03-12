@@ -5,7 +5,7 @@ using Random
 using Distributions
 
 ## Pendulum
-mdp = PendulumPOMDP(actions=[-2., -0.5, 0, 0.5, 2.])
+mdp = PendulumMDP(actions=[-2., -0.5, 0, 0.5, 2.])
 as = [actions(mdp)...]
 amin = [-2f0]
 amax = [2f0]
@@ -25,7 +25,7 @@ SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(
 @time π_reinforce = solve(𝒮_reinforce, mdp)
 
 # Solve with A2C (Generally doesn't learn much, ~1 min)
-𝒮_a2c = A2C(π=ActorCritic(SG(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,))
+𝒮_a2c = A2C(π=ActorCritic(SG(), V()), S=S, N=100000, ΔN=2048, a_opt=(batch_size=512,), λe=0f0)
 @time π_a2c = solve(𝒮_a2c, mdp)
 
 # Solve with PPO (gets to > -200 reward, ~1.5 min)
@@ -43,7 +43,7 @@ off_policy = (S=S,
               buffer_init=1000,
               c_opt=(batch_size=100, optimizer=ADAM(1e-3)),
               a_opt=(batch_size=100, optimizer=ADAM(1e-3)),
-              π_explore=FirstExplorePolicy(1000, rand_policy, GaussianNoiseExplorationPolicy(0.5f0, a_min=[-2.0], a_max=[2.0])))
+              π_explore=GaussianNoiseExplorationPolicy(0.5f0, a_min=[-2.0], a_max=[2.0]))
               
 # Solver with DDPG
 𝒮_ddpg = DDPG(;π=ActorCritic(A(), QSA()), off_policy...)

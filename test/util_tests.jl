@@ -6,19 +6,26 @@ using LinearAlgebra
 using CUDA
 using Distributions
 
+# bslice
+v = zeros(4,4,4)
+@test size(bslice(v, 2)) == (4,4)
+
 # Constant Layer
 c1 = ConstantLayer(ones(10))
 @test Crux.device(c1) == cpu
 @test c1(rand(100)) == c1.vec
 @test Flux.params(c1)[1] == c1.vec
 
-c2 = c1 |> gpu
-@test Crux.device(c2) == gpu
-@test c2(rand(100)) == c2.vec
+if USE_CUDA
+    c2 = c1 |> gpu
+    @test Crux.device(c2) == gpu
+    @test c2(rand(100)) == c2.vec
+end
 
 # Distribution stuff
 objs = [:up, :down]
 o = ObjectCategorical(objs)
+@test o isa DiscreteUnivariateDistribution
 @test o.objs == objs
 @test o.cat.p == Categorical(2).p
 
@@ -26,7 +33,7 @@ o = ObjectCategorical(objs)
 @test rand(o) in objs
 @test size(rand(o, 10)) == (10,)
 
-@test logpdf(o, :up) == logpdf(o, :down)
+@test logpdf(o, [:up]) == logpdf(o, [:down])
 @test size(logpdf(o, rand(o,10))) == (1,10)
 
 ## Flux Stuff

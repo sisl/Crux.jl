@@ -12,7 +12,7 @@ isprioritized(b::BatchAdjacentBuffer) = false
 
 extra_columns(b::BatchAdjacentBuffer) = extra_columns(b.reference_buffer)
 
-DataStructures.capacity(b::BatchAdjacentBuffer) = b.elements
+capacity(b::BatchAdjacentBuffer) = b.elements
 
 Base.length(buffer::BatchAdjacentBuffer) = length(buffer.batches) > 0 ? sum([length(b) for b in buffer.batches]) : 0
 

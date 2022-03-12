@@ -17,5 +17,3 @@ c_gpu = Chain(Dense(5,2)) |> gpu
 @test Crux.device(mdcall(c_cpu, cu(rand(5)), cpu)) == gpu
 @test Crux.device(mdcall(c_gpu, cu(rand(5)), gpu)) == gpu
 
-v = zeros(4,4,4)
-@test size(bslice(v, 2)) == (4,4)

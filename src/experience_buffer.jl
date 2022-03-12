@@ -1,22 +1,3 @@
-const MinHeap = MutableBinaryHeap{Float32, DataStructures.FasterForward}
-
-# Efficient inverse query for fenwick tree : adapted from https://codeforces.com/blog/entry/61364
-function inverse_query(t::FenwickTree, v, N = length(t))
-    tot, pos = 0, 0
-    for i=floor(Int, log2(N)):-1:0
-        new_pos = pos + 1 << i
-        if new_pos <= N && tot + t.bi_tree[new_pos] < v
-            tot += t.bi_tree[new_pos]
-            pos = new_pos
-        end
-    end
-    pos + 1
-end
-
-Base.getindex(t::FenwickTree, i::Int) = prefixsum(t, i) - prefixsum(t, i-1)
-
-DataStructures.update!(t::FenwickTree, i, v) = inc!(t, i, v - t[i])
-
 Base.zero(s::Type{Symbol}) = :zero # For initializing symbolic arrays
 
 # construction of common mdp data
@@ -53,8 +34,6 @@ end
 
 ## Prioritized replay parameters
 @with_kw mutable struct PriorityParams
-    # minsort_priorities::MinHeap
-    # priorities::FenwickTree
     priorities::Vector{Float32}
     cumsum::Vector{Float32} = Float32[]
     cumsum_valid=false
@@ -200,7 +179,7 @@ Base.haskey(b::ExperienceBuffer, k) = haskey(b.data, k)
 
 Base.length(b::ExperienceBuffer) = b.elements
 
-DataStructures.capacity(b::Union{Dict{Symbol, T}, ExperienceBuffer}) where {T <: AbstractArray} = size(first(b)[2])[end]
+capacity(b::Union{Dict{Symbol, T}, ExperienceBuffer}) where {T <: AbstractArray} = size(first(b)[2])[end]
 
 isprioritized(b::ExperienceBuffer) = !isnothing(b.priority_params)
 

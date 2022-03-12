@@ -34,7 +34,7 @@ copyto!(c1, c2)
 @test c1[1].weight == c2[1].weight
 
 polyak_average!(c3, c2, 1f0)
-@test c3[1].weight isa CuArray
+USE_CUDA && @test c3[1].weight isa CuArray
 @test cpu(c3[1].weight) == c2[1].weight
 
 
@@ -45,7 +45,7 @@ p = ContinuousNetwork(Chain(Dense(2, 32, relu), Dense(32, 4)))
 @test p.output_dim == 4
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
 @test p_gpu.output_dim == 4
 
 @test length(Flux.params(p)) == 4
@@ -78,7 +78,7 @@ p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4)), [1,2, 3, 4])
 @test p.outputs == [1,2,3,4]
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
 @test p_gpu.outputs == [1,2,3,4]
 
 @test length(Flux.params(p)) == 4
@@ -102,7 +102,8 @@ a = rand([true, false], 4, 100)
 a, logprob = exploration(p, s0)
 @test size(a) == (1,)
 @test size(logprob) == (1,)
-@test all(logpdf(p, s0, Flux.onehotbatch(a, [1,2,3,4])) .≈ logprob)
+
+@test all(logpdf(p, s0, a) .≈ logprob)
 
 a, logprob = exploration(p, s)
 @test size(a) == (1,100)
@@ -118,7 +119,7 @@ a, logprob = exploration(p, s)
 Flux.onehotbatch(p_gpu, ones(Int, 1, 10) |> gpu)
 
 # Testing the logit conversion function 
-p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4, sigmoid)), [1,2, 3, 4], (s) -> s ./ sum(s,dims=1))
+p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4, sigmoid)), [1,2, 3, 4], (π, s) -> value(π, s) ./ sum(value(π, s),dims=1))
 
 vals = value(p, s)
 lgts = Crux.logits(p, s)
@@ -129,21 +130,21 @@ lgts = Crux.logits(p, s)
 ## Mixture Network
 Q1 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
 Q2 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
-p = MixtureNetwork([Q1, Q2], [0.1, 0.9])
+p = MixtureNetwork([Q1, Q2], [0.1, 0.9], 1)
 s = rand(2,100)
 a = rand([true, false], 3, 100)
 
 
 @test length(Flux.trainable(p)) == 4
 @test length(layers(p)) == 4
-@test device(p) == cpu
+@test Crux.device(p) == cpu
 
 @test p.current_net == 1
 @test action_space(p) == action_space(p.networks[1])
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test all([Crux.device(n)== gpu for n in p_gpu.networks])
+USE_CUDA && @test Crux.device(p_gpu) == gpu
+USE_CUDA && @test all([Crux.device(n)== gpu for n in p_gpu.networks])
 
 @test length(Flux.params(p)) == 8
 @test length(layers(p)) == 4
@@ -165,9 +166,9 @@ p = DoubleNetwork(Q1, Q2)
 @test action_space(p) == action_space(p.N1)
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test Crux.device(p_gpu.N1) == gpu
-@test Crux.device(p_gpu.N2) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu.N1) == gpu
+USE_CUDA && @test Crux.device(p_gpu.N2) == gpu
 
 @test length(Flux.params(p)) == 8
 @test length(layers(p)) == 4
@@ -201,9 +202,9 @@ p = ActorCritic(Anet, C)
 @test action_space(p) == action_space(p.A)
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test Crux.device(p_gpu.A) == gpu
-@test Crux.device(p_gpu.C) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu.A) == gpu
+USE_CUDA && @test Crux.device(p_gpu.C) == gpu
 
 @test length(Flux.params(p)) == 8
 @test length(layers(p)) == 4
@@ -240,9 +241,9 @@ p = GaussianPolicy(μnet, logΣnet)
 @test all(value(p.logΣ, rand(2)) .== 1)
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test Crux.device(p_gpu.μ) == gpu
-@test Crux.device(p_gpu.logΣ) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu.μ) == gpu
+USE_CUDA && @test Crux.device(p_gpu.logΣ) == gpu
 @test all(value(p.logΣ, rand(2)) .== 1)
 
 @test length(Flux.params(p)) == 5
@@ -287,9 +288,9 @@ p = SquashedGaussianPolicy(μnet, logΣnet)
 @test Crux.device(p) == cpu
 
 p_gpu = p |> gpu
-@test Crux.device(p_gpu) == gpu
-@test Crux.device(p_gpu.μ) == gpu
-@test Crux.device(p_gpu.logΣ) == gpu
+USE_CUDA && @test Crux.device(p_gpu) == gpu
+USE_CUDA && @test Crux.device(p_gpu.μ) == gpu
+USE_CUDA && @test Crux.device(p_gpu.logΣ) == gpu
 
 @test length(Flux.params(p)) == 6
 @test length(layers(p))  == 3
@@ -321,30 +322,60 @@ a, logprob = exploration(p, s)
 
 
 ## Distribution Network
-p = DistributionPolicy(Distributions.product_distribution([Uniform(-1,1) for i=1:6]))
+cmv = DistributionPolicy(Distributions.product_distribution([Normal(-1,1) for i=1:6]))
+cuv = DistributionPolicy(Normal(-1,1))
+duv = DistributionPolicy(Categorical([0.1, 0.2, 0.3, 0.4]))
+doc = DistributionPolicy(ObjectCategorical([:up, :down]))
 
-@test Crux.device(p) == cpu
+@test action_space(cmv) == ContinuousSpace(6)
+@test action_space(cuv) == ContinuousSpace(1)
+@test action_space(duv) == DiscreteSpace(4, Base.OneTo(4))
+@test action_space(doc).N ==2
+@test action_space(doc).vals == [:up, :down]
+ps = [cmv, cuv, duv, doc]
 
-@test length(Flux.params(p)) == 0
-@test length(layers(p)) == 0
+@test all(Crux.device.(ps) .== cpu)
+
+@test all(length.(Flux.params.(ps)) .== 0)
+@test all(length.(layers.(ps)) .== 0)
 
 s0 = rand(2)
 s = rand(2,100)
 
-a, logprob = exploration(p, s0)
-@test size(a) == (6,)
-@test size(logprob) == (1,1)
-@test all(logpdf(p, s0, a) .≈ logprob)
+# Check exploration and logprob
+for p in ps
+	@test size(action(p, s0)) == (length(p.distribution),)
+	@test size(action(p, s)) == (length(p.distribution),100)
+	
+	global a, logprob = exploration(p, s0)
+	@test size(a) == (length(p.distribution),)
+	@test size(logprob) == (1,)
+	@test all(logpdf(p, s0, a) .≈ logprob)
 
-a, logprob = exploration(p, s)
-@test size(a) == (6,100)
-@test size(logprob) == (1,100)
-@test all(logpdf(p, s, a) .≈ logprob)
+	global a, logprob = exploration(p, s)
+	@test size(a) == (length(p.distribution),100)
+	@test size(logprob) == (1,100)
+	@test all(logpdf(p, s, a) .≈ logprob)
+	
+	@test size(entropy(p, s0)) == (1,)
+	@test size(entropy(p, s)) == (1, 100)
+end
 
-@test size(entropy(p, s0)) == (1,)
-@test size(entropy(p, s)) == (1, 100)
+# Check that passing by one hot encoding works
+p = duv
+a0 = action(p, s0)
+a = action(p, s)
+ls0 = logpdf(p, s0, a0)
+ls = logpdf(p, s0, a)
 
-@test action_space(p) == ContinuousSpace(6)
+a0 = Flux.onehotbatch(a0, [1,2,3,4])
+a = Flux.onehotbatch(a[:], [1,2,3,4])
+ls0_oh = logpdf(p, s0, a0)
+ls_oh = logpdf(p, s0, a)
+
+@test ls0 == ls0_oh
+@test ls == ls_oh
+
 
 ## ϵGreedyPolicy
 p_on = DiscreteNetwork(Dense(2,2), [2,3])

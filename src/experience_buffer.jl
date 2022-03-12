@@ -84,7 +84,11 @@ function ExperienceBuffer(data::Dict{Symbol, T}; elements=capacity(data), next_i
         !haskey(data, :weight) && (data[:weight] = device(data)((ones(Float32, 1, capacity(data)))))
         pp = PriorityParams(capacity(data); priority_params...)
     end
-    ExperienceBuffer(data, elements, next_ind, indices, pp, elements)
+    b = ExperienceBuffer(data, elements, next_ind, indices, pp, elements)
+    if prioritized
+        update_priorities!(b, 1:elements, b.priority_params.max_priority*ones(Float32, elements))
+    end
+    b    
 end
 
 function ExperienceBuffer(S::T1, A::T2, capacity::Int, extras::Array{Symbol}=Symbol[]; device=cpu, 

@@ -131,7 +131,7 @@ end
 
 function Distributions.entropy(π::DiscreteNetwork, s)
     ps = logits(π, s)
-    sum(ps .* log.(ps .+ eps(Float32)), dims=1)
+    -sum(ps .* log.(ps .+ eps(Float32)), dims=1)
 end
 
 action_space(π::DiscreteNetwork) = DiscreteSpace(length(π.outputs), π.outputs)
@@ -380,17 +380,20 @@ device(π::DistributionPolicy) = cpu
 actor(π::DistributionPolicy) = π
 POMDPs.action(π::DistributionPolicy, s) = exploration(π, s)[1]
 
-function exploration(π::DistributionPolicy, s; kwargs...)
+function exploration(π::DistributionPolicy{T}, s; kwargs...) where T
     B = ndims(s) > 1 ? (size(s)[end]) : () # NOTE: this is a hack and doesn't work if the state space has more than one dim
-    a = rand(π.distribution, length(π.distribution), B...)
-    if a isa Float64 || a isa AbstractArray{Float64}
+    a = rand(π.distribution, B...)
+    if size(a) == ()
+        a = [a]
+    end
+    if !(T isa ObjectCategorical || T isa Categorical) && (a isa Float64 || a isa AbstractArray{Float64})
         a = Float32.(a)
     end
     a |> device(s), logpdf(π, s, a)
 end
 
 function Distributions.logpdf(π::DistributionPolicy, s, a)
-    logpdf.(π.distribution, a)
+    logpdf.([π.distribution], a)
     # if length(logpdfs) > 1
     #     logpdfs = reshape(logpdfs, 1, :)
     # end

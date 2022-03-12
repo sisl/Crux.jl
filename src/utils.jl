@@ -5,6 +5,7 @@ struct ObjectCategorical
     ObjectCategorical(objs::T) where {T <: AbstractArray} = new(Categorical(length(objs)), objs)
     ObjectCategorical(objs::T) where {T <: Tuple} = new(Categorical(length(objs)), [objs...])
 end
+Base.length(d::ObjectCategorical) = length(d.cat)
 
 Base.rand(d::ObjectCategorical, sz::Int...) = d.objs[rand(d.cat, sz...)]
 function Distributions.logpdf(d::ObjectCategorical, x)

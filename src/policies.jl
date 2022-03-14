@@ -412,7 +412,7 @@ function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where T<:Discrete
     (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
 end
 
-Distributions.logpdf(π::DistributionPolicy{T}, s) where T<:DiscreteNonParametric = Base.log.(π.distribution.p)
+logits(π::DistributionPolicy{T}, s) where T<:DiscreteUnivariateDistribution = π.distribution.p
 
 function exploration(π::DistributionPolicy{T}, s; kwargs...) where T
     a = action(π, s)

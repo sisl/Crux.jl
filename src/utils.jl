@@ -1,9 +1,10 @@
 # Categorical distribution that works with arbitrary objects (Rather than consecutive ints)
 struct ObjectCategorical <: DiscreteUnivariateDistribution
-    cat::Categorical
     objs
-    ObjectCategorical(objs::T) where {T <: AbstractArray} = new(Categorical(length(objs)), objs)
-    ObjectCategorical(objs::T) where {T <: Tuple} = new(Categorical(length(objs)), [objs...])
+    p
+    cat
+    ObjectCategorical(objs::T, p = fill(1/length(objs), length(objs))) where {T <: AbstractArray} = new(objs, p, Categorical(p))
+    ObjectCategorical(objs::T) where {T <: Tuple} = ObjectCategorical([objs...])
 end
 Base.length(d::ObjectCategorical) = length(d.cat)
 

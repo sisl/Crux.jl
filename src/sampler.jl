@@ -49,6 +49,9 @@ function terminate_episode!(sampler::Sampler, data, j)
     ep = j - sampler.episode_length + 1 : j
     haskey(data, :advantage) && fill_gae!(data, ep, sampler.agent.π, sampler.λ, sampler.γ)
     haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
+    # (haskey(data, :cum_importance_weight) || 
+    #  haskey(data, :fwd_importance_weight) || 
+    haskey(data, :rev_importance_weight) && fill_rev_importance_weight!(data, ep)
 
     # Dealing with cost constraints
     haskey(data, :cost_advantage) && fill_gae!(data, ep, sampler.Vc, sampler.λ, sampler.γ, source=:cost, target=:cost_advantage)
@@ -93,9 +96,9 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     
     # Handle optional data storage
     haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)
-    if haskey(data, :likelihoodweight)
+    if haskey(data, :importance_weight)
         nom_logprob = logpdf(sampler.agent.pa, sampler.svec, tovec(a, sampler.agent.space))
-        data[:likelihoodweight][:, j] .= exp.(nom_logprob .- logprob)
+        data[:importance_weight][:, j] .= exp.(nom_logprob .- logprob)
     end
     haskey(data, :t) && (data[:t][1, j] = sampler.episode_length + 1)
     haskey(data, :i) && (data[:i][1, j] = i+1)
@@ -265,6 +268,23 @@ function fill_returns!(data, episode_range, γ::Float32; source=:r, target=:retu
     for i in reverse(episode_range)
         r = data[source][1, i] + γ*r
         data[target][:, i] .= r
+    end
+end
+
+function fill_rev_importance_weight!(data, episode_range;)
+    @assert haskey(data, :importance_weight)
+    # w = 1f0
+    # for i in episode_range
+    #     w = data[:importance_weight][1, i] * w
+    #     # data[:fwd_importance_weight][:, i] .= w
+    # end
+    # 
+    # data[:cum_importance_weight][:, episode_range] .= w
+
+    w=1f0
+    for i in reverse(episode_range)
+        w = data[:importance_weight][1, i] * w
+        data[:rev_importance_weight][:, i] .= w
     end
 end
 

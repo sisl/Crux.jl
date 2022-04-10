@@ -7,6 +7,7 @@
     update_every = 1
     early_stopping = (info) -> false
     name = ""
+    max_batches=Inf
 end
 
 Flux.Optimise.train!(π::N, loss::Function, p::TrainingParams; info = Dict()) where {N <: Policy} = train!(Flux.params(π), (;info) -> loss(info = info) + p.regularizer(π), p, info=info)
@@ -24,8 +25,9 @@ function Flux.Optimise.train!(θ, loss::Function, p::TrainingParams; info = Dict
 end
 
 # Train with minibatches and epochs
-function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; info=Dict(), max_batches=Inf, π_loss=π)
+function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; info=Dict(), π_loss=π)
     infos = [] # stores the aggregated info for each epoch
+    total_batches = 0
     for epoch in 1:p.epochs
         minibatch_infos = [] # stores the info from each minibatch
         
@@ -36,18 +38,24 @@ function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; in
         
         # Call train for each minibatch
         partitions = [partition(1:length(D), p.batch_size) for D in 𝒟]
-        batch_num = 1
         for indices in zip(partitions...)
             mbs = [minibatch(D, i) for (D, i) in zip(𝒟, indices)] 
             push!(minibatch_infos, train!(π, (;kwargs...)->p.loss(π_loss, 𝒫, mbs...; kwargs...), p, info=info))
-            batch_num > max_batches && break 
-            batch_num += 1    
+            total_batches += 1 
+            if total_batches >= p.max_batches
+                break
+            end
+            
+            if p.early_stopping([infos...,  aggregate_info(minibatch_infos)])
+                info[:early_stop_batch] = total_batches
+                break    
+            end
         end
-        push!(infos, aggregate_info(minibatch_infos))        
+        push!(infos, aggregate_info(minibatch_infos))
         if p.early_stopping(infos)
-            println("early stopping at epoch $epoch")
             break    
         end
+        
     end
     merge!(info, aggregate_info(infos))
 end

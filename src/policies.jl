@@ -88,7 +88,8 @@ mutable struct DiscreteNetwork <: NetworkPolicy
     logit_conversion
     always_stochastic
     device
-    DiscreteNetwork(network, outputs, logit_conversion=(π, s)->softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+	DiscreteNetwork(network, outputs; logit_conversion=(π, s)->softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+    DiscreteNetwork(network, outputs, logit_conversion, always_stochastic, dev) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
 end
 
 Flux.@functor DiscreteNetwork 

@@ -1,41 +1,41 @@
 # Struct for combining useful policy parameters together
-@with_kw mutable struct PolicyParams{Pol <: Policy, T2 <: AbstractSpace}
+@with_kw mutable struct PolicyParams{Pol<:Policy,T2<:AbstractSpace}
     π::Pol
     space::T2 = action_space(π)
     π_explore = π
     π⁻ = nothing
     pa = nothing # nominal action distribution
 end
-PolicyParams(π::T) where {T <: Policy} = PolicyParams(π=π)
+PolicyParams(π::T) where {T<:Policy} = PolicyParams(π=π)
 
 abstract type NetworkPolicy <: Policy end
 
 # Fixing bug with gpu deepcopies
 function Base.deepcopy(x::NetworkPolicy)
-    invoke(deepcopy, Tuple{Any}, (x |> cpu))  |> device(x)
+    invoke(deepcopy, Tuple{Any}, (x |> cpu)) |> device(x)
 end
 
-device(π::N) where N<:NetworkPolicy = π.device
-actor(π::N) where N<:NetworkPolicy = π
-critic(π::N) where N<:NetworkPolicy = π
+device(π::N) where {N<:NetworkPolicy} = π.device
+actor(π::N) where {N<:NetworkPolicy} = π
+critic(π::N) where {N<:NetworkPolicy} = π
 
-new_ep_reset!(π::N) where N<:Policy = nothing
+new_ep_reset!(π::N) where {N<:Policy} = nothing
 
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
 
 layers(π::Chain) = π.layers
 
-function polyak_average!(to, from, τ=1f0)
+function polyak_average!(to, from, τ=1.0f0)
     to_data = Flux.params(to).order.data
     from_data, from_device = Flux.params(from).order.data, device(from)
     device_match = from_device == device(to)
     for i = 1:length(to_data)
         if device_match
-            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*to_data[i])
+            copyto!(to_data[i], τ .* from_data[i] .+ (1.0f0 - τ) .* to_data[i])
         else
-            copyto!(to_data[i], τ.*from_data[i] .+ (1f0-τ).*from_device(to_data[i]))
-        end            
+            copyto!(to_data[i], τ .* from_data[i] .+ (1.0f0 - τ) .* from_device(to_data[i]))
+        end
     end
 end
 
@@ -54,17 +54,17 @@ mutable struct ContinuousNetwork <: NetworkPolicy
         if isnothing(output_dim)
             try
                 # Flux v0.12+
-                output_dim = size(last(network.layers).weight,1)
+                output_dim = size(last(network.layers).weight, 1)
             catch
                 # Flux v0.11
-                output_dim = size(last(network.layers).W,1)
+                output_dim = size(last(network.layers).W, 1)
             end
         end
         new(network, output_dim, device(network))
     end
 end
 
-Flux.@functor ContinuousNetwork 
+Flux.@functor ContinuousNetwork
 
 Flux.trainable(π::ContinuousNetwork) = Flux.trainable(π.network)
 
@@ -74,7 +74,7 @@ POMDPs.action(π::ContinuousNetwork, s) = value(π, s)
 
 POMDPs.value(π::ContinuousNetwork, s) = mdcall(π.network, s, π.device)
 
-POMDPs.value(π::ContinuousNetwork, s, a) = mdcall(π.network, vcat(s,a), π.device)
+POMDPs.value(π::ContinuousNetwork, s, a) = mdcall(π.network, vcat(s, a), π.device)
 
 action_space(π::ContinuousNetwork) = ContinuousSpace(π.output_dim)
 
@@ -88,11 +88,11 @@ mutable struct DiscreteNetwork <: NetworkPolicy
     logit_conversion
     always_stochastic
     device
-	DiscreteNetwork(network, outputs; logit_conversion=(π, s)->softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+    DiscreteNetwork(network, outputs; logit_conversion=(π, s) -> softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
     DiscreteNetwork(network, outputs, logit_conversion, always_stochastic, dev) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
 end
 
-Flux.@functor DiscreteNetwork 
+Flux.@functor DiscreteNetwork
 
 Flux.trainable(π::DiscreteNetwork) = Flux.trainable(π.network)
 
@@ -100,32 +100,32 @@ layers(π::DiscreteNetwork) = π.network.layers
 
 POMDPs.value(π::DiscreteNetwork, s) = mdcall(π.network, s, π.device)
 
-POMDPs.value(π::DiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims = 1)
+POMDPs.value(π::DiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims=1)
 
 POMDPs.action(π::DiscreteNetwork, s) = π.always_stochastic ? exploration(π, s)[1] : π.outputs[mapslices(argmax, value(π, s), dims=1)]
 
-function Flux.onehotbatch(π::DiscreteNetwork, a)  
-    ignore() do 
+function Flux.onehotbatch(π::DiscreteNetwork, a)
+    ignore() do
         a_oh = Flux.onehotbatch(a[:] |> cpu, π.outputs) |> device(a)
         length(a) == 1 ? dropdims(a_oh, dims=2) : a_oh
     end
-end 
+end
 
 logits(π::DiscreteNetwork, s) = π.logit_conversion(π, s)
 
-categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims = 1))
+categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims=1))
 
 function exploration(π::DiscreteNetwork, s; kwargs...)
-    ps = logits(π, s) 
-    ai = mapslices((v)->rand(Categorical(v)), ps, dims=1)
+    ps = logits(π, s)
+    ai = mapslices((v) -> rand(Categorical(v)), ps, dims=1)
     a = π.outputs[ai]
     a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
 end
 
 function Distributions.logpdf(π::DiscreteNetwork, s, a)
     # If a does not seem to be a one-hot encoding then we encode it
-    Zygote.ignore() do 
-        size(a,1) == 1 && (a = Flux.onehotbatch(π, a)) 
+    Zygote.ignore() do
+        size(a, 1) == 1 && (a = Flux.onehotbatch(π, a))
     end
     return categorical_logpdf(logits(π, s), a)
 end
@@ -140,7 +140,7 @@ action_space(π::DiscreteNetwork) = DiscreteSpace(length(π.outputs), π.outputs
 
 
 ## Double Network architecture
-mutable struct DoubleNetwork{T1, T2} <: NetworkPolicy
+mutable struct DoubleNetwork{T1,T2} <: NetworkPolicy
     N1::T1
     N2::T2
 end
@@ -160,7 +160,7 @@ POMDPs.value(π::DoubleNetwork, s, a) = (value(π.N1, s, a), value(π.N2, s, a))
 POMDPs.action(π::DoubleNetwork, s) = (action(π.N1, s), action(π.N2, s))
 
 exploration(π::DoubleNetwork, s; kwargs...) = (exploration(π.N1, s; kwargs...), exploration(π.N2, s; kwargs...))
-    
+
 Distributions.logpdf(π::DoubleNetwork, s, a) = (logpdf(π.N1, s, a), logpdf(π.N2, s, a))
 
 Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2, s))
@@ -178,7 +178,7 @@ end
 function new_ep_reset!(π::MixtureNetwork)
     π.current_net = rand(Categorical(π.weights))
 end
-    
+
 Flux.@functor MixtureNetwork
 
 Flux.trainable(π::MixtureNetwork) = collect(Iterators.flatten([Flux.trainable(n) for n in π.networks]))
@@ -200,7 +200,7 @@ POMDPs.value(π::MixtureNetwork, s, a) = value(π.networks[π.current_net], s, a
 POMDPs.action(π::MixtureNetwork, s) = action(π.networks[π.current_net], s)
 
 exploration(π::MixtureNetwork, s; kwargs...) = exploration(π.networks[π.current_net], s; kwargs...)
-    
+
 Distributions.logpdf(π::MixtureNetwork, s, a) = logpdf(π.networks[π.current_net], s, a)
 
 Distributions.entropy(π::MixtureNetwork, s) = entropy(π.networks[π.current_net], s)
@@ -212,7 +212,7 @@ critic(π::MixtureNetwork) = MixtureNetwork([critic(net) for net in π.networks]
 
 
 ## Actor Critic Architecture
-mutable struct ActorCritic{TA, TC} <: NetworkPolicy
+mutable struct ActorCritic{TA,TC} <: NetworkPolicy
     A::TA # actor 
     C::TC # critic
 end
@@ -232,15 +232,15 @@ POMDPs.value(π::ActorCritic, s, a) = value(π.C, s, a)
 POMDPs.action(π::ActorCritic, s) = action(π.A, s)
 
 exploration(π::ActorCritic, s; kwargs...) = exploration(π.A, s; kwargs...)
-    
+
 Distributions.logpdf(π::ActorCritic, s, a) = logpdf(π.A, s, a)
 
 Distributions.entropy(π::ActorCritic, s) = entropy(π.A, s)
 
 action_space(π::ActorCritic) = action_space(π.A)
 
-actor(π::AC) where AC<:ActorCritic = π.A
-critic(π::AC) where AC<:ActorCritic = π.C
+actor(π::AC) where {AC<:ActorCritic} = π.A
+critic(π::AC) where {AC<:ActorCritic} = π.C
 
 
 ## Network for concatentaing a latent vector to states
@@ -257,7 +257,7 @@ end
 
 device(π::LatentConditionedNetwork) = device(π.policy)
 
-Flux.@functor LatentConditionedNetwork 
+Flux.@functor LatentConditionedNetwork
 
 Flux.trainable(π::LatentConditionedNetwork) = Flux.trainable(π.policy)
 
@@ -298,15 +298,15 @@ device(π::GaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) :
 POMDPs.action(π::GaussianPolicy, s) = π.always_stochastic ? exploration(π, s)[1] : π.μ(s)
 
 function gaussian_logpdf(μ, logΣ, a)
-    σ² = exp.(logΣ).^2
-    sum(-((a .- μ).^2) ./ (2 .* σ²) .-  0.9189385332046727f0 .- logΣ, dims = 1) # 0.9189385332046727f0 = log(sqrt(2π))
-end 
+    σ² = exp.(logΣ) .^ 2
+    sum(-((a .- μ) .^ 2) ./ (2 .* σ²) .- 0.9189385332046727f0 .- logΣ, dims=1) # 0.9189385332046727f0 = log(sqrt(2π))
+end
 
-function exploration(π::GaussianPolicy, s; kwargs...) 
+function exploration(π::GaussianPolicy, s; kwargs...)
     μ, logΣ = π.μ(s), π.logΣ(s)
     σ = exp.(logΣ)
     ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
-    a = ϵ.*σ .+ μ
+    a = ϵ .* σ .+ μ
     a, gaussian_logpdf(μ, logΣ, a)
 end
 
@@ -324,8 +324,8 @@ mutable struct SquashedGaussianPolicy <: NetworkPolicy
     logΣ::ContinuousNetwork
     ascale::Float32
     always_stochastic::Bool
-    SquashedGaussianPolicy(μ, logΣ, ascale=1f0, always_stochastic=false) = new(μ, logΣ, ascale, always_stochastic)
-    SquashedGaussianPolicy(μ, logΣ::Array, ascale=1f0, always_stochastic=false) = new(μ, ContinuousNetwork(Chain(ConstantLayer(logΣ)), length(logΣ)), ascale, always_stochastic)
+    SquashedGaussianPolicy(μ, logΣ, ascale=1.0f0, always_stochastic=false) = new(μ, logΣ, ascale, always_stochastic)
+    SquashedGaussianPolicy(μ, logΣ::Array, ascale=1.0f0, always_stochastic=false) = new(μ, ContinuousNetwork(Chain(ConstantLayer(logΣ)), length(logΣ)), ascale, always_stochastic)
 end
 
 Flux.@functor SquashedGaussianPolicy
@@ -336,7 +336,7 @@ layers(π::SquashedGaussianPolicy) = unique((layers(π.μ)..., layers(π.logΣ).
 
 device(π::SquashedGaussianPolicy) = device(π.μ) == device(π.logΣ) ? device(π.μ) : error("Mismatched devices")
 
-POMDPs.action(π::SquashedGaussianPolicy, s) = π.always_stochastic ? exploration(π,s)[1] : π.ascale .* tanh.(π.μ(s))
+POMDPs.action(π::SquashedGaussianPolicy, s) = π.always_stochastic ? exploration(π, s)[1] : π.ascale .* tanh.(π.μ(s))
 
 function squashed_gaussian_σ(logΣ)
     LOG_STD_MIN = -5
@@ -348,19 +348,19 @@ end
 
 # a is  untanh'd 
 function squashed_gaussian_logprob(μ, logΣ, a)
-    σ² = squashed_gaussian_σ(logΣ).^2
-    sum(-((a .- μ).^2) ./ (2 .* σ²) .- 0.9189385332046727f0 .- logΣ .- 2*(log(2f0) .- a .- softplus.(-2 .* a)), dims=1)
+    σ² = squashed_gaussian_σ(logΣ) .^ 2
+    sum(-((a .- μ) .^ 2) ./ (2 .* σ²) .- 0.9189385332046727f0 .- logΣ .- 2 * (log(2.0f0) .- a .- softplus.(-2 .* a)), dims=1)
 end
 
 function exploration(π::SquashedGaussianPolicy, s; kwargs...)
     μ, logΣ = π.μ(s), π.logΣ(s)
     σ = squashed_gaussian_σ(logΣ)
     ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
-    a_pretanh = ϵ.*σ .+ μ
-    π.ascale .* tanh.(a_pretanh), squashed_gaussian_logprob(μ ,logΣ, a_pretanh)
+    a_pretanh = ϵ .* σ .+ μ
+    π.ascale .* tanh.(a_pretanh), squashed_gaussian_logprob(μ, logΣ, a_pretanh)
 end
 
-Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(π.μ(s), π.logΣ(s), atanh.(clamp.(a ./ π.ascale, -1f0 + 1f-5, 1f0 - 1f-5)))
+Distributions.logpdf(π::SquashedGaussianPolicy, s, a) = squashed_gaussian_logprob(π.μ(s), π.logΣ(s), atanh.(clamp.(a ./ π.ascale, -1.0f0 + 1.0f-5, 1.0f0 - 1.0f-5)))
 
 Distributions.entropy(π::SquashedGaussianPolicy, s) = 1.4189385332046727f0 .+ sum(π.logΣ(s), dims=1) # 1.4189385332046727 = 0.5 + 0.5 * log(2π) #TODO: This doesn't account for the squash
 
@@ -378,44 +378,44 @@ layers(π::DistributionPolicy) = ()
 device(π::DistributionPolicy) = cpu
 actor(π::DistributionPolicy) = π
 
-function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: ContinuousMultivariateDistribution}
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T<:ContinuousMultivariateDistribution}
     B = ndims(s) > 1 ? size(s)[end] : () # NOTE: This hack doesnt work for states with multiple dimensions (i.e. images)
     Float32.(rand(π.distribution, B...)) |> device(s)
 end
 
-function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: ContinuousUnivariateDistribution}
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T<:ContinuousUnivariateDistribution}
     B = ndims(s) > 1 ? size(s)[end] : 1
     a = Float32.(rand(π.distribution, B))
     (length(a) > 1 ? reshape(a, 1, :) : a) |> device(s)
 end
 
-function POMDPs.action(π::DistributionPolicy{T}, s) where {T <: DiscreteUnivariateDistribution}
+function POMDPs.action(π::DistributionPolicy{T}, s) where {T<:DiscreteUnivariateDistribution}
     B = ndims(s) > 1 ? size(s)[end] : 1
     a = rand(π.distribution, B)
     (length(a) > 1 ? reshape(a, 1, :) : a) |> device(s)
 end
 
-function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T <: ContinuousMultivariateDistribution}
-    ls = Float32.(logpdf(π.distribution, reshape(a, length(π.distribution), :))) 
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T<:ContinuousMultivariateDistribution}
+    ls = Float32.(logpdf(π.distribution, reshape(a, length(π.distribution), :)))
     (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
 end
 
-function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T <: ContinuousUnivariateDistribution}
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T<:ContinuousUnivariateDistribution}
     ls = Float32.(logpdf.(π.distribution, a))
     (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
 end
 
-function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where T<:DiscreteUnivariateDistribution
+function Distributions.logpdf(π::DistributionPolicy{T}, s, a) where {T<:DiscreteUnivariateDistribution}
     # If a seems to be a one-hot encoding then we onecold it
-    size(a,1) == length(support(π.distribution)) && (a=Flux.onecold(a, support(π.distribution))) 
-    
+    size(a, 1) == length(support(π.distribution)) && (a = Flux.onecold(a, support(π.distribution)))
+
     ls = Float32.(logpdf.(π.distribution, a))
     (length(ls) > 1 ? reshape(ls, 1, :) : ls) |> device(s)
 end
 
-logits(π::DistributionPolicy{T}, s) where T<:DiscreteUnivariateDistribution = π.distribution.p
+logits(π::DistributionPolicy{T}, s) where {T<:DiscreteUnivariateDistribution} = π.distribution.p
 
-function exploration(π::DistributionPolicy{T}, s; kwargs...) where T
+function exploration(π::DistributionPolicy{T}, s; kwargs...) where {T}
     a = action(π, s)
     a, logpdf(π, s, a)
 end
@@ -425,8 +425,8 @@ function Distributions.entropy(π::DistributionPolicy, s)
     Float32(entropy(π.distribution)) * ones(Float32, 1, B...)
 end
 
-action_space(π::DistributionPolicy{T}) where T<:ContinuousDistribution = ContinuousSpace(length(π.distribution))
-action_space(π::DistributionPolicy{T}) where T<:DiscreteUnivariateDistribution = DiscreteSpace(support(π.distribution))
+action_space(π::DistributionPolicy{T}) where {T<:ContinuousDistribution} = ContinuousSpace(length(π.distribution))
+action_space(π::DistributionPolicy{T}) where {T<:DiscreteUnivariateDistribution} = DiscreteSpace(support(π.distribution))
 
 
 ## Mixed policy
@@ -438,23 +438,23 @@ end
 MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
 ϵGreedyPolicy(ϵ, actions) = MixedPolicy(ϵ, DistributionPolicy(ObjectCategorical(actions)))
 
-function exploration(π::MixedPolicy, s; π_on, i,)
+function exploration(π::MixedPolicy, s; π_on, i)
     ϵ = π.ϵ(i)
-    if ϵ == 0 || (π_on isa MixtureNetwork && π_on.current_net==3)
+    if ϵ == 0 || (π_on isa MixtureNetwork && π_on.current_net == 3)
         return exploration(π_on, s)
     end
     x = (rand() < ϵ) ? exploration(π.policy, s)[1] : exploration(π_on, s)[1]
-    
-    
+
+
     # Turn the action into an array if it is a value
     # !(x isa AbstractArray || x isa Tuple) && (x=fill(x, 1))
-    
+
     logp1 = Base.log(ϵ) .+ logpdf(π.policy, s, x)
-    logp2 = Base.log(1-ϵ) .+ logpdf(π_on, s, x)
-    
-    p1 = ϵ .*  exp.(logpdf(π.policy, s, x))
-    p2 = (1-ϵ) .* exp.(logpdf(π_on, s, x))
-    
+    logp2 = Base.log(1 - ϵ) .+ logpdf(π_on, s, x)
+
+    p1 = ϵ .* exp.(logpdf(π.policy, s, x))
+    p2 = (1 - ϵ) .* exp.(logpdf(π_on, s, x))
+
     # logsumexp(vcat(logp1, logp2), dims=1)
     x, Base.log.(p1 .+ p2)
 end
@@ -470,12 +470,12 @@ end
     ϵ_max::Float32 = Inf32
 end
 
-GaussianNoiseExplorationPolicy(σ::Real; kwargs...) = GaussianNoiseExplorationPolicy(σ = (i) -> σ; kwargs...)
-GaussianNoiseExplorationPolicy(σ::Function; kwargs...) = GaussianNoiseExplorationPolicy(σ = σ; kwargs...)
+GaussianNoiseExplorationPolicy(σ::Real; kwargs...) = GaussianNoiseExplorationPolicy(σ=(i) -> σ; kwargs...)
+GaussianNoiseExplorationPolicy(σ::Function; kwargs...) = GaussianNoiseExplorationPolicy(σ=σ; kwargs...)
 
 function exploration(π::GaussianNoiseExplorationPolicy, s; π_on, i)
     a = action(π_on, s) |> cpu
-    ϵ = randn(Float32, size(a)...)*π.σ(i)
+    ϵ = randn(Float32, size(a)...) * π.σ(i)
     clamp.(a .+ clamp.(ϵ, π.ϵ_min, π.ϵ_max), π.a_min, π.a_max) |> device(s), NaN
 end
 
@@ -484,7 +484,7 @@ end
 @with_kw mutable struct FirstExplorePolicy <: Policy
     N::Int64 # Number of steps to explore for
     initial_policy::Policy # the policy to use for the first N steps
-    after_policy::Union{Nothing, Policy} = nothing # the policy to use after the first N steps. Nothing means you will use on-policy
+    after_policy::Union{Nothing,Policy} = nothing # the policy to use after the first N steps. Nothing means you will use on-policy
 end
 
 FirstExplorePolicy(N::Int64, initial_policy::Policy) = FirstExplorePolicy(N, initial_policy, nothing)
@@ -499,3 +499,18 @@ function exploration(π::FirstExplorePolicy, s; π_on, i)
     end
 end
 
+# State Dependent Distribution Policy
+struct StateDependentDistributionPolicy <: NetworkPolicy
+    pa
+    action_space
+end
+
+function POMDPs.action(policy::StateDependentDistributionPolicy, s)
+    a_dist = policy.pa(s)
+    a = rand(a_dist)
+    return a
+end
+
+function action_space(policy::StateDependentDistributionPolicy)
+    policy.action_space
+end

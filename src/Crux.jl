@@ -54,7 +54,7 @@ module Crux
            DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
            entropy, logpdf, action_space, exploration, layers, actor, critic,
-           LatentConditionedNetwork, MixtureNetwork
+           LatentConditionedNetwork, MixtureNetwork, StateDependentDistributionPolicy
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 

@@ -136,3 +136,11 @@ function logcompσ(x::Real)
     # Computes log(1 - sigmoid(x)) in a numerically stable way
     return logσ(x) - x
 end
+
+# credit to: http://mileslucas.com/posts/weighted-logsumexp/
+function weighted_logsumexp(X, w; dims=1)
+    a = maximum(X; dims=dims)
+    r = sum(w .* exp.(X .- a); dims=dims)
+    return a .+ log.(r)
+end
+

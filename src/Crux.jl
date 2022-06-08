@@ -51,10 +51,10 @@ module Crux
     
     export PolicyParams, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
-           DistributionPolicy, MixedPolicy, ϵGreedyPolicy,
+           DistributionPolicy, MixedPolicy, MixtureNetwork, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
            entropy, logpdf, action_space, exploration, layers, actor, critic,
-           LatentConditionedNetwork, MixtureNetwork, StateDependentDistributionPolicy
+           LatentConditionedNetwork, StateDependentDistributionPolicy
     include("policies.jl")
     
     export Sampler, initial_observation, terminate_episode!, step!, steps!, 

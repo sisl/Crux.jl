@@ -167,48 +167,49 @@ Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2,
 
 action_space(π::DoubleNetwork) = action_space(π.N1)
 
-## Mixture Network architecture
+## Mixture Model Network architecture
 mutable struct MixtureNetwork <: NetworkPolicy
     networks::Array
-    weights::Array{Float64}
-    current_net::Int
-    MixtureNetwork(networks::Array, weights, current_net=rand(Categorical(weights))) = new(networks, weights, current_net)
-end
-
-function new_ep_reset!(π::MixtureNetwork)
-    π.current_net = rand(Categorical(π.weights))
+    weights::ContinuousNetwork
 end
 
 Flux.@functor MixtureNetwork
 
-Flux.trainable(π::MixtureNetwork) = collect(Iterators.flatten([Flux.trainable(n) for n in π.networks]))
+Flux.trainable(π::MixtureNetwork) = (Iterators.flatten([Flux.trainable(n) for n in π.networks])..., Flux.trainable(π.weights)...)
 
-layers(π::MixtureNetwork) = unique(collect(Iterators.flatten([layers(n) for n in π.networks])))
+layers(π::MixtureNetwork) = unique((Iterators.flatten([layers(n) for n in π.networks])..., layers(π.weights)...))
 
 function device(π::MixtureNetwork)
     dev = device(π.networks[1])
     @assert all([device(n) == dev for n in π.networks])
+    @assert dev == device(π.weights)
     dev
 end
-# 
-# valueall(π::MixtureNetwork, s) = [value(n, s) for n in π.networks]
-# valueall(π::MixtureNetwork, s, a) = [value(n, s, a) for n in π.networks]
 
-POMDPs.value(π::MixtureNetwork, s) = value(π.networks[π.current_net], s)
-POMDPs.value(π::MixtureNetwork, s, a) = value(π.networks[π.current_net], s, a)
+POMDPs.action(π::MixtureNetwork, s) = exploration(π, s)[1]
 
-POMDPs.action(π::MixtureNetwork, s) = action(π.networks[π.current_net], s)
+function exploration(π::MixtureNetwork, s; kwargs...)
+    α = π.weights(s)
+    αi = rand(Categorical(α))
+    a, _ = exploration(π.networks[αi], s)
+    
+    return a, logpdf(π, s, a)
+end
 
-exploration(π::MixtureNetwork, s; kwargs...) = exploration(π.networks[π.current_net], s; kwargs...)
+function Distributions.logpdf(π::MixtureNetwork, s, a)
+    α = π.weights(s)
+    
+    x = log.(sum([α[i] .* exp.(logpdf(p, s, a)) for (i, p) in enumerate(π.networks)]))
+    
+    # x = vcat([logpdf(p, s, a) for p in π.networks]...)
+    # weighted_logsumexp(x, α)
+end
 
-Distributions.logpdf(π::MixtureNetwork, s, a) = logpdf(π.networks[π.current_net], s, a)
+Distributions.entropy(π::MixtureNetwork, s) = @error "Entropy not defined"
 
-Distributions.entropy(π::MixtureNetwork, s) = entropy(π.networks[π.current_net], s)
-
-action_space(π::MixtureNetwork) = action_space(π.networks[π.current_net])
-
-actor(π::MixtureNetwork) = MixtureNetwork([actor(net) for net in π.networks], π.weights, π.current_net)
-critic(π::MixtureNetwork) = MixtureNetwork([critic(net) for net in π.networks], π.weights, π.current_net)
+function action_space(π::MixtureNetwork) 
+    action_space(π.networks[1])
+end
 
 
 ## Actor Critic Architecture
@@ -440,17 +441,14 @@ MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
 
 function exploration(π::MixedPolicy, s; π_on, i)
     ϵ = π.ϵ(i)
-    if ϵ == 0 || (π_on isa MixtureNetwork && π_on.current_net == 3)
-        return exploration(π_on, s)
-    end
     x = (rand() < ϵ) ? exploration(π.policy, s)[1] : exploration(π_on, s)[1]
 
 
     # Turn the action into an array if it is a value
     # !(x isa AbstractArray || x isa Tuple) && (x=fill(x, 1))
 
-    logp1 = Base.log(ϵ) .+ logpdf(π.policy, s, x)
-    logp2 = Base.log(1 - ϵ) .+ logpdf(π_on, s, x)
+    # logp1 = Base.log(ϵ) .+ logpdf(π.policy, s, x)
+    # logp2 = Base.log(1 - ϵ) .+ logpdf(π_on, s, x)
 
     p1 = ϵ .* exp.(logpdf(π.policy, s, x))
     p2 = (1 - ϵ) .* exp.(logpdf(π_on, s, x))

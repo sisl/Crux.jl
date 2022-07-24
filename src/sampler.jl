@@ -59,7 +59,7 @@ function terminate_episode!(sampler::Sampler, data, j)
     haskey(data, :cum_importance_weight) && fill_cum_importance_weight!(data, ep)
     haskey(data, :rev_importance_weight) && fill_rev_importance_weight!(data, ep)
     
-    haskey(data, :traj_importance_weight) && (data[:traj_importance_weight][1,ep] .= sampler.weight_fn(sampler.agent, data, ep))
+    haskey(data, :traj_importance_weight) && (data[:traj_importance_weight][1,ep] .= sampler.traj_weight_fn(sampler.agent, data, ep))
 
     # Dealing with cost constraints
     haskey(data, :cost_advantage) && fill_gae!(data, ep, sampler.Vc, sampler.λ, sampler.γ, source=:cost, target=:cost_advantage)

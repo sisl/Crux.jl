@@ -53,10 +53,10 @@ solve(𝒮_sac, mdp)
              S=S, 
              max_steps=1000,
              CQL_α_thresh = 10f0,
-             a_opt=(epochs=100, batch_size=256, optimizer=ADAM(1e-4)),
-             c_opt=(batch_size=256, optimizer=ADAM(3f-4),),
-             SAC_α_opt=(batch_size=256, optimizer=ADAM(1f-4),),
-             CQL_α_opt=(batch_size=256, optimizer=ADAM(1f-4),),
+             a_opt=(epochs=100, batch_size=256, optimizer=Adam(1e-4)),
+             c_opt=(batch_size=256, optimizer=Adam(3f-4),),
+             SAC_α_opt=(batch_size=256, optimizer=Adam(1f-4),),
+             CQL_α_opt=(batch_size=256, optimizer=Adam(1f-4),),
              log=(period=500, fns=[log_undiscounted_return(1)]),)
 solve(𝒮_cql, mdp)
 

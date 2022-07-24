@@ -41,8 +41,8 @@ off_policy = (S=S,
               N=30000,
               buffer_size=Int(5e5),
               buffer_init=1000,
-              c_opt=(batch_size=100, optimizer=ADAM(1e-3)),
-              a_opt=(batch_size=100, optimizer=ADAM(1e-3)),
+              c_opt=(batch_size=100, optimizer=Adam(1e-3)),
+              a_opt=(batch_size=100, optimizer=Adam(1e-3)),
               π_explore=GaussianNoiseExplorationPolicy(0.5f0, a_min=[-2.0], a_max=[2.0]))
               
 # Solver with DDPG

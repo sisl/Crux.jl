@@ -119,7 +119,7 @@ a, logprob = exploration(p, s)
 Flux.onehotbatch(p_gpu, ones(Int, 1, 10) |> gpu)
 
 # Testing the logit conversion function 
-p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4, sigmoid)), [1,2, 3, 4], (π, s) -> value(π, s) ./ sum(value(π, s),dims=1))
+p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4, sigmoid)), [1,2, 3, 4], logit_conversion=(π, s) -> value(π, s) ./ sum(value(π, s),dims=1))
 
 vals = value(p, s)
 lgts = Crux.logits(p, s)
@@ -130,32 +130,28 @@ lgts = Crux.logits(p, s)
 ## Mixture Network
 Q1 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
 Q2 = DiscreteNetwork(Chain(Dense(2,32, relu), Dense(32, 3)), [1,2,3])
-p = MixtureNetwork([Q1, Q2], [0.1, 0.9], 1)
+p = MixtureNetwork([Q1, Q2], [0.1, 0.9])
 s = rand(2,100)
 a = rand([true, false], 3, 100)
 
 
-@test length(Flux.trainable(p)) == 4
-@test length(layers(p)) == 4
+@test length(Flux.trainable(p)) == 3
+@test length(layers(p)) == 5
 @test Crux.device(p) == cpu
 
-@test p.current_net == 1
 @test action_space(p) == action_space(p.networks[1])
 
 p_gpu = p |> gpu
 USE_CUDA && @test Crux.device(p_gpu) == gpu
 USE_CUDA && @test all([Crux.device(n)== gpu for n in p_gpu.networks])
 
-@test length(Flux.params(p)) == 8
-@test length(layers(p)) == 4
+@test length(Flux.params(p)) == 9
+@test length(layers(p)) == 5
 
-@test all(Crux.value(p, s) .≈ Crux.value(p_gpu, s))
+# @test all(Crux.value(p, s) .≈ Crux.value(p_gpu, s))
 # @test Crux.valueall(p, s) == [Crux.value(p.networks[1], s), Crux.value(p.networks[2], s)]
 # @test Crux.valueall(p, s, a) == [Crux.value(p.networks[1], s, a), Crux.value(p.networks[2], s, a)]
-@test action(p, s) == action(p.networks[1], s)
-
-p.current_net=2
-@test action(p, s) == action(p.networks[2], s)
+action(p, s)
 
 
 ## Double Network
@@ -383,7 +379,7 @@ p = ϵGreedyPolicy(0f0, [2,3])
 a, logprob = exploration(p, s0; π_on=p_on, i=1)
 
 @test a[1] in [2,3]
-@test logprob[1] < 0
+@test logprob[1] <= 0
 
 
 ## GaussianNoiseExplorationPolicy

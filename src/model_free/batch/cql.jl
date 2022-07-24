@@ -1,5 +1,5 @@
 function CQL_alpha_loss(π, 𝒫, 𝒟; info = Dict())
-    ignore() do
+    ignore_derivatives() do
         info["CQL alpha"] = exp(𝒫[:CQL_log_α][1])
     end
     -conservative_loss(π, 𝒫, 𝒟)
@@ -9,7 +9,7 @@ function importance_sampling(πsamp, π, obs, Nsamples)
     @assert ndims(obs) == 2 # does not support multidimensional observations yet
     @assert critic(π) isa DoubleNetwork # Assumes we have a double network
     
-    rep_obs, flat_actions, logprobs = Zygote.ignore() do
+    rep_obs, flat_actions, logprobs = ignore_derivatives() do
         actions_and_logprobs = [exploration(πsamp, obs) for i=1:Nsamples]
         actions = cat([a for (a, _) in actions_and_logprobs]..., dims=3)
         logprobs = cat([lp for (_, lp) in actions_and_logprobs]..., dims=3)

@@ -32,7 +32,7 @@ function NDA_GAIL_JS(;π,
         # Set the reward
         D_out = value(D, 𝒟[:a], 𝒟[:s]) # This is swapped because a->x and s->y and the convention for GANs is D(x,y)
         r = αr * logσ.(D_out) .- (1f0 - αr) * logcompσ.(D_out)
-        ignore() do
+        ignore_derivatives() do
             minval, maxval = extrema(D_out)
             info["disc_reward"] = mean(r)
         end
@@ -43,7 +43,7 @@ function NDA_GAIL_JS(;π,
         r_nda = αr * logσ.(D_out_nda) .- (1f0 - αr) * logcompσ.(D_out_nda)
         c = max.(0, r_nda .- r)
         # c = max.(0, σ.(D_out_nda) .- σ.(D_out))
-        ignore() do
+        ignore_derivatives() do
             info["disc_nda_cost"] = sum(c) / sum(𝒟[:episode_end])
         end
         𝒟[:cost] .= c

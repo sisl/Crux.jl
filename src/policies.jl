@@ -24,6 +24,15 @@ new_ep_reset!(π::N) where {N<:Policy} = nothing
 # Call policies as functions calls the value function
 (pol::NetworkPolicy)(x...) = value(pol, x...)
 
+# Trajecotry pdf
+function trajectory_pdf(π::N, D) where {N <: Policy}
+	exp(sum(logpdf(π, D[:s], D[:a])))
+end
+
+function trajectory_pdf(π::N, D, ep) where {N <: Policy}
+	exp(sum(logpdf(π, D[:s][:, ep], D[:a][:, ep])))
+end
+
 layers(π::Chain) = π.layers
 
 function polyak_average!(to, from, τ=1.0f0)
@@ -105,7 +114,7 @@ POMDPs.value(π::DiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims=1)
 POMDPs.action(π::DiscreteNetwork, s) = π.always_stochastic ? exploration(π, s)[1] : π.outputs[mapslices(argmax, value(π, s), dims=1)]
 
 function Flux.onehotbatch(π::DiscreteNetwork, a)
-    ignore() do
+    ignore_derivatives() do
         a_oh = Flux.onehotbatch(a[:] |> cpu, π.outputs) |> device(a)
         length(a) == 1 ? dropdims(a_oh, dims=2) : a_oh
     end
@@ -124,7 +133,7 @@ end
 
 function Distributions.logpdf(π::DiscreteNetwork, s, a)
     # If a does not seem to be a one-hot encoding then we encode it
-    Zygote.ignore() do
+    ignore_derivatives() do
         size(a, 1) == 1 && (a = Flux.onehotbatch(π, a))
     end
     return categorical_logpdf(logits(π, s), a)
@@ -167,10 +176,13 @@ Distributions.entropy(π::DoubleNetwork, s) = (entropy(π.N1, s), entropy(π.N2,
 
 action_space(π::DoubleNetwork) = action_space(π.N1)
 
-## Mixture Model Network architecture
+## Mixture Model Network architecture (Mixed per action)
 mutable struct MixtureNetwork <: NetworkPolicy
     networks::Array
     weights::ContinuousNetwork
+	MixtureNetwork(networks::Array, weights::ContinuousNetwork) = new(networks, weights)
+    MixtureNetwork(networks::Array, weights::AbstractArray) = new(networks, ContinuousNetwork(Chain(ConstantLayer(weights)), length(weights)))
+
 end
 
 Flux.@functor MixtureNetwork
@@ -235,6 +247,8 @@ POMDPs.action(π::ActorCritic, s) = action(π.A, s)
 exploration(π::ActorCritic, s; kwargs...) = exploration(π.A, s; kwargs...)
 
 Distributions.logpdf(π::ActorCritic, s, a) = logpdf(π.A, s, a)
+
+trajectory_pdf(π::ActorCritic, D...) = trajectory_pdf(π.A, D...)
 
 Distributions.entropy(π::ActorCritic, s) = entropy(π.A, s)
 
@@ -306,7 +320,7 @@ end
 function exploration(π::GaussianPolicy, s; kwargs...)
     μ, logΣ = π.μ(s), π.logΣ(s)
     σ = exp.(logΣ)
-    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
+    ϵ = ignore_derivatives(() -> randn(Float32, size(μ)...) |> device(s))
     a = ϵ .* σ .+ μ
     a, gaussian_logpdf(μ, logΣ, a)
 end
@@ -356,7 +370,7 @@ end
 function exploration(π::SquashedGaussianPolicy, s; kwargs...)
     μ, logΣ = π.μ(s), π.logΣ(s)
     σ = squashed_gaussian_σ(logΣ)
-    ϵ = Zygote.ignore(() -> randn(Float32, size(μ)...) |> device(s))
+    ϵ = ignore_derivatives(() -> randn(Float32, size(μ)...) |> device(s))
     a_pretanh = ϵ .* σ .+ μ
     π.ascale .* tanh.(a_pretanh), squashed_gaussian_logprob(μ, logΣ, a_pretanh)
 end
@@ -441,7 +455,7 @@ MixedPolicy(ϵ::Real, policy) = MixedPolicy((i) -> ϵ, policy)
 
 function exploration(π::MixedPolicy, s; π_on, i)
     ϵ = π.ϵ(i)
-    x = (rand() < ϵ) ? exploration(π.policy, s)[1] : exploration(π_on, s)[1]
+    x = (rand() < ϵ) ? exploration(π.policy, s)[1] : action(π_on, s) #exploration(π_on, s)[1]
 
 
     # Turn the action into an array if it is a value
@@ -451,7 +465,11 @@ function exploration(π::MixedPolicy, s; π_on, i)
     # logp2 = Base.log(1 - ϵ) .+ logpdf(π_on, s, x)
 
     p1 = ϵ .* exp.(logpdf(π.policy, s, x))
-    p2 = (1 - ϵ) .* exp.(logpdf(π_on, s, x))
+	if hasproperty(actor(π_on), :always_stochastic) && actor(π_on).always_stochastic
+    	p2 = (1 - ϵ) .* exp.(logpdf(π_on, s, x))
+	else
+		p2 = (1 - ϵ)
+	end
 
     # logsumexp(vcat(logp1, logp2), dims=1)
     x, Base.log.(p1 .+ p2)

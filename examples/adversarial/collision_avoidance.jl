@@ -31,13 +31,13 @@ for i=1:5
                     buffer_size=Int(1e5), 
                     buffer_init=1000, 
                     π_explore=π_explore(actions(mdp)), 
-                    c_opt=(;batch_size=256, optimizer=ADAM(1e-4)))
+                    c_opt=(;batch_size=256, optimizer=Adam(1e-4)))
     ARL_params() = (DQN_params()..., 
-                    x_c_opt=(;batch_size=256, optimizer=ADAM(1e-4)), 
+                    x_c_opt=(;batch_size=256, optimizer=Adam(1e-4)), 
                     desired_AP_ratio=3)
     neg_QS(outputs) = DiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, length(outputs), x->-softplus(-x))), outputs)
     QS(outputs) = DiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu),Dense(64, length(outputs))), outputs)
-    (;batch_size=256, optimizer=ADAM(1e-4))
+    (;batch_size=256, optimizer=Adam(1e-4))
 
     # Train with DQN
     𝒮_dqn = DQN(π=neg_QS(actions(mdp)); DQN_params()...)

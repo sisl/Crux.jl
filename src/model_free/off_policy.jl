@@ -27,7 +27,7 @@
     buffer_fractions = [1.0] # Fraction of the minibatch devoted to each buffer
 end
 
-function train_step(𝒮::OffPolicySolver, 𝒟, γ)
+function value_training(𝒮::OffPolicySolver, 𝒟, γ)
     infos = []
     # Loop over the desired number of training steps
     for epoch in 1:𝒮.c_opt.epochs
@@ -71,7 +71,7 @@ function train_step(𝒮::OffPolicySolver, 𝒟, γ)
     # If not using a separate actor, update target networks after critic training
     isnothing(𝒮.a_opt) && 𝒮.target_update(𝒮.agent.π⁻, 𝒮.agent.π, i=𝒮.i + 1:𝒮.i + 𝒮.ΔN)
     
-    infos
+    aggregate_info(infos)
 end
 
 function POMDPs.solve(𝒮::OffPolicySolver, mdp)
@@ -104,10 +104,10 @@ function POMDPs.solve(𝒮::OffPolicySolver, mdp)
 		𝒮.pre_train_callback(𝒮, info=info)
         
         # Train the networks
-        infos = train_step(𝒮, 𝒟, γ)
+        training_info = value_training(𝒮, 𝒟, γ)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, aggregate_info(infos), info, 𝒮=𝒮)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, training_info, info, 𝒮=𝒮)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π

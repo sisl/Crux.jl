@@ -2,7 +2,7 @@
 function reinforce_loss(π, 𝒫, 𝒟; info = Dict())
     new_probs = logpdf(π, 𝒟[:s], 𝒟[:a])
     
-    ignore() do
+    ignore_derivatives() do
         info[:entropy] = mean(entropy(π, 𝒟[:s]))
         info[:kl] = mean(𝒟[:logprob] .- new_probs)
     end 

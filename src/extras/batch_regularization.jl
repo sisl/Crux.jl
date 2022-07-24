@@ -17,7 +17,7 @@ end
 function (R::BatchRegularizer)(π)
     # sample a random batch for each buffer
     ret0 = false
-    ignore() do
+    ignore_derivatives() do
         if any([length(b) == 0 for b in R.buffers])
             ret0 = true
         else 

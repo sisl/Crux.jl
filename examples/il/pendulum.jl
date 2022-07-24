@@ -57,8 +57,8 @@ solve(𝒮_gail_on, mdp)
                        ΔN=50,
                        N=30000,
                        buffer_size=Int(1e4),
-                       c_opt=(batch_size=512, optimizer=ADAM(1e-3)),
-                       a_opt=(optimizer=ADAM(1e-3),),
+                       c_opt=(batch_size=512, optimizer=Adam(1e-3)),
+                       a_opt=(optimizer=Adam(1e-3),),
                        d_opt=(epochs=1, batch_size=256),
                        π_explore=GaussianNoiseExplorationPolicy(0.2f0, a_min=[-2.0], a_max=[2.0])
                        )
@@ -70,7 +70,7 @@ solve(𝒮_gail, mdp)
 solve(𝒮_bc, mdp)
 
 ## Advil
-𝒮_advil = AdVIL(π=ActorCritic(A(),QSA()), 𝒟_demo=expert_trajectories, S=S, a_opt=(epochs=1000, optimizer=ADAM(8f-4), batch_size=1024), c_opt=(optimizer=ADAM(8e-4),), max_steps=100, log=(period=100,))
+𝒮_advil = AdVIL(π=ActorCritic(A(),QSA()), 𝒟_demo=expert_trajectories, S=S, a_opt=(epochs=1000, optimizer=Adam(8f-4), batch_size=1024), c_opt=(optimizer=Adam(8e-4),), max_steps=100, log=(period=100,))
 solve(𝒮_advil, mdp)
 
 ## SQIL
@@ -80,8 +80,8 @@ solve(𝒮_advil, mdp)
               max_steps=100,
               N=30000,
               buffer_size=Int(1e4),
-              c_opt=(batch_size=128, optimizer=ADAM(1e-3)),
-              a_opt=(batch_size=128, optimizer=ADAM(1e-3)),
+              c_opt=(batch_size=128, optimizer=Adam(1e-3)),
+              a_opt=(batch_size=128, optimizer=Adam(1e-3)),
               solver=TD3,
               π_explore=GaussianNoiseExplorationPolicy(0.2f0, a_min=[-2.0], a_max=[2.0]))
 solve(𝒮_sqil, mdp)
@@ -93,8 +93,8 @@ solve(𝒮_sqil, mdp)
               max_steps=100,
               N=30000,
               buffer_size=Int(1e4),
-              c_opt=(batch_size=128, optimizer=ADAM(1e-3)),
-              a_opt=(batch_size=128, optimizer=ADAM(1e-3)),
+              c_opt=(batch_size=128, optimizer=Adam(1e-3)),
+              a_opt=(batch_size=128, optimizer=Adam(1e-3)),
               π_explore=GaussianNoiseExplorationPolicy(0.2f0, a_min=[-2.0], a_max=[2.0]))
 solve(𝒮_adril, mdp)
 
@@ -106,7 +106,7 @@ solve(𝒮_adril, mdp)
               𝒟_demo=expert_trajectories,
               N=50000,
               max_steps=100,
-              a_opt=(batch_size=256, optimizer=Flux.Optimise.Optimiser(Flux.ClipValue(1f0), ADAM(1e-3)), epochs=10))
+              a_opt=(batch_size=256, optimizer=Flux.Optimise.Optimiser(Flux.ClipValue(1f0), Adam(1e-3)), epochs=10))
 solve(𝒮_ASAF, mdp)
 
 

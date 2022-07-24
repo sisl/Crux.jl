@@ -67,7 +67,7 @@ plot!(-3:0.1:3, x -> pdf(target_dist, x))
 logpdf(n, x, y)
 
 
-opt = ADAM()
+opt = Adam()
 
 
 evalcb() = @show(loss(x, y))

@@ -11,7 +11,7 @@ module Crux
     using TensorBoardLogger
     using Flux
     using Zygote
-    import Zygote: ignore
+    import Zygote: ignore_derivatives
     using Flux.Optimise: train!
     using CUDA
     using LinearAlgebra
@@ -49,7 +49,7 @@ module Crux
     export TrainingParams, batch_train!
     include("training.jl")
     
-    export PolicyParams, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
+    export PolicyParams, trajectory_pdf, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
            DistributionPolicy, MixedPolicy, MixtureNetwork, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 
@@ -135,9 +135,6 @@ module Crux
     export ExperienceReplay, TIER
     include("model_free/cl/experience_replay.jl")
     include("model_free/cl/tier.jl")
-    
-    export ISDRL_Discrete, ISDRL_Continuous
-    include("model_free/evaluation/isdrl.jl")
     
     export AdversarialOffPolicySolver, RARL, RARL_DQN, RARL_TD3, ISARL, ISARL_DQN, ISARL_TD3
     include("model_free/adversarial/adv_off_policy.jl")

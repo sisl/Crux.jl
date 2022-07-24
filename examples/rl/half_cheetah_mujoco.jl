@@ -46,15 +46,15 @@ end
 shared = (max_steps=1000, N=Int(3e6), S=S)
 on_policy = (ΔN=4000, 
              λ_gae=0.97, 
-             a_opt=(batch_size=4000, epochs=80, optimizer=ADAM(3e-4)), 
-             c_opt=(batch_size=4000, epochs=80, optimizer=ADAM(1e-3)))
+             a_opt=(batch_size=4000, epochs=80, optimizer=Adam(3e-4)), 
+             c_opt=(batch_size=4000, epochs=80, optimizer=Adam(1e-3)))
 off_policy = (ΔN=50,
               max_steps=1000,
               log=(period=4000, fns=[log_undiscounted_return(3)]),
               buffer_size=Int(1e6), 
               buffer_init=1000, 
-              c_opt=(batch_size=100, optimizer=ADAM(1e-3)),
-              a_opt=(batch_size=100, optimizer=ADAM(1e-3)), 
+              c_opt=(batch_size=100, optimizer=Adam(1e-3)),
+              a_opt=(batch_size=100, optimizer=Adam(1e-3)), 
               π_explore=FirstExplorePolicy(10000, rand_policy, GaussianNoiseExplorationPolicy(0.1f0, a_min=amin, a_max=amax)))
 
 ## Run solvers 

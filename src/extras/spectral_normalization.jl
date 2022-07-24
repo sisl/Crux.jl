@@ -37,7 +37,7 @@ Flux.trainable(a::DenseSN) = (a.weight, a.bias)
 
 function (a::DenseSN)(x::AbstractVecOrMat)
   W, b, σ = a.weight, a.bias, a.σ
-  u, v = Zygote.ignore(() -> power_iteration!(W, a.u, a.n_iterations))
+  u, v = ignore_derivatives(() -> power_iteration!(W, a.u, a.n_iterations))
   σ.((W ./ msv(u, v, W))*x .+ b)
 end
 
@@ -84,7 +84,7 @@ Flux.trainable(a::ConvSN) = (a.weight, a.bias)
 function (c::ConvSN)(x::AbstractArray)
   σ, b = c.σ, reshape(c.bias, ntuple(_->1, length(c.stride))..., :, 1)
   cdims = DenseConvDims(x, c.weight; stride=c.stride, padding=c.pad, dilation=c.dilation)
-  u, v = Zygote.ignore(() -> power_iteration!(to2D(c.weight), c.u, c.n_iterations))
+  u, v = ignore_derivatives(() -> power_iteration!(to2D(c.weight), c.u, c.n_iterations))
   σ.(conv(x, c.weight ./ msv(u, v, to2D(c.weight)), cdims) .+ b)
 end
 

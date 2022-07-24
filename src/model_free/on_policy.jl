@@ -23,6 +23,30 @@
     cost_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the cost value
 end
 
+function policy_gradient_training(𝒮::OnPolicySolver, 𝒟)
+    info = Dict()
+    
+    # Train parameters
+    for (θs, p_opt) in 𝒮.param_optimizers
+        batch_train!(θs, p_opt, 𝒮.𝒫, 𝒟, info=info, π_loss=𝒮.agent.π)
+    end
+    
+    # Train the actor
+    batch_train!(actor(𝒮.agent.π), 𝒮.a_opt, 𝒮.𝒫, 𝒟, info=info)
+    
+    # Train the critic (if applicable)
+    if !isnothing(𝒮.c_opt)
+        batch_train!(critic(𝒮.agent.π), 𝒮.c_opt, 𝒮.𝒫, 𝒟, info=info)
+    end
+    
+    
+    if !isnothing(𝒮.cost_opt)
+        batch_train!(𝒮.Vc, 𝒮.cost_opt, 𝒮.𝒫, 𝒟, info=info)
+    end
+    
+    return info
+end
+
 function POMDPs.solve(𝒮::OnPolicySolver, mdp)
     # Construct the training buffer, constants, and sampler
     𝒟 = ExperienceBuffer(𝒮.S, 𝒮.agent.space, 𝒮.ΔN, 𝒮.required_columns, device=device(𝒮.agent.π))
@@ -44,25 +68,11 @@ function POMDPs.solve(𝒮::OnPolicySolver, mdp)
         # Post-batch callback, often used for additional training
         𝒮.post_batch_callback(𝒟, info=info, 𝒮=𝒮)
         
-        # Train parameters
-        for (θs, p_opt) in 𝒮.param_optimizers
-            batch_train!(θs, p_opt, 𝒮.𝒫, 𝒟, info=info, π_loss=𝒮.agent.π)
-        end
-        
-        # Train the actor
-        batch_train!(actor(𝒮.agent.π), 𝒮.a_opt, 𝒮.𝒫, 𝒟, info=info)
-        
-        # Train the critic (if applicable)
-        if !isnothing(𝒮.c_opt)
-            batch_train!(critic(𝒮.agent.π), 𝒮.c_opt, 𝒮.𝒫, 𝒟, info=info)
-        end
-        
-        if !isnothing(𝒮.cost_opt)
-            batch_train!(𝒮.Vc, 𝒮.cost_opt, 𝒮.𝒫, 𝒟, info=info)
-        end
+        # Train the networks
+        training_info = policy_gradient_training(𝒮, 𝒟)
         
         # Log the results
-        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, info, 𝒮=𝒮)
+        log(𝒮.log, 𝒮.i + 1:𝒮.i + 𝒮.ΔN, training_info, info, 𝒮=𝒮)
     end
     𝒮.i += 𝒮.ΔN
     𝒮.agent.π

@@ -73,7 +73,7 @@ function td_loss(;loss=Flux.mse, name=:Qavg, s_key=:s, a_key=:a, weight=nothing)
         Q = value(π, 𝒟[s_key], 𝒟[a_key]) 
         
         # Store useful information
-        ignore() do
+        ignore_derivatives() do
             info[name] = mean(Q)
         end
         

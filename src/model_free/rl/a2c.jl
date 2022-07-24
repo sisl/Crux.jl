@@ -4,7 +4,7 @@ function a2c_loss(π, 𝒫, 𝒟; info = Dict())
     e_loss = -mean(entropy(π, 𝒟[:s]))
     
     # Log useful information
-    ignore() do
+    ignore_derivatives() do
         info[:entropy] = -e_loss
         info[:kl] = mean(𝒟[:logprob] .- new_probs)
     end 

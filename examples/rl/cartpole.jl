@@ -1,7 +1,7 @@
 using POMDPs, Crux, Flux, POMDPGym
 
 ## Cartpole - V0
-mdp = GymPOMDP(:CartPole, version = :v0)
+mdp = GymPOMDP(:CartPole, version = :v1)
 as = actions(mdp)
 S = state_space(mdp)
 

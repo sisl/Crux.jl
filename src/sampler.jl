@@ -11,10 +11,14 @@
     λ::Float32 = NaN32
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
+    was_reset = false # Used to make sure that there isn't more than 1 reset per trajectory
     
     # Parameters for cost constraints
     Vc::Union{ContinuousNetwork, Nothing} = nothing
     λcost::Float32 = NaN32
+    
+    # Trajectory-level measurements
+    traj_weight_fn=nothing # weight of the trajectory
 end
 
 Sampler(mdp, π::T; kwargs...) where {T <: Policy} = Sampler(;mdp=mdp, agent=PolicyParams(π), kwargs...)
@@ -25,6 +29,7 @@ Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(m
 Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
         
 function reset_sampler!(sampler::Sampler)
+    sampler.was_reset && return
     if sampler.agent.π isa LatentConditionedNetwork && hasproperty(sampler.mdp, :z)
         sampler.agent.π.z = sampler.mdp.z
     end
@@ -34,6 +39,7 @@ function reset_sampler!(sampler::Sampler)
     sampler.s = rand(initialstate(sampler.mdp))
     sampler.svec = tovec(initial_observation(sampler.mdp, sampler.s), sampler.S)
     sampler.episode_length = 0
+    sampler.was_reset=true
 end
 
 function initial_observation(mdp, s)
@@ -49,9 +55,11 @@ function terminate_episode!(sampler::Sampler, data, j)
     ep = j - sampler.episode_length + 1 : j
     haskey(data, :advantage) && fill_gae!(data, ep, sampler.agent.π, sampler.λ, sampler.γ)
     haskey(data, :return) && fill_returns!(data, ep, sampler.γ)
-    # (haskey(data, :cum_importance_weight) || 
-    #  haskey(data, :fwd_importance_weight) || 
+    haskey(data, :fwd_importance_weight) && fill_fwd_importance_weight!(data, ep)
+    haskey(data, :cum_importance_weight) && fill_cum_importance_weight!(data, ep)
     haskey(data, :rev_importance_weight) && fill_rev_importance_weight!(data, ep)
+    
+    haskey(data, :traj_importance_weight) && (data[:traj_importance_weight][1,ep] .= sampler.weight_fn(sampler.agent, data, ep))
 
     # Dealing with cost constraints
     haskey(data, :cost_advantage) && fill_gae!(data, ep, sampler.Vc, sampler.λ, sampler.γ, source=:cost, target=:cost_advantage)
@@ -61,6 +69,7 @@ function terminate_episode!(sampler::Sampler, data, j)
 end
     
 function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
+    sampler.was_reset=false
     a, logprob = explore ? exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i) : (action(sampler.agent.π, sampler.svec), NaN)
     (a isa AbstractArray || a isa Tuple) && length(a) == 1 && (a = a[1])
     
@@ -271,16 +280,26 @@ function fill_returns!(data, episode_range, γ::Float32; source=:r, target=:retu
     end
 end
 
+function fill_fwd_importance_weight!(data, episode_range;)
+    @assert haskey(data, :importance_weight)
+    w = 1f0
+    for i in episode_range
+        w = data[:importance_weight][1, i] * w
+        data[:fwd_importance_weight][:, i] .= w
+    end
+end
+
+function fill_cum_importance_weight!(data, episode_range;)
+    @assert haskey(data, :importance_weight)
+    w = 1f0
+    for i in episode_range
+        w = data[:importance_weight][1, i] * w
+    end
+    data[:cum_importance_weight][:, episode_range] .= w
+end
+
 function fill_rev_importance_weight!(data, episode_range;)
     @assert haskey(data, :importance_weight)
-    # w = 1f0
-    # for i in episode_range
-    #     w = data[:importance_weight][1, i] * w
-    #     # data[:fwd_importance_weight][:, i] .= w
-    # end
-    # 
-    # data[:cum_importance_weight][:, episode_range] .= w
-
     w=1f0
     for i in reverse(episode_range)
         w = data[:importance_weight][1, i] * w

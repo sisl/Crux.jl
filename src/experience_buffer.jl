@@ -15,7 +15,7 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
                  :cost_return, :value, :var_prob, :cvar_prob, :f]
             data[k] = ArrayType(fill(zero(R), 1, capacity))
         elseif k in [:weight, :importance_weight, :fwd_importance_weight,
-                     :rev_importance_weight, :cum_importance_weight, :traj_importance_weigth,]
+                     :rev_importance_weight, :cum_importance_weight, :traj_importance_weight,]
             data[k] = ArrayType(fill(one(R), 1, capacity))
         elseif k in [:fail, :grasp_success]
             data[k] = ArrayType(fill(false, 1, capacity))

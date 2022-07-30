@@ -201,9 +201,16 @@ end
 POMDPs.action(π::MixtureNetwork, s) = exploration(π, s)[1]
 
 function exploration(π::MixtureNetwork, s; kwargs...)
-    α = π.weights(s)
-    αi = rand(Categorical(α))
-    a, _ = exploration(π.networks[αi], s)
+    αs = π.weights(s)
+    indices = ignore_derivatives() do 
+		αi = mapslices(α -> rand(Categorical(α)), αs, dims=1)[:]
+		indices = []
+		for i=1:length(π.networks)
+			push!(indices,  αi .== i)
+		end
+		indices
+	end
+    a = hcat([exploration(d, s[:, i])[1] for (d, i) in zip(π.networks, indices)]...)
     
     return a, logpdf(π, s, a)
 end

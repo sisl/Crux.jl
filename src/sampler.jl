@@ -185,7 +185,7 @@ function episodes!(sampler::Sampler, buffer=nothing; store=nothing, cb=(kwargs..
             step!(data, j, sampler, explore=explore, i=i + (i-1))
             if sampler.episode_length == 0
                 episode_ends[k] = j
-                sampler.episode_checker(data, episode_starts[k], j) ? (k = k+1) : (j = episode_starts[k])
+                sampler.episode_checker(data, episode_starts[k], j) ? (k = k+1) : (j = episode_starts[k]-1)
                 break
             end
         end

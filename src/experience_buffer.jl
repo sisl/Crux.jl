@@ -204,6 +204,12 @@ function episodes(b::ExperienceBuffer, use_done=false, episode_checker=nothing)
         error("Need :episode_end flag or :t column to determine episodes")
     end
     
+    # make sure every index is part of an episode
+    if length(b) > 0 && ep_ends[end] != length(b)
+        push!(ep_starts, ep_ends[end]+1)
+        push!(ep_ends, length(b))
+    end
+    
     # If an episode checker is supplied use it to pull out those that return true
     if !isnothing(episode_checker)
         episodes = collect(zip(ep_starts, ep_ends))

@@ -168,6 +168,7 @@ end
 
 
 minibatch(b::ExperienceBuffer, indices) = Dict(k => bslice(b.data[k], indices) for k in keys(b))
+minibatch_copy(b::ExperienceBuffer, indices) = Dict(k => collect(bslice(b.data[k], indices)) for k in keys(b))
 
 Base.getindex(b::ExperienceBuffer, key::Symbol) = bslice(b.data[key], 1:b.elements)
 

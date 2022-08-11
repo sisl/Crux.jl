@@ -40,7 +40,7 @@ module Crux
            LinearDecaySchedule, MultitaskDecaySchedule, multi_td_loss, multi_actor_loss
     include("utils.jl")
     
-    export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch,
+    export MinHeap, inverse_query, mdp_data, PriorityParams, ExperienceBuffer, buffer_like, minibatch, minibatch_copy,
            clear!, trim!, isprioritized, dim, episodes, update_priorities!, uniform_sample!, 
            prioritized_sample!, capacity, normalize!, extra_columns, get_last_N_indices, 
            push_reservoir!, get_episodes

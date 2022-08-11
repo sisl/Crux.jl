@@ -47,9 +47,10 @@ function batch_train!(π, p::TrainingParams, 𝒫, 𝒟::ExperienceBuffer...; in
         end
         push!(infos, aggregate_info(minibatch_infos))
         p.early_stopping(infos) && break
+        total_batches >= p.max_batches && break
         
     end
-    info[:batches_trained] = total_batches
+    info[string(p.name, "batches_trained")] = total_batches
     merge!(info, aggregate_info(infos))
 end
 

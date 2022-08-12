@@ -22,6 +22,11 @@ Distributions.support(d::ObjectCategorical) = d.objs
 
 Distributions.entropy(d::ObjectCategorical) = entropy(d.cat)
 
+function Distributions.fit(dt::Type{D}, x, w; objs) where D <: ObjectCategorical
+	cat = fit(Categorical, Flux.onecold(x), w)
+	ObjectCategorical(objs, cat.p)
+end
+
 # Constant Layer
 struct ConstantLayer{T}
     vec::T

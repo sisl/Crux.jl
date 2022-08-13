@@ -25,12 +25,12 @@ new_ep_reset!(π::N) where {N<:Policy} = nothing
 (pol::NetworkPolicy)(x...) = value(pol, x...)
 
 # Trajecotry pdf
-function trajectory_pdf(π::N, D) where {N <: Policy}
-	exp(sum(logpdf(π, D[:s], D[:a])))
+function trajectory_logpdf(π::N, D) where {N <: Policy}
+	sum(logpdf(π, D[:s], D[:a]))
 end
 
-function trajectory_pdf(π::N, D, ep) where {N <: Policy}
-	exp(sum(logpdf(π, D[:s][:, ep], D[:a][:, ep])))
+function trajectory_logpdf(π::N, D, ep) where {N <: Policy}
+	sum(logpdf(π, D[:s][:, ep], D[:a][:, ep]))
 end
 
 layers(π::Chain) = π.layers
@@ -255,7 +255,7 @@ exploration(π::ActorCritic, s; kwargs...) = exploration(π.A, s; kwargs...)
 
 Distributions.logpdf(π::ActorCritic, s, a) = logpdf(π.A, s, a)
 
-trajectory_pdf(π::ActorCritic, D...) = trajectory_pdf(π.A, D...)
+trajectory_logpdf(π::ActorCritic, D...) = trajectory_logpdf(π.A, D...)
 
 Distributions.entropy(π::ActorCritic, s) = entropy(π.A, s)
 

@@ -142,10 +142,22 @@ function logcompσ(x::Real)
     return logσ(x) - x
 end
 
-# credit to: http://mileslucas.com/posts/weighted-logsumexp/
-function weighted_logsumexp(X, w; dims=1)
-    a = maximum(X; dims=dims)
-    r = sum(w .* exp.(X .- a); dims=dims)
-    return a .+ log.(r)
+
+# credit to: https://mileslucas.com/posts/weighted-logsumexp/
+function weighted_logsumexp(X, w)
+    a = -Inf
+    r = zero(eltype(X))
+    for (x, wi) in zip(X, w)
+        if x ≤ a
+            # standard computation
+            r += wi * exp(x - a)
+        else
+            # if new value is higher than current max
+            r *= exp(a - x)
+            r += wi
+            a = x
+        end
+    end
+    return a + log(r)
 end
 

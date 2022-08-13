@@ -49,7 +49,7 @@ module Crux
     export TrainingParams, batch_train!
     include("training.jl")
     
-    export PolicyParams, trajectory_pdf, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
+    export PolicyParams, trajectory_logpdf, NetworkPolicy, polyak_average!, ContinuousNetwork, DiscreteNetwork, 
            DoubleNetwork, ActorCritic, GaussianPolicy, SquashedGaussianPolicy, 
            DistributionPolicy, MixedPolicy, MixtureNetwork, ϵGreedyPolicy,
            GaussianNoiseExplorationPolicy, FirstExplorePolicy, 

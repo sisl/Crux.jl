@@ -1,8 +1,8 @@
-@with_kw mutable struct Sampler{P, V, Pol <: Policy, T1 <: AbstractSpace, T2 <: AbstractSpace}
+@with_kw mutable struct Sampler{P, Pol <: Policy, T1 <: AbstractSpace, T2 <: AbstractSpace}
     mdp::P
     agent::PolicyParams{Pol, T2} # The agent
     adversary = nothing # The adversary
-    s::V = rand(initialstate(mdp)) # Current State
+    s = rand(initialstate(mdp)) # Current State
     S::T1 = state_space(initial_observation(mdp, s)) # State space
     svec::AbstractArray = tovec(initial_observation(mdp, s), S) # Current observation
     max_steps::Int = 100

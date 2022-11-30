@@ -12,11 +12,11 @@
     episode_length::Int64 = 0
     episode_checker::Function = (data, start, stop) -> true
     was_reset = false # Used to make sure that there isn't more than 1 reset per trajectory
-    
+
     # Parameters for cost constraints
     Vc::Union{ContinuousNetwork, Nothing} = nothing
     λcost::Float32 = NaN32
-    
+
     # Trajectory-level measurements
     traj_weight_fn=nothing # weight of the trajectory
 end
@@ -27,15 +27,15 @@ Sampler(mdp, agent::T; kwargs...) where {T <: PolicyParams} = Sampler(;mdp=mdp, 
 # Construct a vector of samplers from a vector of mdps
 Sampler(mdps::AbstractVector, π::T; kwargs...) where {T <: Policy} = [Sampler(mdps[i], π; kwargs...) for i in 1:length(mdps)]
 Sampler(mdps::AbstractVector, agent::T; kwargs...) where {T <: PolicyParams} = [Sampler(mdps[i], agent; kwargs...) for i in 1:length(mdps)]
-        
+
 function reset_sampler!(sampler::Sampler)
     sampler.was_reset && return
     if sampler.agent.π isa LatentConditionedNetwork && hasproperty(sampler.mdp, :z)
         sampler.agent.π.z = sampler.mdp.z
     end
-    
+
     new_ep_reset!(sampler.agent.π)
-    
+
     sampler.s = rand(initialstate(sampler.mdp))
     sampler.svec = tovec(initial_observation(sampler.mdp, sampler.s), sampler.S)
     sampler.episode_length = 0
@@ -58,25 +58,25 @@ function terminate_episode!(sampler::Sampler, data, j)
     haskey(data, :fwd_importance_weight) && fill_fwd_importance_weight!(data, ep)
     haskey(data, :cum_importance_weight) && fill_cum_importance_weight!(data, ep)
     haskey(data, :rev_importance_weight) && fill_rev_importance_weight!(data, ep)
-    
+
     haskey(data, :traj_importance_weight) && (data[:traj_importance_weight][1,ep] .= sampler.traj_weight_fn(sampler.agent, data, ep))
 
     # Dealing with cost constraints
     haskey(data, :cost_advantage) && fill_gae!(data, ep, sampler.Vc, sampler.λ, sampler.γ, source=:cost, target=:cost_advantage)
     haskey(data, :cost_return) && fill_returns!(data, ep, sampler.γ, source=:cost, target=:cost_return)
-    
+
     reset_sampler!(sampler)
 end
-    
+
 function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     sampler.was_reset=false
     a, logprob = explore ? exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i) : (action(sampler.agent.π, sampler.svec), NaN)
     (a isa AbstractArray || a isa Tuple) && length(a) == 1 && (a = a[1])
-    
+
     # This implements the ability to get cost information from safety gym
     info = Dict()
-    kwargs = (haskey(data, :cost) || haskey(data, :z) || haskey(data, :grasp_success)) ? (info=info,) : () 
-    
+    kwargs = (haskey(data, :cost) || haskey(data, :z) || haskey(data, :grasp_success)) ? (info=info,) : ()
+
     args = (a,)
     if !isnothing(sampler.adversary)
         x, xlogprob = explore ? exploration(sampler.adversary.π_explore, sampler.svec, π_on=sampler.adversary.π, i=i) : (action(sampler.adversary.π, sampler.svec), NaN)
@@ -85,12 +85,12 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
         haskey(data, :xlogprob) && (data[:xlogprob][:, j] .= xlogprob)
         args = (a, x)
     end
-    
+
     if sampler.mdp isa POMDP
-        sp, o, r = gen(sampler.mdp, sampler.s, args...; kwargs...)
+        sp, o, r = @gen(:sp,:o,:r)(sampler.mdp, sampler.s, args...; kwargs...)
         spvec = convert_o(AbstractArray, o, sampler.mdp)
     else
-        sp, r = gen(sampler.mdp, sampler.s, args...; kwargs...)
+        sp, r = @gen(:sp,:r)(sampler.mdp, sampler.s, args...; kwargs...)
         spvec = convert_s(AbstractArray, sp, sampler.mdp)
     end
     spvec = tovec(spvec, sampler.S)
@@ -102,7 +102,7 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
     bslice(data[:sp], j:j) .= spvec
     data[:r][1, j] = r
     data[:done][1, j] = done
-    
+
     # Handle optional data storage
     haskey(data, :logprob) && (data[:logprob][:, j] .= logprob)
     if haskey(data, :importance_weight)
@@ -118,17 +118,17 @@ function step!(data, j::Int, sampler::Sampler; explore=false, i=0)
         if sampler.agent.π isa LatentConditionedNetwork
             sampler.agent.π.z = z
         end
-        
+
         if size(data[:z], 1) == 0
             data[:z] = fill(z[1], length(z), size(data[:s], 2))
         end
         data[:z][:, j] = z
-    end 
+    end
     haskey(data, :fail) && (data[:fail][1,j] = extra_functions["isfailure"](sampler.mdp, sp)) #TODO Changed this to "s" instead of "sp" for the continuum world
-    
+
     # Cut the episode short if needed
     sampler.episode_length += 1
-    if done || sampler.episode_length >= sampler.max_steps 
+    if done || sampler.episode_length >= sampler.max_steps
         terminate_episode!(sampler, data, j)
     else
         sampler.s = sp
@@ -140,17 +140,17 @@ function steps!(sampler::Sampler, buffer=nothing; store=nothing, cb=(kwargs...)-
     data = mdp_data(sampler.S, sampler.agent.space, Nsteps, sampler.required_columns)
     for j=1:Nsteps
         step!(data, j, sampler, explore=explore, i=i + (j-1))
-        if return_at_episode_end && sampler.episode_length == 0 
+        if return_at_episode_end && sampler.episode_length == 0
             trim!(data, j)
             break
         end
     end
     reset && terminate_episode!(sampler, data, Nsteps)
-    
+
     cb(data) # Run the callback on the dataset before adding it
     !isnothing(store) && push!(store, data) # add it to the storage array if provided
-    !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer    
-    
+    !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer
+
     return_episodes ? (data, episodes(data)) : data
 end
 
@@ -164,11 +164,11 @@ function steps!(samplers::Vector{T}, buffer=nothing; store=nothing, cb=(kwargs..
         end
     end
     reset && terminate_episode!(sampler, data, Nsteps)
-    
+
     cb(data) # Run the callback on the dataset before adding it
     !isnothing(store) && push!(store, data) # add it to the storage array if provided
     !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer
-    
+
     return_episodes ? (data, episodes(data)) : data
 end
 
@@ -191,11 +191,11 @@ function episodes!(sampler::Sampler, buffer=nothing; store=nothing, cb=(kwargs..
         end
     end
     trim!(data, j)
-    
+
     cb(data) # Run the callback on the dataset before adding it
     !isnothing(store) && push!(store, data) # add it to the storage array if provided
     !isnothing(buffer) && push!(buffer, data) # Push it to the provided buffer
-    
+
     return_episodes ? (data, zip(episode_starts, episode_ends)) : data
 end
 
@@ -210,15 +210,15 @@ function metrics_by_key(s::Sampler; keys, Neps=100, kwargs...)
         s.mdp.logging = true
     end
     data = episodes!(s, Neps=Neps; kwargs...)
-    
+
     if hasproperty(s.mdp, :logging)
         s.mdp.logging = false
     end
-    
+
     [sum(data[key]) / Neps for key in keys]
 end
 
-# recover a single metric 
+# recover a single metric
 metric_by_key(data, start, stop; key) = metrics_by_key(data, start, stop; keys=[key])[1]
 
 metric_by_key(s::Sampler; key, Neps=100, kwargs...) = metrics_by_key(s; keys=[key], Neps=Neps, kwargs...)[1]
@@ -249,8 +249,8 @@ function failure(s::Sampler; threshold=0., Neps=100, kwargs...)
     data, episodes = episodes!(s, Neps = Neps, return_episodes = true; kwargs...)
     mean([failure(data, e..., threshold = threshold) for e in episodes])
 end
-    
-    
+
+
 ## Generalized Advantage Estimation
 function fill_gae!(d::ExperienceBuffer, V, λ::Float32, γ::Float32)
     eps = episodes(d)
@@ -314,4 +314,3 @@ function trim!(data::Dict{Symbol, Array}, N)
     end
     data
 end
-

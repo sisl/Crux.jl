@@ -1,5 +1,6 @@
 using POMDPs
 using POMDPGym
+import POMDPModels
 using Test
 using Crux
 using Flux
@@ -55,6 +56,9 @@ test_solver((π) -> REINFORCE(π=π, S=S, N=N, ΔN=ΔN), discrete_mdp, A())
 test_solver((π) -> A2C(π=π, S=S, N=N, ΔN=ΔN), discrete_mdp, AC())
 test_solver((π) -> PPO(π=π, S=S, N=N, ΔN=ΔN), discrete_mdp, AC())
 test_solver((π) -> DQN(π=π, S=S, N=N), discrete_mdp, A())
+
+# test compatibility with non-POMDPGym MDPs
+test_solver((π) -> PPO(π=π, S=S, N=N, ΔN=ΔN), POMDPModels.SimpleGridWorld(), AC())
 
 ## Continuous RL
 continuous_mdp = PendulumPOMDP()

@@ -99,7 +99,7 @@ eps2 = Crux.episodes(buffer)
 @test all(eps .== eps2)
 
 ## Test the adversarial MDP stuff
-amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], [1,1]))
+amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], LinearAlgebra.Diagonal([1,1])))
 G() = GaussianPolicy(ContinuousNetwork(Chain(Dense(4,2))), zeros(2))
 
 s = Sampler(amdp, G(), adversary=PolicyParams(G()))

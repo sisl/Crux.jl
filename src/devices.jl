@@ -2,20 +2,18 @@ device(v::T) where T <: CuArray = gpu
 device(v::T) where T <: AbstractArray = cpu
 device(v::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = gpu
 device(v::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = cpu
-function device(c) 
+function device(c)
     p = Flux.params(c)
     length(p) > 0 && p[1] isa CuArray ? gpu : cpu
-end 
+end
 
 # Call F with input x but ensure they are both on the device of F
 gpucall(F, x::CuArray) = F(x)
 gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = F(x)
 
-gpucall(F, x::Array) = cpu(F(gpu(x)))
-gpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = cpu(F(gpu(collect(x))))
+gpucall(F, x::AbstractArray) = cpu(F(gpu(x)))
 
-cpucall(F, x::Array) = F(x)
-cpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: AbstractArray, I, L} = F(x)
+cpucall(F, x::AbstractArray) = F(x)
 
 cpucall(F, x::CuArray) = gpu(F(cpu(x)))
 cpucall(F, x::SubArray{T,N,P,I,L}) where {T, N, P <: CuArray, I, L} = gpu(F(cpu(x)))

@@ -20,14 +20,14 @@ end
 
 function SAC_actor_loss(π, 𝒫, 𝒟; info = Dict())
     a, logprob = exploration(π.A, 𝒟[:s])
-    ignore() do
+    ignore_derivatives() do
         info["entropy"] = -mean(logprob)
     end
     mean(exp(𝒫[:SAC_log_α][1]).*logprob .- min.(value(π, 𝒟[:s], a)...))
 end
 
 function SAC_temp_loss(π, 𝒫, 𝒟; info = Dict())
-    ignore() do
+    ignore_derivatives() do
         info["SAC alpha"] = exp(𝒫[:SAC_log_α][1])
     end
     _, logprob = exploration(π.A, 𝒟[:s])
@@ -35,23 +35,23 @@ function SAC_temp_loss(π, 𝒫, 𝒟; info = Dict())
     -mean(exp(𝒫[:SAC_log_α][1]) .* target_α)
 end
 
-function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}}, 
-              ΔN=50, 
-              SAC_α::Float32=1f0, 
-              SAC_H_target::Float32 = Float32(-prod(dim(action_space(π)))), 
-              π_explore=GaussianNoiseExplorationPolicy(0.1f0), 
-              SAC_α_opt::NamedTuple=(;), 
-              a_opt::NamedTuple=(;), 
+function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}},
+              ΔN=50,
+              SAC_α::Float32=1f0,
+              SAC_H_target::Float32 = Float32(-prod(dim(action_space(π)))),
+              π_explore=GaussianNoiseExplorationPolicy(0.1f0),
+              SAC_α_opt::NamedTuple=(;),
+              a_opt::NamedTuple=(;),
               c_opt::NamedTuple=(;),
               a_loss=SAC_actor_loss,
               c_loss=double_Q_loss(),
               target_fn=SAC_target(π),
               prefix="",
-              log::NamedTuple=(;), 
-              𝒫::NamedTuple=(;), 
-              param_optimizers=Dict(), 
+              log::NamedTuple=(;),
+              𝒫::NamedTuple=(;),
+              param_optimizers=Dict(),
               kwargs...) where T
-              
+
     𝒫 = (SAC_log_α=[Base.log(SAC_α)], SAC_H_target=SAC_H_target, 𝒫...)
     OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)),
                      ΔN=ΔN,
@@ -63,4 +63,3 @@ function SAC(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetw
                      target_fn=target_fn,
                      kwargs...)
 end
-

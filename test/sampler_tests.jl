@@ -1,7 +1,7 @@
 using Crux
 using Test
 using POMDPs
-import POMDPPolicies:FunctionPolicy
+import POMDPTools: FunctionPolicy
 using Random
 using Flux
 using POMDPModels
@@ -47,7 +47,7 @@ data = steps!(s3, Nsteps = 100)
 ## episodes! function
 data, eps = episodes!(s2, Neps=10, return_episodes=true)
 
-@test length(eps) == 10 
+@test length(eps) == 10
 
 for e in eps
     @test e[1] < e[2]
@@ -99,7 +99,7 @@ eps2 = Crux.episodes(buffer)
 @test all(eps .== eps2)
 
 ## Test the adversarial MDP stuff
-amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], [1,1]))
+amdp = AdditiveAdversarialMDP(ContinuumWorldMDP(), MvNormal([0,0], LinearAlgebra.Diagonal([1,1])))
 G() = GaussianPolicy(ContinuousNetwork(Chain(Dense(4,2))), zeros(2))
 
 s = Sampler(amdp, G(), adversary=PolicyParams(G()))
@@ -107,4 +107,3 @@ s = Sampler(amdp, G(), adversary=PolicyParams(G()))
 
 # d = steps!(s, Nsteps=100)
 # size(d[:x]) == size(d[:a])
-

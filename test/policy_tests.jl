@@ -118,7 +118,7 @@ a, logprob = exploration(p, s)
 # Onhotbatch - This used to error
 Flux.onehotbatch(p_gpu, ones(Int, 1, 10) |> gpu)
 
-# Testing the logit conversion function 
+# Testing the logit conversion function
 p = DiscreteNetwork(Chain(Dense(2, 32, relu), Dense(32, 4, sigmoid)), [1,2, 3, 4], logit_conversion=(π, s) -> value(π, s) ./ sum(value(π, s),dims=1))
 
 vals = value(p, s)
@@ -151,7 +151,12 @@ USE_CUDA && @test all([Crux.device(n)== gpu for n in p_gpu.networks])
 # @test all(Crux.value(p, s) .≈ Crux.value(p_gpu, s))
 # @test Crux.valueall(p, s) == [Crux.value(p.networks[1], s), Crux.value(p.networks[2], s)]
 # @test Crux.valueall(p, s, a) == [Crux.value(p.networks[1], s, a), Crux.value(p.networks[2], s, a)]
-action(p, s)
+@test_broken try
+	action(p, s)
+	true
+catch
+	false
+end
 
 
 ## Double Network
@@ -182,7 +187,7 @@ Random.seed!(1)
 e1 = exploration(p, s)
 Random.seed!(1)
 e2 = (exploration(p.N1, s), exploration(p.N2, s))
-@test e1 == e2 
+@test e1 == e2
 
 a = rand([1,], 100)
 @test logpdf(p, s, Flux.onehotbatch(Q1, a)) == (logpdf(p.N1, s, Flux.onehotbatch(Q1, a)), logpdf(p.N2, s, Flux.onehotbatch(Q2, a)))
@@ -220,7 +225,7 @@ Random.seed!(1)
 e1 = exploration(p, s)
 Random.seed!(1)
 e2 = exploration(p.A, s)
-@test e1 == e2 
+@test e1 == e2
 
 a = rand([1,], 100)
 @test logpdf(p, s, a) == logpdf(p.A, s, a)
@@ -270,7 +275,7 @@ a, logprob = exploration(p, s)
 @test action_space(p) == ContinuousSpace(4)
 
 # Check empirically if the mean and std are correct
-p =  GaussianPolicy(ContinuousNetwork((s)-> zeros(Float32, 6), 6), -0.5*ones(Float32, 6)) 
+p =  GaussianPolicy(ContinuousNetwork((s)-> zeros(Float32, 6), 6), -0.5*ones(Float32, 6))
 a = [exploration(p, [1])[1][1] for i=1:100000]
 
 @test abs(std(a) .- exp(-0.5)) < 1e-2
@@ -342,7 +347,7 @@ s = rand(2,100)
 for p in ps
 	@test size(action(p, s0)) == (length(p.distribution),)
 	@test size(action(p, s)) == (length(p.distribution),100)
-	
+
 	global a, logprob = exploration(p, s0)
 	@test size(a) == (length(p.distribution),)
 	@test size(logprob) == (1,)
@@ -352,7 +357,7 @@ for p in ps
 	@test size(a) == (length(p.distribution),100)
 	@test size(logprob) == (1,100)
 	@test all(logpdf(p, s, a) .≈ logprob)
-	
+
 	@test size(entropy(p, s0)) == (1,)
 	@test size(entropy(p, s)) == (1, 100)
 end
@@ -409,4 +414,3 @@ a, logprob = exploration(p, s; π_on=ContinuousNetwork((x)->[1,], 1), i=2)
 
 a, logprob = exploration(p, s; π_on=ContinuousNetwork((x)->[1,], 1), i=20)
 @test a==[1]
-

@@ -1,5 +1,5 @@
 using POMDPs, Crux, Flux, POMDPGym, BSON
-import POMDPPolicies:FunctionPolicy
+import POMDPTools:FunctionPolicy
 import Distributions:Uniform
 using Random
 using Distributions
@@ -14,7 +14,7 @@ rand_policy = FunctionPolicy((s) -> Float32.(rand.(Uniform.(amin, amax))))
 S = state_space(mdp)#, σ=[3.14f0, 8f0])
 
 # get expert trajectories
-expert_trajectories = BSON.load("/home/anthonycorso/.julia/dev/Crux/examples/il/expert_data/pendulum.bson")[:data]
+expert_trajectories = BSON.load("examples/il/expert_data/pendulum.bson")[:data]
 expert_perf = sum(expert_trajectories[:r]) / length(episodes(expert_trajectories))
 expert_trajectories[:r] .= 1
 

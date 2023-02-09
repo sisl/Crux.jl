@@ -10,7 +10,7 @@ V() = ContinuousNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64,
 A() = DiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
 
 # Fill a buffer with expert trajectories
-expert_trajectories = BSON.load("/Users/anthonycorso/.julia/dev/Crux/examples/il/expert_data/cartpole.bson")[:data]
+expert_trajectories = BSON.load("examples/il/expert_data/cartpole.bson")[:data]
 
 # Solve with PPO-GAIL
 γ = Float32(discount(mdp))

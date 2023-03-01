@@ -9,25 +9,19 @@
 mutable struct SoftDiscreteNetwork <: NetworkPolicy
     network
     outputs
-    logit_conversion
-    alpha
-    always_stochastic
+    α
     device
-    SoftDiscreteNetwork(network, outputs; logit_conversion=(π, s) -> softmax(value(π, s)), always_stochastic=false, dev=nothing) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
-    SoftDiscreteNetwork(network, outputs, logit_conversion, always_stochastic, dev) = new(network, cpu(outputs), logit_conversion, always_stochastic, device(network))
+    SoftDiscreteNetwork(network, outputs; α=1., dev=nothing) = new(network, cpu(outputs), α, device(network))
+    SoftDiscreteNetwork(network, outputs, α, dev) = new(network, cpu(outputs), α, device(network))
 end
+
+#logit_conversion=(π, s) -> softmax(value(π, s)),
 
 Flux.@functor SoftDiscreteNetwork
 
 Flux.trainable(π::SoftDiscreteNetwork) = Flux.trainable(π.network)
 
 layers(π::SoftDiscreteNetwork) = π.network.layers
-
-POMDPs.value(π::SoftDiscreteNetwork, s) = mdcall(π.network, s, π.device)
-
-POMDPs.value(π::SoftDiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims=1)
-
-POMDPs.action(π::SoftDiscreteNetwork, s) = π.always_stochastic ? exploration(π, s)[1] : π.outputs[mapslices(argmax, value(π, s), dims=1)]
 
 function Flux.onehotbatch(π::SoftDiscreteNetwork, a)
     ignore_derivatives() do
@@ -36,9 +30,19 @@ function Flux.onehotbatch(π::SoftDiscreteNetwork, a)
     end
 end
 
-logits(π::SoftDiscreteNetwork, s) = π.logit_conversion(π, s)
+# Return Q(s,⋅)
+POMDPs.value(π::SoftDiscreteNetwork, s) = mdcall(π.network, s, π.device)
 
-categorical_logpdf(probs, a_oh) = log.(sum(probs .* a_oh, dims=1))
+# Return V(s)
+soft_value(π::SoftDiscreteNetwork, s) = π.α .* logsumexp((value(π, s) ./ π.α), dims=1)
+
+# Return Q(s,a)
+POMDPs.value(π::SoftDiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims=1)
+
+POMDPs.action(π::SoftDiscreteNetwork, s) = exploration(π, s)[1]
+
+
+logits(π::SoftDiscreteNetwork, s) = value(π, s) ./ π.α
 
 function exploration(π::SoftDiscreteNetwork, s; kwargs...)
     ps = logits(π, s)
@@ -72,15 +76,13 @@ action_space(π::SoftDiscreteNetwork) = DiscreteSpace(length(π.outputs), π.out
 
 # since explore is on (offpolicysolver), can just define our own function 
 # a, log_probs = exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i)
+
 # exploration: action(s) propto softmax(q(s)/alpha) 
-
-
-soft_value(π, s; alpha::Float32=NaN32) = alpha .* logsumexp((value(π, s) ./ alpha), dims=1)
-
 # target = reward + (1-done)*gamma*v_target(sp)
+# v(s) = alpha*logsumexp(q(s)/alpha)
 # v_target(sp) = alpha*logsumexp(q_target(sp)/alpha) 
 # update q(s, a) to target
-# v(s) = alpha*logsumexp(q(s)/alpha)
+
 function SoftQ_target(π, 𝒫, 𝒟, γ::Float32; alpha::Float32=NaN32, kwargs...)
     𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* soft_value(π, 𝒟[:sp], alpha=alpha)
 end

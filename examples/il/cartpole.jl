@@ -21,3 +21,4 @@ solve(𝒮_gail, mdp)
 𝒮_bc = BC(π=A(), 𝒟_demo=expert_trajectories, S=S, opt=(epochs=100,), log=(period=10,))
 N = solve(𝒮_bc, mdp)
 
+# Solve with IQ-Learn

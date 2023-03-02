@@ -41,11 +41,11 @@ POMDPs.value(π::SoftDiscreteNetwork, s, a_oh) = sum(value(π, s) .* a_oh, dims=
 
 POMDPs.action(π::SoftDiscreteNetwork, s) = exploration(π, s)[1]
 
-
 logits(π::SoftDiscreteNetwork, s) = value(π, s) ./ π.α
+probs(π::SoftDiscreteNetwork, s) = softmax(logits(π, s))
 
 function exploration(π::SoftDiscreteNetwork, s; kwargs...)
-    ps = logits(π, s)
+    ps = probs(π, s)
     ai = mapslices((v) -> rand(Categorical(v)), ps, dims=1)
     a = π.outputs[ai]
     a, categorical_logpdf(ps, Flux.onehotbatch(π, a))
@@ -56,11 +56,11 @@ function Distributions.logpdf(π::SoftDiscreteNetwork, s, a)
     ignore_derivatives() do
         size(a, 1) == 1 && (a = Flux.onehotbatch(π, a))
     end
-    return categorical_logpdf(logits(π, s), a)
+    return categorical_logpdf(probs(π, s), a)
 end
 
 function Distributions.entropy(π::SoftDiscreteNetwork, s)
-    ps = logits(π, s)
+    ps = probs(π, s)
     -sum(ps .* log.(ps .+ eps(Float32)), dims=1)
 end
 
@@ -71,9 +71,6 @@ action_space(π::SoftDiscreteNetwork) = DiscreteSpace(length(π.outputs), π.out
 
 ########## 
 
-
-
-
 # since explore is on (offpolicysolver), can just define our own function 
 # a, log_probs = exploration(sampler.agent.π_explore, sampler.svec, π_on=sampler.agent.π, i=i)
 
@@ -83,13 +80,12 @@ action_space(π::SoftDiscreteNetwork) = DiscreteSpace(length(π.outputs), π.out
 # v_target(sp) = alpha*logsumexp(q_target(sp)/alpha) 
 # update q(s, a) to target
 
-function SoftQ_target(π, 𝒫, 𝒟, γ::Float32; alpha::Float32=NaN32, kwargs...)
-    𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* soft_value(π, 𝒟[:sp], alpha=alpha)
+function SoftQ_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
+    𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* soft_value(π, 𝒟[:sp])
 end
 
 function SoftQ(;π::SoftDiscreteNetwork, 
           N::Int, 
-          alpha::Real=0.5,
           ΔN=4, 
           c_opt::NamedTuple=(;), 
           log::NamedTuple=(;),
@@ -97,14 +93,12 @@ function SoftQ(;π::SoftDiscreteNetwork,
           target_fn=SoftQ_target,
           prefix="",
           kwargs...)
-
-          π_explore = ... 
-OffPolicySolver(;agent=PolicyParams(π=π, π_explore=π_explore, π⁻=deepcopy(π)), 
+OffPolicySolver(;agent=PolicyParams(π=π, π⁻=deepcopy(π)), 
                   log=LoggerParams(;dir="log/dqn", log...),
                   N=N,
                   ΔN=ΔN,
                   c_opt = TrainingParams(;loss=c_loss, name=string(prefix, "critic_"), epochs=ΔN, c_opt...),
-                  target_fn=(π, 𝒫, 𝒟, γ::Float32; kwargs...) -> target_fn(π, 𝒫, 𝒟, γ;alpha=alpha, kwargs...),
+                  target_fn=target_fn,
                   kwargs...)
 end 
     

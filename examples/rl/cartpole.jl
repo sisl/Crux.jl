@@ -7,6 +7,8 @@ S = state_space(mdp)
 
 A() = DiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
 V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1)))
+SoftA(α::Float32) = SoftDiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as;α=α)
+
 
 # Solve with REINFORCE (~2 seconds)
 𝒮_reinforce = REINFORCE(π=A(), S=S, N=10000, ΔN=500, a_opt=(epochs=5,), interaction_storage=[])
@@ -24,8 +26,15 @@ V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, rel
 𝒮_dqn = DQN(π=A(), S=S, N=10000, interaction_storage=[])
 @time π_dqn = solve(𝒮_dqn, mdp)
 
+# Solve with SoftQLearning w/ varying α (~12 seconds)
+αs = Vector{Float32}([1,0.5,0.2,0.1])
+𝒮_sqls = [SoftQ(π=SoftA(α), S=S, N=10000, interaction_storage=[]) for α in αs]
+π_sqls = [@time solve(𝒮_sqls[i], mdp) for i=1:length(αs)]
+
 # Plot the learning curve
-p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn], title = "CartPole-V0 Training Curves", labels = ["REINFORCE", "A2C", "PPO", "DQN"])
+p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_sqls...], title = "CartPole-V0 Training Curves", 
+    labels = ["REINFORCE", "A2C", "PPO", "DQN", ["SQL ($i)" for i in αs]...])
+Crux.savefig(p, "examples/rl/cartpole_training.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, π_ppo, "cartpole_policy.gif", max_steps=100)

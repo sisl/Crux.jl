@@ -1,5 +1,5 @@
 using POMDPs, Crux, Flux, POMDPGym
-import POMDPPolicies:FunctionPolicy
+import POMDPTools:FunctionPolicy
 import Distributions:Uniform
 using Random
 using Distributions
@@ -15,6 +15,7 @@ S = state_space(mdp, σ=[3.14f0, 8f0])
 # Define the networks we will use
 QSA() = ContinuousNetwork(Chain(Dense(3, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 QS() = DiscreteNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
+SoftA(α::Float32) = SoftDiscreteNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as; α=α)
 V() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 A() = ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1, tanh), x -> 2f0 * x), 1)
 SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(64, 64, relu), Dense(64, 1))), zeros(Float32, 1), 2f0)
@@ -33,12 +34,18 @@ SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(
 @time π_ppo = solve(𝒮_ppo, mdp)
 
 # Solve with DQN (gets to > -200 reward, ~30 sec)
-𝒮_dqn = DQN(π=QS(), S=S, N=30000)
+𝒮_dqn = DQN(π=QS(), S=S, N=60000)
 @time π_dqn = solve(𝒮_dqn, mdp)
+
+# Solve with SoftQ
+αs = Vector{Float32}([0.3,1,3])
+𝒮_sqls = [SoftQ(π=SoftA(α), S=S, N=60000) for α in αs]
+π_sqls = [@time solve(𝒮_sqls[i], mdp) for i=1:length(αs)]
+
 
 off_policy = (S=S,
               ΔN=50,
-              N=30000,
+              N=60000,
               buffer_size=Int(5e5),
               buffer_init=1000,
               c_opt=(batch_size=100, optimizer=Adam(1e-3)),
@@ -57,9 +64,9 @@ off_policy = (S=S,
 𝒮_sac = SAC(;π=ActorCritic(SG(), DoubleNetwork(QSA(), QSA())), off_policy...)
 @time π_sac = solve(𝒮_sac, mdp)
 
-
 # Plot the learning curve
-p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", labels=["REINFORCE", "A2C", "PPO", "DQN", "DDPG", "TD3", "SAC"], legend=:right)
+p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_sqls..., 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", 
+    labels=["REINFORCE", "A2C", "PPO", "DQN", ["SQL ($i)" for i in αs]..., "DDPG", "TD3", "SAC"], legend=:right)
 Crux.savefig("examples/rl/pendulum_benchmark.pdf")
 
 # Produce a gif with the final policy

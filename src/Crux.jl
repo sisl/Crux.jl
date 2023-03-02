@@ -109,6 +109,7 @@ module Crux
     include("model_free/batch.jl")
 
     export REINFORCE, A2C, PPO, LagrangePPO, DQN, DDPG, TD3, SoftQ, SAC
+    export SoftDiscreteNetwork
     include("model_free/rl/reinforce.jl")
     include("model_free/rl/a2c.jl")
     include("model_free/rl/ppo.jl")

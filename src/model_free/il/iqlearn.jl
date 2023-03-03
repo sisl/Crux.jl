@@ -42,37 +42,51 @@
 # alpha: 0.5
 # lambda_gp: 10
 
-function IQ_loss(π, 𝒫, 𝒟, γ::Float32; kwargs...)
-    V = soft_value(π, 𝒟[:s])
-    Vp = soft_value(π, 𝒟[:sp])
-    Q = value(π, 𝒟[:s], onehotbatch(𝒟[:a]))
-    y = γ .* (1.f0 .- 𝒟[:done]) .* Vp
-    R = Q-y
+function iq_loss(;reg::Bool=true, α_reg=Float32(0.5), 
+    gp::Bool=true, λ_gp=Float32(10))
 
-    p1 = mean(-R[expert])
-    p2 = mean(V-y)
+    begin (π, 𝒫, 𝒟, ::Nothing; kwargs...) ->
+    
+        V = soft_value(π, 𝒟[:s])
+        Vp = soft_value(π, 𝒟[:sp])
+        Q = value(π, 𝒟[:s], onehotbatch(𝒟[:a]))
+        y = γ .* (1.f0 .- 𝒟[:done]) .* Vp
+        R = Q-y
+        expert = 𝒟[:e]
+        p1 = mean(-R[expert])
+        p2 = mean(V-y)
 
-    loss = p1+p2
-    if gradient_penalty
-        gp = ...
-        loss += gp
+        loss = p1+p2
+        if gp
+            grad_pen = λ_gp*gradient_penalty(π.network, 𝒟[:s][expert], 𝒟[:s][.!expert])
+            loss += grad_pen
+        end
+        if reg
+            reg_loss = 1/(4*α_reg) .* mean(R .^ 2)
+            loss += reg_loss
+        end
+        loss
     end
-    if regularize
-        reg_loss = 1/(4*α) .* mean(R .^ 2)
-        loss += reg_loss
-    end
-    loss
 end
+
+# fixme - right way of giving buffers correct labels after each sampling 
+# (only need to do expert once)
+function iq_callback(𝒟, 𝒮, info)
+    𝒮.extra_buffers[1][:e] .= true 
+    𝒮.buffer[:e] .= false
+end
+
 
 function OnlineIQLearn(;π, 
     S, 
     𝒟_demo, 
     normalize_demo::Bool=true, 
     solver=SoftQ, # or SAC for continuous states 
-    d_opt::NamedTuple=(), 
     log::NamedTuple=(;), 
-    regularize::Bool=true,
-    
+    reg::Bool=true,
+    α_reg=Float32(0.5),
+    gp::Bool=true,
+    λ_gp=Float32(10.),
     kwargs...)
 
     # Normalize and/or change device of expert and NDA data
@@ -81,18 +95,14 @@ function OnlineIQLearn(;π,
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, A))
     𝒟_demo = 𝒟_demo |> dev
 
-    # loss calculations
-    V = soft_value(s)
-    V' = soft_value(π,s')
-    a_oh = Flux.one_hot(a)
-    Q = value(π,s,a)
-    y = 
-
-    
-    function SoftQ_target(π, 𝒫, 𝒟, γ::Float32; kwargs...)
-        𝒟[:r] .+ γ .* (1.f0 .- 𝒟[:done]) .* soft_value(π, 𝒟[:sp])
-    end
-
-
-
+    solver(;π=π, 
+        S=S, 
+        post_sample_callback=IQ_callback, 
+        extra_buffers=[𝒟_demo],
+        buffer_fractions=[1/2, 1/2],
+        log=(dir="log/iq", period=500, log...),
+        c_loss=iq_loss(;reg=reg,α_reg=α_reg, gp=gp,λ_gp=λ_gp),
+        target_fn=(args...)->nothing,
+        post_sample_callback=iq_callback,
+        kwargs...)
 end

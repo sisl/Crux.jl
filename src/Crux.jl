@@ -24,6 +24,7 @@ module Crux
     using Base.Iterators: partition
     using WeightsAndBiasLogger
     using Dates
+    using Infiltrator # remove once done
 
     extra_functions = Dict()
     function set_function(key, val)
@@ -119,7 +120,7 @@ module Crux
     include("model_free/rl/softq.jl")
     include("model_free/rl/sac.jl")
 
-    export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF, OnPolicyIQLearn
+    export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF, OnlineIQLearn
     export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS, iq_loss
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
@@ -129,7 +130,7 @@ module Crux
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
     include("model_free/il/nda_gail_js.jl")
-    include("model_free/il/on_policy_iqlearn.jl")
+    include("model_free/il/iqlearn.jl")
 
     export CQL, BatchSAC
     include("model_free/batch/cql.jl")

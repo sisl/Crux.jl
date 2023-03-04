@@ -45,8 +45,8 @@
 function iq_loss(;reg::Bool=true, α_reg=Float32(0.5), 
     gp::Bool=true, λ_gp=Float32(10))
 
-    begin (π, 𝒫, 𝒟, ::Nothing; kwargs...) ->
-    
+    (π, 𝒫, 𝒟, y; info=Dict()) -> begin
+        @infiltrate
         V = soft_value(π, 𝒟[:s])
         Vp = soft_value(π, 𝒟[:sp])
         Q = value(π, 𝒟[:s], onehotbatch(𝒟[:a]))
@@ -54,15 +54,26 @@ function iq_loss(;reg::Bool=true, α_reg=Float32(0.5),
         R = Q-y
         expert = 𝒟[:e]
         p1 = mean(-R[expert])
-        p2 = mean(V-y)
+        p2 = mean(V - y)
 
         loss = p1+p2
+        ignore_derivative() do 
+            info[:softQloss] = p1
+            info[:valueloss] = p2
+        end
+
         if gp
             grad_pen = λ_gp*gradient_penalty(π.network, 𝒟[:s][expert], 𝒟[:s][.!expert])
+            ignore_derivative() do 
+                info[:grad_pen] = grad_pen
+            end
             loss += grad_pen
         end
         if reg
             reg_loss = 1/(4*α_reg) .* mean(R .^ 2)
+            ignore_derivative() do
+                info[:reg_loss] = reg_loss
+            end
             loss += reg_loss
         end
         loss
@@ -71,11 +82,12 @@ end
 
 # fixme - right way of giving buffers correct labels after each sampling 
 # (only need to do expert once)
-function iq_callback(𝒟, 𝒮, info)
-    𝒮.extra_buffers[1][:e] .= true 
-    𝒮.buffer[:e] .= false
+function iq_callback(𝒟; 𝒮, kwargs...)
+    if !(:e in keys(𝒮.extra_buffers[1].data))
+        𝒮.extra_buffers[1].data[:e] = ones(Bool, 1, 𝒮.extra_buffers[1].elements)
+    end
+    𝒟[:e] = zeros(Bool,1,length(𝒟[:done]))
 end
-
 
 function OnlineIQLearn(;π, 
     S, 
@@ -97,12 +109,11 @@ function OnlineIQLearn(;π,
 
     solver(;π=π, 
         S=S, 
-        post_sample_callback=IQ_callback, 
         extra_buffers=[𝒟_demo],
         buffer_fractions=[1/2, 1/2],
         log=(dir="log/iq", period=500, log...),
         c_loss=iq_loss(;reg=reg,α_reg=α_reg, gp=gp,λ_gp=λ_gp),
-        target_fn=(args...)->nothing,
+        target_fn=(args...;kwargs...)->nothing,
         post_sample_callback=iq_callback,
         kwargs...)
 end

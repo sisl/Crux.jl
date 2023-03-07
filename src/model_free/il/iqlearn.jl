@@ -51,7 +51,7 @@ function iq_loss(;γ=Float32(0.9),reg::Bool=true, α_reg=Float32(0.5),
         Q = value(π, 𝒟[:s], 𝒟[:a])
         y = γ .* (1.f0 .- 𝒟[:done]) .* Vp
         R = Q-y
-        expert = 𝒟[:expert]
+        expert = 𝒟[:expert][1,:]
         p1 = mean(-R[expert])
         p2 = mean(V - y)
 
@@ -59,10 +59,12 @@ function iq_loss(;γ=Float32(0.9),reg::Bool=true, α_reg=Float32(0.5),
         ignore_derivatives() do 
             info[:softQloss] = p1
             info[:valueloss] = p2
+            info[:avg_R_expert_IQ] = -p1
+            info[:avg_R_demo_IQ] = mean(R[.!expert])
         end
 
         if gp
-            grad_pen = λ_gp*gradient_penalty(π.network, 𝒟[:s][expert], 𝒟[:s][.!expert])
+            grad_pen = λ_gp*gradient_penalty(π.network, 𝒟[:s][:,expert], 𝒟[:s][:,.!expert])
             ignore_derivatives() do 
                 info[:grad_pen] = grad_pen
             end
@@ -92,7 +94,7 @@ function OnlineIQLearn(;π,
     γ=Float32(0.9),
     normalize_demo::Bool=true, 
     solver=SoftQ, # or SAC for continuous states 
-    log::NamedTuple=(;), 
+    log::NamedTuple=(;period=500), 
     reg::Bool=true,
     α_reg=Float32(0.5),
     gp::Bool=true,
@@ -110,7 +112,7 @@ function OnlineIQLearn(;π,
         S=S, 
         extra_buffers=[𝒟_demo],
         buffer_fractions=[1/2, 1/2],
-        log=(dir="log/iq", period=500, log...),
+        log=(dir="log/iq", log...),
         c_loss=iq_loss(;γ=γ,reg=reg,α_reg=α_reg, gp=gp,λ_gp=λ_gp),
         target_fn=(args...;kwargs...)->nothing,
         post_sample_callback=iq_callback,

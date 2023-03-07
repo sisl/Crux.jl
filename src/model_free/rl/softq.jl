@@ -87,7 +87,7 @@ end
 function SoftQ(;π::SoftDiscreteNetwork, 
           N::Int, 
           ΔN=4, 
-          c_opt::NamedTuple=(;), 
+          c_opt::NamedTuple=(;epochs=4), 
           log::NamedTuple=(;),
           c_loss=td_loss(),
           target_fn=SoftQ_target,
@@ -97,7 +97,7 @@ OffPolicySolver(;agent=PolicyParams(π=π, π⁻=deepcopy(π)),
                   log=LoggerParams(;dir="log/dqn", log...),
                   N=N,
                   ΔN=ΔN,
-                  c_opt = TrainingParams(;loss=c_loss, name=string(prefix, "critic_"), epochs=ΔN, c_opt...),
+                  c_opt = TrainingParams(;loss=c_loss, name=string(prefix, "critic_"), c_opt...),
                   target_fn=target_fn,
                   kwargs...)
 end 

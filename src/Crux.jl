@@ -24,7 +24,7 @@ module Crux
     using Base.Iterators: partition
     using WeightsAndBiasLogger
     using Dates
-
+  
     extra_functions = Dict()
     function set_function(key, val)
         extra_functions[key] = val
@@ -108,17 +108,18 @@ module Crux
     include("model_free/off_policy.jl")
     include("model_free/batch.jl")
 
-    export REINFORCE, A2C, PPO, LagrangePPO, DQN, DDPG, TD3, SAC
+    export REINFORCE, A2C, PPO, LagrangePPO, DQN, DDPG, TD3, SoftQ, SAC
     include("model_free/rl/reinforce.jl")
     include("model_free/rl/a2c.jl")
     include("model_free/rl/ppo.jl")
     include("model_free/rl/dqn.jl")
     include("model_free/rl/ddpg.jl")
     include("model_free/rl/td3.jl")
+    include("model_free/rl/softq.jl")
     include("model_free/rl/sac.jl")
 
-    export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF
-    export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS
+    export OnPolicyGAIL, OffPolicyGAIL, BC, AdVIL, SQIL, AdRIL, ASAF, OnlineIQLearn
+    export mse_action_loss, logpdf_bc_loss, mse_value_loss, NDA_GAIL_JS, iq_loss
     include("model_free/il/bc.jl")
     include("model_free/il/AdVIL.jl")
     include("model_free/il/on_policy_gail.jl")
@@ -127,6 +128,7 @@ module Crux
     include("model_free/il/sqil.jl")
     include("model_free/il/AdRIL.jl")
     include("model_free/il/nda_gail_js.jl")
+    include("model_free/il/iqlearn.jl")
 
     export CQL, BatchSAC
     include("model_free/batch/cql.jl")

@@ -24,15 +24,23 @@ V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, rel
 𝒮_dqn = DQN(π=A(), S=S, N=10000, interaction_storage=[])
 @time π_dqn = solve(𝒮_dqn, mdp)
 
+# Solve with SoftQLearning w/ varying α (~12 seconds)
+𝒮_sql = SoftQ(π=A(), α=Float32(0.1), S=S, N=10000, 
+    ΔN=1, c_opt=(;epochs=5), interaction_storage=[])
+@time π_sql = solve(𝒮_sql, mdp)
+
 # Plot the learning curve
-p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn], title = "CartPole-V0 Training Curves", labels = ["REINFORCE", "A2C", "PPO", "DQN"])
+p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_sql], title = "CartPole-V0 Training Curves", 
+    labels = ["REINFORCE", "A2C", "PPO", "DQN", "SoftQ" ])
+Crux.savefig(p, "examples/rl/cartpole_training.pdf")
 
 # Produce a gif with the final policy
 gif(mdp, π_ppo, "cartpole_policy.gif", max_steps=100)
 
+
 ## Optional - Save data for imitation learning
 # using BSON
-# s = Sampler(mdp, 𝒮_dqn.π, max_steps=100, required_columns=[:t])
+# s = Sampler(mdp, 𝒮_dqn.agent, max_steps=100, required_columns=[:t])
 # 
 # data = steps!(s, Nsteps=10000)
 # sum(data[:r])/100

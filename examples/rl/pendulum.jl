@@ -1,5 +1,5 @@
 using POMDPs, Crux, Flux, POMDPGym
-import POMDPPolicies:FunctionPolicy
+import POMDPTools:FunctionPolicy
 import Distributions:Uniform
 using Random
 using Distributions
@@ -33,12 +33,17 @@ SG() = SquashedGaussianPolicy(ContinuousNetwork(Chain(Dense(2, 64, relu), Dense(
 @time π_ppo = solve(𝒮_ppo, mdp)
 
 # Solve with DQN (gets to > -200 reward, ~30 sec)
-𝒮_dqn = DQN(π=QS(), S=S, N=30000)
+𝒮_dqn = DQN(π=QS(), S=S, N=60000)
 @time π_dqn = solve(𝒮_dqn, mdp)
+
+# Solve with SoftQ
+𝒮_sql = SoftQ(π=QS(),α=Float32(0.5), S=S, N=60000) 
+@time π_sql = solve(𝒮_sql, mdp)
+
 
 off_policy = (S=S,
               ΔN=50,
-              N=30000,
+              N=60000,
               buffer_size=Int(5e5),
               buffer_init=1000,
               c_opt=(batch_size=100, optimizer=Adam(1e-3)),
@@ -57,9 +62,9 @@ off_policy = (S=S,
 𝒮_sac = SAC(;π=ActorCritic(SG(), DoubleNetwork(QSA(), QSA())), off_policy...)
 @time π_sac = solve(𝒮_sac, mdp)
 
-
 # Plot the learning curve
-p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", labels=["REINFORCE", "A2C", "PPO", "DQN", "DDPG", "TD3", "SAC"], legend=:right)
+p = plot_learning([𝒮_reinforce, 𝒮_a2c, 𝒮_ppo, 𝒮_dqn, 𝒮_sql, 𝒮_ddpg, 𝒮_td3, 𝒮_sac], title="Pendulum Swingup Training Curves", 
+    labels=["REINFORCE", "A2C", "PPO", "DQN", "SoftQ", "DDPG", "TD3", "SAC"], legend=:right)
 Crux.savefig("examples/rl/pendulum_benchmark.pdf")
 
 # Produce a gif with the final policy

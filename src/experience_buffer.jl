@@ -17,7 +17,7 @@ function mdp_data(S::T1, A::T2, capacity::Int, extras::Array{Symbol} = Symbol[];
         elseif k in [:weight, :importance_weight, :fwd_importance_weight,
                      :rev_importance_weight, :cum_importance_weight, :traj_importance_weight,]
             data[k] = ArrayType(fill(one(R), 1, capacity))
-        elseif k in [:fail, :grasp_success]
+        elseif k in [:fail, :grasp_success, :expert]
             data[k] = ArrayType(fill(false, 1, capacity))
         elseif k in [:t, :i, :id]
             data[k] = ArrayType(fill(0, 1, capacity))

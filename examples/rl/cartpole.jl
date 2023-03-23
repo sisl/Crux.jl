@@ -7,7 +7,6 @@ S = state_space(mdp)
 
 A() = DiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
 V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, 1)))
-SoftA(α::Float32) = SoftDiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as;α=α)
 
 # Solve with REINFORCE (~2 seconds)
 𝒮_reinforce = REINFORCE(π=A(), S=S, N=10000, ΔN=500, a_opt=(epochs=5,), interaction_storage=[])
@@ -26,7 +25,7 @@ SoftA(α::Float32) = SoftDiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), 
 @time π_dqn = solve(𝒮_dqn, mdp)
 
 # Solve with SoftQLearning w/ varying α (~12 seconds)
-𝒮_sql = SoftQ(π=SoftA(Float32(0.1)), S=S, N=10000, 
+𝒮_sql = SoftQ(π=A(), α=Float32(0.1), S=S, N=10000, 
     ΔN=1, c_opt=(;epochs=5), interaction_storage=[])
 @time π_sql = solve(𝒮_sql, mdp)
 

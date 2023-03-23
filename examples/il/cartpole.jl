@@ -9,7 +9,6 @@ S = state_space(mdp)
 Disc() = ContinuousNetwork(Chain(Dense(6, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 V() = ContinuousNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, 1)))
 A() = DiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as)
-SA() = SoftDiscreteNetwork(Chain(Dense(4, 64, relu), Dense(64, 64, relu), Dense(64, length(as))), as;α=Float32(1.))
 
 # Fill a buffer with expert trajectories
 expert_trajectories = BSON.load("examples/il/expert_data/cartpole.bson")[:data]
@@ -24,7 +23,7 @@ solve(𝒮_gail, mdp)
 solve(𝒮_bc, mdp)
 
 # Solve with IQ-Learn
-𝒮_iql = OnlineIQLearn(π=SA(), 𝒟_demo=expert_trajectories, S=S, γ=γ, N=10000, ΔN=1, 
+𝒮_iql = OnlineIQLearn(π=A(), 𝒟_demo=expert_trajectories, S=S, γ=γ, N=10000, ΔN=1, 
     c_opt=(;epochs=1),reg=false,gp=false, log=(;period=50))
 solve(𝒮_iql, mdp)
 

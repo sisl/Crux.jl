@@ -9,6 +9,7 @@ Supports CPU and GPU computation and implements the following algorithms:
 ### Reinforcement Learning
 * <a href="./src/model_free/rl/dqn.jl">Deep Q-Learning</a>
   * Prioritized Experience Replay
+* <a href="./src/model_free/rl/softq.jl">Soft Q-Learning</a>
 * <a href="./src/model_free/rl/reinforce.jl">REINFORCE</a>
 * <a href="./src/model_free/rl/ppo.jl">Proximal Policy Optimization (PPO)</a>
 * Lagrange-Constrained PPO
@@ -24,6 +25,7 @@ Supports CPU and GPU computation and implements the following algorithms:
 * <a href="./src/model_free/il/AdRIL.jl">(AdRIL)</a>
 * <a href="./src/model_free/il/sqil.jl">(SQIL)</a>
 * <a href="./src/model_free/il/asaf.jl">Adversarial Soft Advantage Fitting (ASAF)</a>
+* <a href="./src/model_free/il/iqlearn.jl">Inverse Q-Learning (IQLearn)</a>
 
 ### Batch RL
 * <a href="./src/model_free/batch/sac.jl">Batch Soft Actor Critic (SAC)</a>

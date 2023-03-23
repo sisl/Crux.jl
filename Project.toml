@@ -24,7 +24,7 @@ WeightsAndBiasLogger = "71805093-c1fc-4af5-8d0a-8dde53c6ac46"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
-CUDA = "3"
+CUDA = "3, 4"
 ColorSchemes = "3"
 Distributions = "0.25"
 Flux = "0.13"

@@ -36,6 +36,7 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
 
+      - run: pip install gym
       - run: julia --color=yes --project -e 'using Pkg; pkg\"add https://github.com/ancorso/POMDPGym.jl\"; Pkg.instantiate()'
         if: matrix.os == 'windows-latest'
       - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'

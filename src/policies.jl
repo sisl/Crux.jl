@@ -210,6 +210,7 @@ function exploration(π::MixtureNetwork, s; kwargs...)
 		end
 		indices
 	end
+    println("weights: ", αs, "indices: ", indices)
     a = hcat([exploration(d, s[:, i])[1] for (d, i) in zip(π.networks, indices)]...)
     
     return a, logpdf(π, s, a)

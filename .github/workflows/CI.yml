@@ -16,18 +16,18 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - "1.6" # Latest
+          - "1.9" # Latest
         os:
           - ubuntu-latest
           - windows-latest
         arch:
           - x64
     steps:
-      # install CUDA
-      - uses: Jimver/cuda-toolkit@v0.2.4
-        id: cuda-toolkit
-        with:
-          cuda: '11.2.2'
+      # # install CUDA
+      # - uses: Jimver/cuda-toolkit@v0.2.4
+      #   id: cuda-toolkit
+      #   with:
+      #     cuda: '11.2.2'
 
       # check out the project and install Julia
       - uses: actions/checkout@v2

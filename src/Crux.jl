@@ -3,13 +3,14 @@ module Crux
 
     set_crux_warnings(val::Bool) = global CRUX_WARNINGS = val
 
+    using Reexport
     using Random
     using Distributions
     using POMDPs
     using POMDPTools:render
     using Parameters
     using TensorBoardLogger
-    using Flux
+    @reexport using Flux
     using Zygote
     import Zygote: ignore_derivatives
     using Flux.Optimise: train!
@@ -24,6 +25,7 @@ module Crux
     using Base.Iterators: partition
     using WeightsAndBiasLogger
     using Dates
+
   
     extra_functions = Dict()
     function set_function(key, val)

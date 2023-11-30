@@ -61,9 +61,6 @@ vline!([deg2rad(20), deg2rad(-20)])
 
 plot(-3:0.1:3, [exp.(logpdf(antagonist(𝒮_isarl.π).A, [0, 0, 0], [x]))[1] for x=-3:0.1:3], label="Px")
 
-antagonist(𝒮_isarl.π).A.logΣ([0, 0, 0])
-, [1])[1]
-
 # Solve with DQN
 𝒮_dqn = DQN(π=QS(as), S=S, N=N)
 π_dqn = solve(𝒮_dqn, mdp)
@@ -81,10 +78,6 @@ println("RARL Failure rate: ", pfail_rarl)
 
 pfail_isarl = Crux.failure(Sampler(mdp, protagonist(π_isarl), S=S, max_steps=100), Neps=Int(1e5), threshold=100)
 println("IS Failure rate: ", pfail_isarl)
-
-pol = AdvPol()
-
-𝒮_isarl.buffer
 
 
 pol = AdversarialPolicy(π_dqn, Pf(xs), ϵGreedyPolicy(Crux.LinearDecaySchedule(1., 0.1, floor(Int, N/2)), xs))

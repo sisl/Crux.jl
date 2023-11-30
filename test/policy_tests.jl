@@ -151,7 +151,7 @@ USE_CUDA && @test all([Crux.device(n)== gpu for n in p_gpu.networks])
 # @test all(Crux.value(p, s) .≈ Crux.value(p_gpu, s))
 # @test Crux.valueall(p, s) == [Crux.value(p.networks[1], s), Crux.value(p.networks[2], s)]
 # @test Crux.valueall(p, s, a) == [Crux.value(p.networks[1], s, a), Crux.value(p.networks[2], s, a)]
-@test_broken try
+@test_broken try # I think this is because the mixture network isn't designed for batch actions?
 	action(p, s)
 	true
 catch

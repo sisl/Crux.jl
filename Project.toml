@@ -1,7 +1,7 @@
 name = "Crux"
 uuid = "e51cc422-768a-4345-bb8e-2246287ae729"
 authors = ["Anthony Corso <anthonycorso92@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -30,12 +30,13 @@ CUDA = "3, 4, 5"
 ColorSchemes = "3"
 Distributions = "0.25"
 Flux = "0.14"
-Images = "0.26"
+Images = "0.25, 0.26"
 POMDPTools = "0.1"
 POMDPs = "0.9"
 Parameters = "0.12"
 Plots = "1"
 Reexport = "1"
+Statistics = "1"
 StatsBase = "0.33, 0.34"
 TensorBoardLogger = "0.1"
 ValueHistories = "0.5"

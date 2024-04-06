@@ -1,7 +1,7 @@
 # Crux.jl
 
-[![Build Status](https://github.com/ancorso/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ancorso/Crux.jl/actions/workflows/CI.yml)
-[![Code Coverage](https://codecov.io/gh/ancorso/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/ancorso/Crux.jl)
+[![Build Status](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml)
+[![Code Coverage](https://codecov.io/gh/sisl/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sisl/Crux.jl)
 
 Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
@@ -41,9 +41,8 @@ Supports CPU and GPU computation and implements the following algorithms:
 ## Installation
 
 * Install <a href="https://github.com/ancorso/POMDPGym">POMDPGym</a>
-* Install by opening julia and running `]add git@github.com:ancorso/Crux.git`
+* Install by opening julia and running `] add Crux`
 
-
-To edit or contribute use `]dev Crux` and the repo will be cloned to `~/.julia/dev/Crux`
+To edit or contribute use `] dev Crux` and the repo will be cloned to `~/.julia/dev/Crux`
 
 Maintained by Anthony Corso (acorso@stanford.edu)

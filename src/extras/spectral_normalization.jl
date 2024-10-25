@@ -1,13 +1,13 @@
 # Power iteration algorithm for computing the spectral norm
 function power_iteration!(W, u, n_iterations)
-    v = nothing
-    for i=1:n_iterations
-        Wu = W' * u
-        v = Wu ./ (norm(Wu) + eps(Float32))
-        Wv = W * v
-        u .= Wv ./ (norm(Wv) + eps(Float32))
-    end
-    u, v
+  v = nothing
+  for i=1:n_iterations
+      Wu = W' * u
+      v = Wu ./ (norm(Wu) + eps(Float32))
+      Wv = W * v
+      u .= Wv ./ (norm(Wv) + eps(Float32))
+  end
+  u, v
 end
 
 # Compute the maximum singular value

@@ -7,6 +7,10 @@ on:
     tags: ["*"]
   pull_request:
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   # unit tests with coverage
   test:
@@ -16,7 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - "1.9" # Latest
+          - "1.10"
+          - "1"
         os:
           - ubuntu-latest
           - windows-latest
@@ -30,36 +35,50 @@ jobs:
       #     cuda: '11.2.2'
 
       # check out the project and install Julia
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
 
-      - run: pip install gym
-      - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'
-      # using a cache can speed up execution times
-      - uses: actions/cache@v2
-        env:
-          cache-name: cache-artifacts
+      # Set up Python 3.10
+      - uses: actions/setup-python@v4
         with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-${{ matrix.arch }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-${{ matrix.arch }}-test-
-            ${{ runner.os }}-${{ matrix.arch }}-
-            ${{ runner.os }}-
-
+          python-version: '3.10'
+      
+      # Get Python location and install packages
+      - run: |
+          echo "PYTHON=$(which python)" >> $GITHUB_ENV
+          python -m pip install gym wandb
+          
+      # Use Julia-specific cache
+      - uses: julia-actions/cache@v2
+      
+      # Install POMDPGym and configure PyCall
+      - run: |
+          julia --color=yes -e '
+            using Pkg;
+            ENV["PYTHON"]="${{ env.PYTHON }}";
+            ENV["PYCALL_JL_RUNTIME_PYTHON"]="${{ env.PYTHON }}";
+            Pkg.add("PyCall");
+            Pkg.build("PyCall");
+            # Add POMDPGym to test environment
+            Pkg.activate("test");
+            Pkg.add(url="https://github.com/ancorso/POMDPGym.jl");
+            Pkg.activate(".");
+            Pkg.instantiate();
+          '
+      
+      
       # build the depencies, run the tests, and upload coverage results
-      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-buildpkg@v1
       - run: |
           git config --global user.name Tester
           git config --global user.email te@st.er
       - name: Run Tests
-        uses: julia-actions/julia-runtest@latest
+        uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v3
         with:
           file: ./lcov.info
           flags: unittests

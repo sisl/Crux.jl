@@ -4,9 +4,12 @@ using Test
 try
 	using POMDPGym
 catch e
-	if e isa Union{ArgumentError,LoadError}
-		using Conda; Conda.add("gym")
-		Pkg.add(url="https://github.com/ancorso/POMDPGym.jl")
+	Pkg.add(url="https://github.com/ancorso/POMDPGym.jl")
+	try
+		using POMDPGym
+	catch e
+		@info "Error loading POMDPGym"
+		throw(e)
 	end
 end
 using CUDA, Crux
@@ -17,7 +20,9 @@ try
 	cu(zeros(Float32, 10, 10))
 	USE_CUDA = true
 	CUDA.allowscalar(false)
-catch end
+catch e
+	@info "Error loading CUDA, not performing GPU tests" e
+end
 
 ## Run basic functionality tests
 @testset "spaces" begin

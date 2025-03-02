@@ -1,5 +1,4 @@
 using Crux
-using POMDPModels
 using Test
 using CUDA
 using Flux

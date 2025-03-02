@@ -1,7 +1,7 @@
 name = "Crux"
 uuid = "e51cc422-768a-4345-bb8e-2246287ae729"
 authors = ["Anthony Corso <anthonycorso92@gmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -43,4 +43,21 @@ ValueHistories = "0.5"
 WeightsAndBiasLogger = "0.5"
 Zygote = "0.6"
 cuDNN = "1"
-julia = "1.6 - 1.10"
+julia = "1.6"
+
+[extras]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
+POMDPModels = "355abbd5-f08e-5560-ac9e-8b5f2592a0ca"
+POMDPTools = "7588e00f-9cae-40de-98dc-e0c70c48cdd7"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[targets]
+test = ["CUDA", "Distributions", "Flux", "LinearAlgebra", "Plots", "POMDPs", "POMDPModels", "POMDPTools", "Random", "Statistics", "Test", "Zygote"]

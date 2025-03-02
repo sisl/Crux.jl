@@ -2,7 +2,6 @@ using Crux
 using Test
 using Flux
 using POMDPs
-using POMDPGym
 using Random
 using Statistics
 using Distributions

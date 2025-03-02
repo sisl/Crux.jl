@@ -40,9 +40,14 @@ Supports CPU and GPU computation and implements the following algorithms:
 
 ## Installation
 
-* Install <a href="https://github.com/ancorso/POMDPGym">POMDPGym</a>
 * Install by opening julia and running `] add Crux`
 
 To edit or contribute use `] dev Crux` and the repo will be cloned to `~/.julia/dev/Crux`
 
-Maintained by Anthony Corso (acorso@stanford.edu)
+### Usage with POMDPGym
+
+* Install <a href="https://github.com/ancorso/POMDPGym">POMDPGym</a>
+    * See `examples/` for use of POMDPGym environments.
+
+---
+Maintained by Anthony Corso (acorso@stanford.edu) and Robert Moss (mossr@stanford.edu)

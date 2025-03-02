@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - "1.9" # Latest
+          - "1.11" # Latest
         os:
           - ubuntu-latest
           - windows-latest
@@ -36,8 +36,8 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
 
-      - run: pip install gym
-      - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'
+      # - run: pip install gym
+      # - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'
       # using a cache can speed up execution times
       - uses: actions/cache@v2
         env:

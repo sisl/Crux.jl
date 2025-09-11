@@ -1,5 +1,8 @@
-using POMDPs
 using Conda
+Conda.add("gymnasium")
+Conda.add("pygame")
+
+using POMDPs
 using POMDPGym
 import POMDPModels
 using Test

@@ -64,32 +64,3 @@ jobs:
           file: ./lcov.info
           flags: unittests
           name: codecov-umbrella
-  docs:
-    name: 'Documentation: ${{ matrix.format }}'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        format:
-          - html
-    steps:
-      - uses: actions/checkout@v5
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1'
-      - uses: julia-actions/cache@v2
-      - name: Build the manual
-        run: julia --project=docs/ -e 'using Pkg;
-                                       pkg"add Crux";
-                                       pkg"instantiate";
-                                       Pkg.develop(PackageSpec(path=pwd()))'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-          DOCUMENTER_LATEX_DEBUG: ${{ github.workspace }}/latex-debug-logs
-      - name: Upload search index
-        if: ${{ matrix.format == 'html' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: search-index
-          path: docs/build/search_index.js

@@ -37,7 +37,7 @@ jobs:
           arch: ${{ matrix.arch }}
 
       # - run: pip install gym
-      # - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate()'
+      - run: julia --color=yes --project -e 'using Pkg; pkg"add https://github.com/ancorso/POMDPGym.jl"; Pkg.instantiate(); Pkg.build()'
       # using a cache can speed up execution times
       - uses: actions/cache@v3
         env:

@@ -1,6 +1,6 @@
 # Crux.jl
 
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://sisl.github.io/Crux.jl/latest/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://sisl.github.io/Crux.jl/dev/)
 [![Build Status](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml)
 [![Code Coverage](https://codecov.io/gh/sisl/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sisl/Crux.jl)
 

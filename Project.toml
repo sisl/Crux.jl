@@ -51,6 +51,7 @@ julia = "1.6"
 
 [extras]
 BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
+Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
@@ -69,4 +70,4 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 POMDPGym = {url = "https://github.com/ancorso/POMDPGym.jl", rev = "main"}
 
 [targets]
-test = ["BSON", "CUDA", "Distributions", "Flux", "LinearAlgebra", "Plots", "POMDPs", "POMDPGym", "POMDPModels", "POMDPTools", "Random", "Statistics", "Test", "Zygote"]
+test = ["BSON", "Conda", "CUDA", "Distributions", "Flux", "LinearAlgebra", "Plots", "POMDPs", "POMDPGym", "POMDPModels", "POMDPTools", "Random", "Statistics", "Test", "Zygote"]

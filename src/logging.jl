@@ -1,9 +1,12 @@
 elapsed(i::Int, N::Int) = (i % N) == 0
 elapsed(i::UnitRange, N::Int) = any([i...] .% N .== 0)
 
-function TensorBoardLogger.log_value(logger::WBLogger, name::AbstractString, value::Real; step=0)
-    info_dict = Dict(string(name) => value)
-    wandb.log(info_dict, step=step)
+function build_logger(; use_wandb, config, project, entity, notes, dir)
+    if use_wandb
+        error("Please run `using WeightsAndBiasLogger`")
+    else
+        return TBLogger(dir, tb_increment)
+    end
 end
 
 @with_kw mutable struct LoggerParams
@@ -14,7 +17,7 @@ end
     project::Union{AbstractString, Nothing} = nothing
     entity::Union{AbstractString, Nothing} = nothing
 	notes::Union{AbstractString, Nothing} = nothing
-    logger::Union{TBLogger, WBLogger} = use_wandb ? WBLogger(config=config, project=project, entity=entity, notes=notes) : TBLogger(dir, tb_increment)
+    logger = build_logger(; use_wandb, config, project, entity, notes, dir)
     fns = Any[log_undiscounted_return(10), log_episode_averages([:r], period)]
     writeout::Dict{Int, Any} = Dict() # Other things to write to disk. Period => Function
     verbose::Bool = true
@@ -121,19 +124,16 @@ function log_experience_sums(keys, period)
     end
 end
 
-function save_gif(;base_name="demo", log_at_zero=false, log_wandb=true, append_rand=false, kwargs...)
+# pass through
+function log_fig(::TBLogger, filename) end
+
+function save_gif(; base_name="demo", log_at_zero=false, append_rand=false, kwargs...)
     (;i, s, dir, logger) -> begin
         !log_at_zero && i==0 && return
         pref = append_rand ? replace(replace(string(now(), "_"), (":"=>"_")), "-"=>"_") : ""
         filename = string(dir,"/", pref, base_name, "_$i.gif")
         @info "writing gif to $filename"
         Crux.gif(s.mdp, s.agent.π, filename; kwargs...)
-        
-        if log_wandb && logger isa WBLogger
-            vid = wandb.Video(filename, format="gif")
-            wandb.log(Dict("gif"=>vid))
-            rm(filename)
-        end
+        log_fig(logger, filename)
     end
 end
-

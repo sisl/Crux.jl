@@ -12,7 +12,7 @@ module Crux
     using TensorBoardLogger
     @reexport using Flux
     using Zygote
-    import Zygote: ignore_derivatives
+    import Zygote: ignore_derivatives, Zeros
     using Flux.Optimise: train!
     using CUDA
     using LinearAlgebra

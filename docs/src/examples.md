@@ -83,6 +83,11 @@ p = plot_learning([solver_reinforce, solver_a2c, solver_ppo],
 Crux.savefig(p, "cartpole_training.pdf")
 ```
 
+Here's an example for the half cheetah MuJoCo problem, comparing four RL algorithms from [`examples/rl/half_cheetah_mujoco.jl`](https://github.com/sisl/Crux.jl/blob/master/examples/rl/half_cheetah_mujoco.jl#L78).
+
+![mujoco](half_cheetah_mujoco_benchmark.pdf)
+
+
 You can also create an animated gif of the final policy:
 ```julia
 gif(mdp, policy_ppo, "cartpole_policy.gif", max_steps=100)

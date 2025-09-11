@@ -14,6 +14,6 @@ makedocs(
     ]
 )
 
-# deploydocs(
-#     repo = "github.com/sisl/Crux.jl.git",
-# )
+deploydocs(
+    repo = "github.com/sisl/Crux.jl.git",
+)

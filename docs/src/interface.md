@@ -7,19 +7,16 @@ CurrentModule = Crux
 ```
 
 ## Contents
-
 ```@contents
 Pages = ["interface.md"]
 ```
 
 ## Index
-
 ```@index
 Pages = ["interface.md"]
 ```
 
 ## Reinforcement Learning
-
 RL interfaces are categorized by on-policy and off-policy below.
 
 ### On-Policy

@@ -1,3 +1,6 @@
+"""
+A2C loss function.
+"""
 function a2c_loss(π, 𝒫, 𝒟; info = Dict())
     new_probs = logpdf(π, 𝒟[:s], 𝒟[:a])
     p_loss = -mean(new_probs .* 𝒟[:advantage])
@@ -12,14 +15,30 @@ function a2c_loss(π, 𝒫, 𝒟; info = Dict())
     𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss
 end
 
-function A2C(;π::ActorCritic, 
-              a_opt::NamedTuple=(;), 
-              c_opt::NamedTuple=(;), 
-              log::NamedTuple=(;), 
-              λp::Float32=1f0, 
-              λe::Float32=0.1f0, 
-              required_columns=[],
-              kwargs...)
+"""
+Advantage actor critic (A2C) solver.
+
+```julia
+A2C(;
+    π::ActorCritic, 
+    a_opt::NamedTuple=(;), 
+    c_opt::NamedTuple=(;), 
+    log::NamedTuple=(;), 
+    λp::Float32=1f0, 
+    λe::Float32=0.1f0, 
+    required_columns=[],
+    kwargs...)
+```
+"""
+function A2C(;
+        π::ActorCritic, 
+        a_opt::NamedTuple=(;), 
+        c_opt::NamedTuple=(;), 
+        log::NamedTuple=(;), 
+        λp::Float32=1f0, 
+        λe::Float32=0.1f0, 
+        required_columns=[],
+        kwargs...)
               
     OnPolicySolver(;agent=PolicyParams(π),
                     𝒫=(λp=λp, λe=λe),

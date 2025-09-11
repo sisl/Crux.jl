@@ -1,4 +1,6 @@
-# PPO loss
+"""
+PPO loss function.
+"""
 function ppo_loss(π, 𝒫, 𝒟; info = Dict())
     new_probs = logpdf(π, 𝒟[:s], 𝒟[:a])
     r = exp.(new_probs .- 𝒟[:logprob])
@@ -18,16 +20,34 @@ function ppo_loss(π, 𝒫, 𝒟; info = Dict())
     𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss
 end
 
-function PPO(;π::ActorCritic,
-     ϵ::Float32 = 0.2f0,
-     λp::Float32 = 1f0,
-     λe::Float32 = 0.1f0,
-     target_kl = 0.012f0,
-     a_opt::NamedTuple=(;),
-     c_opt::NamedTuple=(;),
-     log::NamedTuple=(;),
-     required_columns=[],
-     kwargs...)
+"""
+Proximal policy optimization (PPO) solver.
+
+```julia
+PPO(;
+    π::ActorCritic,
+    ϵ::Float32 = 0.2f0,
+    λp::Float32 = 1f0,
+    λe::Float32 = 0.1f0,
+    target_kl = 0.012f0,
+    a_opt::NamedTuple=(;),
+    c_opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    required_columns=[],
+    kwargs...)
+```
+"""
+function PPO(;
+        π::ActorCritic,
+        ϵ::Float32 = 0.2f0,
+        λp::Float32 = 1f0,
+        λe::Float32 = 0.1f0,
+        target_kl = 0.012f0,
+        a_opt::NamedTuple=(;),
+        c_opt::NamedTuple=(;),
+        log::NamedTuple=(;),
+        required_columns=[],
+        kwargs...)
 
      function record_avgr(𝒟; info=Dict(), 𝒮)
          info[:avg_r] = sum(𝒟[:r]) / sum(𝒟[:episode_end])
@@ -44,7 +64,9 @@ function PPO(;π::ActorCritic,
                     kwargs...)
 end
 
-# PPO loss with a penalty
+"""
+PPO loss with a penalty.
+"""
 function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
     new_probs = logpdf(π, 𝒟[:s], 𝒟[:a])
     r = exp.(new_probs .- 𝒟[:logprob])
@@ -108,27 +130,57 @@ function lagrange_ppo_loss(π, 𝒫, 𝒟; info = Dict())
     (𝒫[:λp]*p_loss + 𝒫[:λe]*e_loss + cost_loss) / (1 + penalty)
 end
 
-function LagrangePPO(;π::ActorCritic,
-     Vc::ContinuousNetwork, # value network for estimating cost
-     ϵ::Float32 = 0.2f0,
-     λp::Float32 = 1f0,
-     λe::Float32 = 0.1f0,
-     λ_gae = 0.95f0,
-     target_kl = 0.012f0,
-     target_cost = 0.025f0,
-     penalty_scale = 1f0,
-     penalty_max = Inf32,
-     Ki_max = 10f0,
-     Ki = 1f-3,
-     Kp = 1,
-     Kd = 0,
-     ema_α = 0.95,
-     a_opt::NamedTuple=(;),
-     c_opt::NamedTuple=(;),
-     cost_opt::NamedTuple=(;),
-     log::NamedTuple=(;),
-     required_columns=[],
-     kwargs...)
+"""
+Lagrange-Constrained PPO solver.
+
+```julia
+LagrangePPO(;
+    π::ActorCritic,
+    Vc::ContinuousNetwork, # value network for estimating cost
+    ϵ::Float32 = 0.2f0,
+    λp::Float32 = 1f0,
+    λe::Float32 = 0.1f0,
+    λ_gae = 0.95f0,
+    target_kl = 0.012f0,
+    target_cost = 0.025f0,
+    penalty_scale = 1f0,
+    penalty_max = Inf32,
+    Ki_max = 10f0,
+    Ki = 1f-3,
+    Kp = 1,
+    Kd = 0,
+    ema_α = 0.95,
+    a_opt::NamedTuple=(;),
+    c_opt::NamedTuple=(;),
+    cost_opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    required_columns=[],
+    kwargs...)
+```
+
+"""
+function LagrangePPO(;
+    π::ActorCritic,
+    Vc::ContinuousNetwork, # value network for estimating cost
+    ϵ::Float32 = 0.2f0,
+    λp::Float32 = 1f0,
+    λe::Float32 = 0.1f0,
+    λ_gae = 0.95f0,
+    target_kl = 0.012f0,
+    target_cost = 0.025f0,
+    penalty_scale = 1f0,
+    penalty_max = Inf32,
+    Ki_max = 10f0,
+    Ki = 1f-3,
+    Kp = 1,
+    Kd = 0,
+    ema_α = 0.95,
+    a_opt::NamedTuple=(;),
+    c_opt::NamedTuple=(;),
+    cost_opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    required_columns=[],
+    kwargs...)
 
      function record_avgr(𝒟; info=Dict(), 𝒮)
          info[:avg_r] = sum(𝒟[:r]) / sum(𝒟[:episode_end])

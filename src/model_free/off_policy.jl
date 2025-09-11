@@ -1,3 +1,39 @@
+"""
+Off policy solver type.
+
+Fields
+======
+
+- `agent::PolicyParams` # Policy parameters ([`PolicyParams`](@ref))
+- `S::AbstractSpace` # State space
+- `N::Int = 1000` # Number of environment interactions
+- `ΔN::Int = 4` # Number of interactions between updates
+- `max_steps::Int = 100` # Maximum number of steps per episode
+- `log::Union{Nothing, LoggerParams} = nothing` # The logging parameters
+- `i::Int = 0` # The current number of environment interactions
+- `param_optimizers::Dict{Any, TrainingParams} = Dict()` # Training parameters for the parameters
+- `a_opt::Union{Nothing, TrainingParams} = nothing` # Training parameters for the actor
+- `c_opt::TrainingParams` # Training parameters for the critic
+- `𝒫::NamedTuple = (;)` # Parameters of the algorithm
+- `interaction_storage = nothing` # If this is initialized to an array then it will store all interactions
+- `post_sample_callback = (𝒟; kwargs...) -> nothing` # Callback that that happens after sampling experience
+
+
+Off-policy-specific parameters
+======
+
+- `post_batch_callback = (𝒟; kwargs...) -> nothing` Callback that that happens after sampling a batch
+- `pre_train_callback = (𝒮; kwargs...) -> nothing` callback that gets called once prior to training
+- `target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0)` Function for updating the target network
+- `target_fn` Target for critic regression with input signature `(π⁻, 𝒟, γ; i)`
+- `buffer_size = 1000` Size of the buffer
+- `required_columns = Symbol[]`
+- `buffer = ExperienceBuffer(S, agent.space, buffer_size, required_columns)` The replay buffer
+- `priority_fn = td_error` function for prioritized replay
+- `buffer_init::Int = max(c_opt.batch_size, 200)` Number of observations to initialize the buffer with
+- `extra_buffers = []` extra buffers (i.e. for experience replay in continual learning)
+- `buffer_fractions = [1.0]` Fraction of the minibatch devoted to each buffer
+"""
 @with_kw mutable struct OffPolicySolver <: Solver
     agent::PolicyParams # Policy
     S::AbstractSpace # State space

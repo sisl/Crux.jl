@@ -1,3 +1,14 @@
+"""
+Adversarial off-policy solver.
+
+- `𝒮_pro::OffPolicySolver` Solver parameters for the protagonist
+- `𝒮_ant::OffPolicySolver` Solver parameters for the antagonist
+- `px::PolicyParams` Nominal disturbance policy
+- `train_pro_every::Int = 1`
+- `train_ant_every::Int = 1`
+- `log::Union{Nothing, LoggerParams} = nothing` The logging parameters
+- `i::Int = 0` The current number of environment interactions
+"""
 @with_kw mutable struct AdversarialOffPolicySolver <: Solver
     𝒮_pro::OffPolicySolver # Solver parameters for the protagonist
     𝒮_ant::OffPolicySolver # Solver parameters for the antagonist

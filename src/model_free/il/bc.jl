@@ -16,17 +16,37 @@ function logpdf_bc_loss(π, 𝒫, 𝒟; info=Dict())
     𝒫[:λe]*eloss + lloss
 end
 
-function BC(;π,
-             S,
-             𝒟_demo,
-             normalize_demo::Bool=true,
-             loss=nothing,
-             validation_fraction=0.3,
-             window=100,
-             λe::Float32=1f-3,
-             opt::NamedTuple=(;),
-             log::NamedTuple=(;),
-             kwargs...)
+
+"""
+Behavioral cloning solver.
+
+```julia
+BC(;
+    π,
+    S,
+    𝒟_demo,
+    normalize_demo::Bool=true,
+    loss=nothing,
+    validation_fraction=0.3,
+    window=100,
+    λe::Float32=1f-3,
+    opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    kwargs...)
+```
+"""
+function BC(;
+        π,
+        S,
+        𝒟_demo,
+        normalize_demo::Bool=true,
+        loss=nothing,
+        validation_fraction=0.3,
+        window=100,
+        λe::Float32=1f-3,
+        opt::NamedTuple=(;),
+        log::NamedTuple=(;),
+        kwargs...)
 
     if isnothing(loss)
         loss = π isa ContinuousNetwork ? mse_action_loss : logpdf_bc_loss

@@ -1,4 +1,4 @@
-function ASAF_actor_loss(πG, 𝒟_demo)
+function asaf_actor_loss(πG, 𝒟_demo)
     (π, 𝒫, 𝒟,; info=Dict()) -> begin
         πsa_G = logpdf(π, 𝒟[:s], 𝒟[:a])
         πsa_E = logpdf(π, 𝒟_demo[:s], 𝒟_demo[:a])
@@ -20,24 +20,41 @@ function ASAF_actor_loss(πG, 𝒟_demo)
     end
 end
 
+"""
+Adversarial Soft Advantage Fitting (ASAF) solver.
 
-function ASAF(;π,
-               S,
-               𝒟_demo,
-               normalize_demo::Bool=true,
-               ΔN=50,
-               λ_orth=1f-4,
-               a_opt::NamedTuple=(;),
-               c_opt::NamedTuple=(;),
-               log::NamedTuple=(;),
-               kwargs...)
+```julia
+ASAF(;
+    π,
+    S,
+    𝒟_demo,
+    normalize_demo::Bool=true,
+    ΔN=50,
+    λ_orth=1f-4,
+    a_opt::NamedTuple=(;),
+    c_opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    kwargs...)
+```
+"""
+function ASAF(;
+        π,
+        S,
+        𝒟_demo,
+        normalize_demo::Bool=true,
+        ΔN=50,
+        λ_orth=1f-4,
+        a_opt::NamedTuple=(;),
+        c_opt::NamedTuple=(;),
+        log::NamedTuple=(;),
+        kwargs...)
 
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
     OnPolicySolver(;agent=PolicyParams(π),
                     S=S,
                     ΔN=ΔN,
-                    post_batch_callback=(D; 𝒮, kwargs...) -> 𝒮.a_opt.loss = ASAF_actor_loss(deepcopy(𝒮.agent.π), 𝒟_demo),
+                    post_batch_callback=(D; 𝒮, kwargs...) -> 𝒮.a_opt.loss = asaf_actor_loss(deepcopy(𝒮.agent.π), 𝒟_demo),
                     log=LoggerParams(;dir="log/ASAF", period=100, log...),
                     a_opt=TrainingParams(;name="actor_", loss=nothing, a_opt...),
                     kwargs...)

@@ -1,4 +1,14 @@
-# Struct for combining useful policy parameters together
+"""
+Struct for combining useful policy parameters together
+
+```julia
+    π::Pol
+    space::T2 = action_space(π)
+    π_explore = π
+    π⁻ = nothing
+    pa = nothing # nominal action distribution
+```
+"""
 @with_kw mutable struct PolicyParams{Pol<:Policy,T2<:AbstractSpace}
     π::Pol
     space::T2 = action_space(π)

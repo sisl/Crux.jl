@@ -1,25 +1,46 @@
-function GAIL_D_loss(gan_loss)
+function gail_d_loss(gan_loss)
     (D, 𝒫, 𝒟_ex, 𝒟_π; info = Dict()) ->begin
         Lᴰ(gan_loss, D, 𝒟_ex[:a], 𝒟_π[:a], yD = (𝒟_ex[:s],), yG = (𝒟_π[:s],))
     end
 end
 
-function OnPolicyGAIL(;π,
-                       S,
-                       γ,
-                       λ_gae::Float32 = 0.95f0,
-                       𝒟_demo,
-                       αr::Float32 = 0.5f0,
-                       normalize_demo::Bool=true,
-                       D::ContinuousNetwork,
-                       solver=PPO,
-                       gan_loss::GANLoss=GAN_BCELoss(),
-                       d_opt::NamedTuple=(;),
-                       log::NamedTuple=(;),
-                       Rscale=1f0,
-                       kwargs...)
+"""
+On-policy generative adversarial imitation learning (GAIL) solver.
+```julia
+OnPolicyGAIL(;
+    π,
+    S,
+    γ,
+    λ_gae::Float32 = 0.95f0,
+    𝒟_demo,
+    αr::Float32 = 0.5f0,
+    normalize_demo::Bool=true,
+    D::ContinuousNetwork,
+    solver=PPO,
+    gan_loss::GANLoss=GAN_BCELoss(),
+    d_opt::NamedTuple=(;),
+    log::NamedTuple=(;),
+    Rscale=1f0,
+    kwargs...)
+```
+"""
+function OnPolicyGAIL(;
+        π,
+        S,
+        γ,
+        λ_gae::Float32 = 0.95f0,
+        𝒟_demo,
+        αr::Float32 = 0.5f0,
+        normalize_demo::Bool=true,
+        D::ContinuousNetwork,
+        solver=PPO,
+        gan_loss::GANLoss=GAN_BCELoss(),
+        d_opt::NamedTuple=(;),
+        log::NamedTuple=(;),
+        Rscale=1f0,
+        kwargs...)
 
-    d_opt = TrainingParams(;loss = GAIL_D_loss(gan_loss), name="discriminator_", d_opt...)
+    d_opt = TrainingParams(;loss = gail_d_loss(gan_loss), name="discriminator_", d_opt...)
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))
     𝒟_demo = 𝒟_demo |> device(π)
 

@@ -1,4 +1,4 @@
-function CQL_alpha_loss(π, 𝒫, 𝒟; info = Dict())
+function cql_alpha_loss(π, 𝒫, 𝒟; info = Dict())
     ignore_derivatives() do
         info["CQL alpha"] = exp(𝒫[:CQL_log_α][1])
     end
@@ -36,7 +36,7 @@ function conservative_loss(π, 𝒫, 𝒟; info=Dict())
     β * (5f0*loss - 𝒫[:CQL_α_thresh])
 end
 
-function CQL_critic_loss(;kwargs...)
+function cql_critic_loss(;kwargs...)
     Q2loss = double_Q_loss(;kwargs...)
     (π, 𝒫, 𝒟, y; info=Dict()) -> begin
         loss = Q2loss(π, 𝒫, 𝒟, y, info=info)
@@ -45,17 +45,38 @@ function CQL_critic_loss(;kwargs...)
     end
 end
 
-function CQL(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}},
-              solver_type=BatchSAC,
-              CQL_α::Float32=1f0,
-              CQL_is_distribution=DistributionPolicy(product_distribution([Uniform(-1,1) for i=1:dim(action_space(π))[1]])),
-              CQL_α_thresh::Float32=10f0,
-              CQL_n_action_samples::Int=10,
-              CQL_α_opt::NamedTuple=(;),
-              a_opt::NamedTuple=(;), 
-              c_opt::NamedTuple=(;), 
-              log::NamedTuple=(;),
-              kwargs...) where T
+
+"""
+Conservative Q-Learning (CQL) solver.
+
+```julia
+CQL(;
+    π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}},
+    solver_type=BatchSAC,
+    CQL_α::Float32=1f0,
+    CQL_is_distribution=DistributionPolicy(product_distribution([Uniform(-1,1) for i=1:dim(action_space(π))[1]])),
+    CQL_α_thresh::Float32=10f0,
+    CQL_n_action_samples::Int=10,
+    CQL_α_opt::NamedTuple=(;),
+    a_opt::NamedTuple=(;), 
+    c_opt::NamedTuple=(;), 
+    log::NamedTuple=(;),
+    kwargs...)
+```
+"""
+function CQL(;
+        π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetwork}},
+        solver_type=BatchSAC,
+        CQL_α::Float32=1f0,
+        CQL_is_distribution=DistributionPolicy(product_distribution([Uniform(-1,1) for i=1:dim(action_space(π))[1]])),
+        CQL_α_thresh::Float32=10f0,
+        CQL_n_action_samples::Int=10,
+        CQL_α_opt::NamedTuple=(;),
+        a_opt::NamedTuple=(;), 
+        c_opt::NamedTuple=(;), 
+        log::NamedTuple=(;),
+        kwargs...) where T
+
     # Fill the parameters
     𝒫 = (CQL_log_α=[Base.log(CQL_α)],
           CQL_is_distribution=CQL_is_distribution,
@@ -65,9 +86,9 @@ function CQL(;π::ActorCritic{T, DoubleNetwork{ContinuousNetwork, ContinuousNetw
         π=π,
         𝒫=𝒫,
         log=(;dir = "log/cql", log...),
-        param_optimizers=Dict(Flux.params(𝒫[:CQL_log_α]) => TrainingParams(;loss=CQL_alpha_loss, name="CQL_alpha_", CQL_α_opt...)),
+        param_optimizers=Dict(Flux.params(𝒫[:CQL_log_α]) => TrainingParams(;loss=cql_alpha_loss, name="CQL_alpha_", CQL_α_opt...)),
         a_opt=a_opt,
-        c_opt=(loss=CQL_critic_loss(), name="critic_", c_opt...),
+        c_opt=(loss=cql_critic_loss(), name="critic_", c_opt...),
         kwargs...)
 end
 

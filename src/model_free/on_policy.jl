@@ -1,3 +1,33 @@
+"""
+On policy solver type.
+
+Fields
+======
+- `agent::PolicyParams` Policy parameters ([`PolicyParams`](@ref))
+- `S::AbstractSpace` State space
+- `N::Int = 1000` Number of environment interactions
+- `ΔN::Int = 200` Number of interactions between updates
+- `max_steps::Int = 100` Maximum number of steps per episode
+- `log::Union{Nothing, LoggerParams} = nothing` The logging parameters
+- `i::Int = 0` The current number of environment interactions
+- `param_optimizers::Dict{Any, TrainingParams} = Dict()` Training parameters for the parameters
+- `a_opt::TrainingParams` Training parameters for the actor
+- `c_opt::Union{Nothing, TrainingParams} = nothing` Training parameters for the critic
+- `𝒫::NamedTuple = (;)` Parameters of the algorithm
+- `interaction_storage = nothing` If this is initialized to an array then it will store all interactions
+- `post_sample_callback = (𝒟; kwargs...) -> nothing` Callback that that happens after sampling experience
+- `post_batch_callback = (𝒟; kwargs...) -> nothing` Callback that that happens after sampling a batch
+
+On-policy-specific parameters
+======
+- `λ_gae::Float32 = 0.95` Generalized advantage estimation parameter
+- `required_columns = Symbol[]` Extra data columns to store
+
+Parameters specific to cost constraints (a separate value network)
+======
+- `Vc::Union{ContinuousNetwork, Nothing} = nothing` Cost value approximator
+- `cost_opt::Union{Nothing, TrainingParams} = nothing` Training parameters for the cost value
+"""
 @with_kw mutable struct OnPolicySolver <: Solver
     agent::PolicyParams # Policy
     S::AbstractSpace # State space
@@ -18,7 +48,7 @@
     λ_gae::Float32 = 0.95 # Generalized advantage estimation parameter
     required_columns = Symbol[]# Extra data columns to store
     
-    # Parameters specific to cost constraints (a separete value network)
+    # Parameters specific to cost constraints (a separate value network)
     Vc::Union{ContinuousNetwork, Nothing} = nothing # Cost value approximator
     cost_opt::Union{Nothing, TrainingParams} = nothing # Training parameters for the cost value
 end

@@ -1,3 +1,22 @@
+"""
+Batch solver type.
+
+Fields
+======
+- `agent::PolicyParams` Policy parameters ([`PolicyParams`](@ref))
+- `S::AbstractSpace` State space
+- `max_steps::Int = 100` Maximum number of steps per episode
+- `𝒟_train` Training data
+- `param_optimizers::Dict{Any, TrainingParams} = Dict()` Training parameters for the parameters
+- `a_opt::TrainingParams` Training parameters for the actor
+- `c_opt::Union{Nothing, TrainingParams} = nothing` Training parameters for the discriminator
+- `target_fn = nothing` the target function for value-based methods
+- `target_update = (π⁻, π; kwargs...) -> polyak_average!(π⁻, π, 0.005f0)` Function for updating the target network
+- `𝒫::NamedTuple = (;)` Parameters of the algorithm
+- `log::Union{Nothing, LoggerParams} = nothing` The logging parameters
+- `required_columns = Symbol[]` Extra columns to sample
+- `epoch = 0` Number of epochs of training
+"""
 @with_kw mutable struct BatchSolver <: Solver
     agent::PolicyParams
     S::AbstractSpace # State space

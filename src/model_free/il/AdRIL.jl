@@ -1,15 +1,35 @@
-function AdRIL(;π, 
-                S,
-                ΔN=50,
-                solver=SAC, 
-                𝒟_demo, 
-                normalize_demo::Bool=true,
-                expert_frac=0.5, 
-                buffer_size = 1000, 
-                buffer_init=0,
-                log::NamedTuple=(;),
-                buffer::ExperienceBuffer = ExperienceBuffer(S, action_space(π), buffer_size, [:i]), 
-                kwargs...)
+"""
+Adversarial Reward-moment Imitation Learning (AdRIL) solver.
+
+```julia
+AdRIL(;
+    π, 
+    S,
+    ΔN=50,
+    solver=SAC, 
+    𝒟_demo, 
+    normalize_demo::Bool=true,
+    expert_frac=0.5, 
+    buffer_size = 1000, 
+    buffer_init=0,
+    log::NamedTuple=(;),
+    buffer::ExperienceBuffer = ExperienceBuffer(S, action_space(π), buffer_size, [:i]), 
+    kwargs...)
+```
+"""
+function AdRIL(;
+        π, 
+        S,
+        ΔN=50,
+        solver=SAC, 
+        𝒟_demo, 
+        normalize_demo::Bool=true,
+        expert_frac=0.5, 
+        buffer_size = 1000, 
+        buffer_init=0,
+        log::NamedTuple=(;),
+        buffer::ExperienceBuffer = ExperienceBuffer(S, action_space(π), buffer_size, [:i]), 
+        kwargs...)
     
     !haskey(𝒟_demo, :r) && error("AdRIL requires a reward value for the demonstrations")
     normalize_demo && (𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π)))

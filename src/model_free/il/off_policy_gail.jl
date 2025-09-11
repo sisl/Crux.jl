@@ -1,13 +1,31 @@
-function OffPolicyGAIL(;π, 
-                        S, 
-                        𝒟_demo, 
-                        𝒟_ndas::Array{ExperienceBuffer} = ExperienceBuffer[], 
-                        normalize_demo::Bool=true, 
-                        D::ContinuousNetwork, 
-                        solver=SAC, 
-                        d_opt::NamedTuple=(epochs=5,), 
-                        log::NamedTuple=(;), 
-                        kwargs...)
+"""
+Off-policy generative adversarial imitation learning (GAIL) solver.
+
+```julia
+OffPolicyGAIL(;
+    π,
+    S, 
+    𝒟_demo, 
+    𝒟_ndas::Array{ExperienceBuffer} = ExperienceBuffer[], 
+    normalize_demo::Bool=true, 
+    D::ContinuousNetwork, 
+    solver=SAC, 
+    d_opt::NamedTuple=(epochs=5,), 
+    log::NamedTuple=(;), 
+    kwargs...)
+```
+"""
+function OffPolicyGAIL(;
+        π,
+        S, 
+        𝒟_demo, 
+        𝒟_ndas::Array{ExperienceBuffer} = ExperienceBuffer[], 
+        normalize_demo::Bool=true, 
+        D::ContinuousNetwork, 
+        solver=SAC, 
+        d_opt::NamedTuple=(epochs=5,), 
+        log::NamedTuple=(;), 
+        kwargs...)
                         
     # Define the training parameters for the desciminator
     d_opt = TrainingParams(;name="discriminator_", loss=()->nothing, d_opt...)

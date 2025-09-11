@@ -88,7 +88,12 @@ function iq_callback(𝒟; 𝒮, kwargs...)
     𝒟[:expert] = Array(fill(false, 1, length(𝒟[:done])))
 end
 
-function OnlineIQLearn(;π, 
+"""
+Online Inverse Q-Learning solver.
+
+```julia
+OnlineIQLearn(;
+    π, 
     S, 
     𝒟_demo, 
     γ=Float32(0.9),
@@ -100,6 +105,21 @@ function OnlineIQLearn(;π,
     gp::Bool=true,
     λ_gp=Float32(10.),
     kwargs...)
+```
+"""
+function OnlineIQLearn(;
+        π, 
+        S, 
+        𝒟_demo, 
+        γ=Float32(0.9),
+        normalize_demo::Bool=true, 
+        solver=SoftQ, # or SAC for continuous states 
+        log::NamedTuple=(;period=500), 
+        reg::Bool=true,
+        α_reg=Float32(0.5),
+        gp::Bool=true,
+        λ_gp=Float32(10.),
+        kwargs...)
 
     # Normalize and/or change device of expert and NDA data
     dev = device(π)

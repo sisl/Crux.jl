@@ -1,0 +1,3 @@
+[deps]
+Crux = "e51cc422-768a-4345-bb8e-2246287ae729"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

@@ -1,3 +1,6 @@
+"""
+Experience replay buffer.
+"""
 function ExperienceReplay(;π, 
                           S, 
                           𝒫=(;),

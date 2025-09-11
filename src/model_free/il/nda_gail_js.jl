@@ -16,8 +16,8 @@ function NDA_GAIL_JS(;π,
                        log::NamedTuple=(;), 
                        kwargs...)
                        
-    d_opt = TrainingParams(;loss = Crux.GAIL_D_loss(gan_loss), name="discriminator_", d_opt...)
-    d_opt_nda = TrainingParams(;loss = Crux.GAIL_D_loss(gan_loss), name="nda_discriminator_", d_opt_nda...)
+    d_opt = TrainingParams(;loss = Crux.gail_d_loss(gan_loss), name="discriminator_", d_opt...)
+    d_opt_nda = TrainingParams(;loss = Crux.gail_d_loss(gan_loss), name="nda_discriminator_", d_opt_nda...)
     if normalize_demo
         𝒟_demo = normalize!(deepcopy(𝒟_demo), S, action_space(π))
         𝒟_nda = normalize!(deepcopy(𝒟_nda), S, action_space(π))

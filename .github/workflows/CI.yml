@@ -53,6 +53,8 @@ jobs:
 
       # build the depencies, run the tests, and upload coverage results
       - uses: julia-actions/julia-buildpkg@latest
+        env:
+          PYTHON: ""
       - run: |
           git config --global user.name Tester
           git config --global user.email te@st.er

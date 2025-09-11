@@ -1,15 +1,4 @@
-# using Pkg
-using Test
-
-# try
-# 	using POMDPGym
-# catch e
-# 	if e isa Union{ArgumentError,LoadError}
-# 		using Conda; Conda.add("gym")
-# 		Pkg.add(url="https://github.com/ancorso/POMDPGym.jl")
-# 	end
-# end
-using CUDA, Crux
+using Test, CUDA, Crux
 
 ## Only run CUDA tests if it seems to be working properly
 USE_CUDA = false
@@ -19,7 +8,7 @@ try
 	CUDA.allowscalar(false)
 catch end
 
-## Run basic functionality tests
+## Run functionality tests
 @testset "spaces" begin
 	include("spaces_tests.jl")
 end
@@ -41,9 +30,9 @@ end
 @testset "extras" begin
 	include("extras_tests.jl")
 end
-# @testset "solver" begin
-# 	include("gym/solver_tests.jl")
-# end
-# @testset "sampler" begin
-# 	include("gym/sampler_tests.jl")
-# end
+@testset "solver" begin
+	include("gym/solver_tests.jl")
+end
+@testset "sampler" begin
+	include("gym/sampler_tests.jl")
+end

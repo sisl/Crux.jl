@@ -78,7 +78,7 @@ test_solver((π) -> SAC(π=π, S=S, N=N, ΔN=ΔN), continuous_mdp, ActorCritic(G
 
 # Continuous IL
 γ = 0.95f0
-exp_data_path = abspath(joinpath(@__DIR__, "..", "examples", "il", "expert_data", "pendulum.bson"))
+exp_data_path = abspath(joinpath(@__DIR__, "..", "..", "examples", "il", "expert_data", "pendulum.bson"))
 𝒟_demo = expert_trajectories = BSON.load(exp_data_path)[:data]
 D(output=1) = ContinuousNetwork(Chain(DenseSN(3, 12, relu), DenseSN(12, output)))
 

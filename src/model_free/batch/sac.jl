@@ -45,7 +45,7 @@ function BatchSAC(;
                  𝒫=𝒫,
                  𝒟_train=𝒟_train,
                  log=LoggerParams(;dir = "log/batch_sac", log...),
-                 param_optimizers=Dict(Flux.params(𝒫[:SAC_log_α]) => TrainingParams(;loss=SAC_temp_loss, name="temp_", SAC_α_opt...), param_optimizers...),
+                 param_optimizers=Dict(Flux.params(𝒫[:SAC_log_α]) => TrainingParams(;loss=sac_temp_loss, name="temp_", SAC_α_opt...), param_optimizers...),
                  a_opt=TrainingParams(;loss=sac_actor_loss, name="actor_", a_opt...),
                  c_opt=TrainingParams(;loss=double_Q_loss(), name="critic_", epochs=ΔN, c_opt...),
                  target_fn=sac_target(π),

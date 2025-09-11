@@ -7,6 +7,7 @@ using Flux
 using POMDPModels
 using POMDPGym
 using Distributions
+using LinearAlgebra
 
 mdp = GridWorldMDP()
 pomdp = TigerPOMDP()

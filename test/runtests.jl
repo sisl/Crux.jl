@@ -36,3 +36,6 @@ end
 @testset "sampler" begin
 	include("gym/sampler_tests.jl")
 end
+@testset "analysis" begin
+	include("analysis.jl")
+end

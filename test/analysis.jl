@@ -12,8 +12,8 @@ as = actions(mdp)
 S = state_space(mdp)
 
 # Flux network: Map states to actions
-A() = DiscreteNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, length(as))), as)
-V() = ContinuousNetwork(Chain(Dense(dim(S)..., 64, relu), Dense(64, 1)))
+A() = DiscreteNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, length(as))), as)
+V() = ContinuousNetwork(Chain(Dense(Crux.dim(S)..., 64, relu), Dense(64, 1)))
 
 solver_reinforce = REINFORCE(S=S, π=A())
 policy_reinforce = solve(solver_reinforce, mdp)

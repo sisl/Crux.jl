@@ -45,7 +45,7 @@ Supports CPU and GPU computation and implements deep reinforcement learning, imi
 An example usage of the `REINFORCE` algorithm with a simple Flux network for the Cart Pole problem is shown here:
 
 ```julia
-using Crux, POMDPGym
+using Crux, POMDPGym, POMDPs
 
 # Problem setup
 mdp = GymPOMDP(:CartPole)

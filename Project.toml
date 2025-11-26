@@ -56,6 +56,7 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 POMDPGym = "23110f14-cb49-4285-84b1-33ab57423405"
 POMDPModels = "355abbd5-f08e-5560-ac9e-8b5f2592a0ca"
 POMDPTools = "7588e00f-9cae-40de-98dc-e0c70c48cdd7"
@@ -70,4 +71,4 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 POMDPGym = {url = "https://github.com/ancorso/POMDPGym.jl", rev = "main"}
 
 [targets]
-test = ["BSON", "Conda", "CUDA", "Distributions", "Flux", "LinearAlgebra", "Plots", "POMDPs", "POMDPGym", "POMDPModels", "POMDPTools", "Random", "Statistics", "Test", "Zygote"]
+test = ["BSON", "Conda", "CUDA", "Distributions", "Flux", "LinearAlgebra", "Pkg", "Plots", "POMDPs", "POMDPGym", "POMDPModels", "POMDPTools", "Random", "Statistics", "Test", "Zygote"]

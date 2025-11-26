@@ -1,3 +1,9 @@
+# Configure PyCall to use Conda's Python distribution
+ENV["PYTHON"] = ""
+using Pkg
+Pkg.build("PyCall")
+
+# Now install gymnasium and pygame via Conda
 using Conda
 Conda.add("gymnasium")
 Conda.add("pygame")

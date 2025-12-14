@@ -6,7 +6,7 @@
 
 Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
-Supports CPU and GPU computation and implements deep reinforcement learning, imitation learning, batch RL, adversarial RL, and continual learning algorithms. See the [documentation]() for more details.
+Supports CPU and GPU computation and implements deep reinforcement learning, imitation learning, batch RL, adversarial RL, and continual learning algorithms. See the [documentation](https://sisl.github.io/Crux.jl/dev/) for more details.
 
 ### Reinforcement Learning
 * [Deep Q-Learning (DQN)](https://github.com/sisl/Crux.jl/blob/master/src/model_free/rl/dqn.jl)
@@ -70,4 +70,4 @@ To install the package, run:
 ] add Crux
 ```
 
-See the [installation documentation]() for more details on how to install POMDPGym for more environment.
+See the [installation documentation](https://github.com/ancorso/POMDPGym.jl?tab=readme-ov-file#installation) for more details on how to install POMDPGym for more environment.

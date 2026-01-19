@@ -9,6 +9,9 @@ try
 catch end
 
 ## Run functionality tests
+@testset "README example" begin
+	include("readme.jl")
+end
 @testset "spaces" begin
 	include("spaces_tests.jl")
 end

@@ -25,10 +25,34 @@ For a full set of examples, please see the [`examples/`](https://github.com/sisl
     - [Hopper Medium (MuJoCo)](https://github.com/sisl/Crux.jl/blob/master/examples/offline%20rl/hopper_medium.jl)
 
 
-## Minimal RL Example
+## Minimal RL Example (Pure Julia)
 
-As a minimal example, we'll show how to set up a cart-pole problem and solve it with a simple Flux network using the REINFORCE algorithm.
+As a minimal self-contained example, we'll show how to solve a GridWorld problem using DQN with no external dependencies:
 
+```julia
+using Crux
+
+mdp = SimpleGridWorld()
+S = state_space(mdp)
+
+A() = DiscreteNetwork(Chain(Dense(2, 8, relu), Dense(8, 4)), actions(mdp))
+
+solver = DQN(π=A(), S=S, N=100_000)
+policy = solve(solver, mdp)
+```
+
+## Gym Environments
+
+For OpenAI Gym environments like CartPole, you need to install [POMDPGym.jl](https://github.com/ancorso/POMDPGym.jl):
+
+```julia
+] add https://github.com/ancorso/POMDPGym.jl
+```
+
+!!! note
+    POMDPGym requires Python with [Gymnasium](https://gymnasium.farama.org/) installed (`pip install gymnasium`).
+
+Here's an example using REINFORCE to solve CartPole:
 
 ```julia
 using Crux, POMDPGym

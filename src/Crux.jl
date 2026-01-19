@@ -7,6 +7,7 @@ module Crux
     using Random
     using Distributions
     @reexport using POMDPs
+    @reexport using POMDPModels
     using POMDPTools:render
     using Parameters
     using TensorBoardLogger

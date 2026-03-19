@@ -71,7 +71,7 @@ header-includes: |
 
 
 # Summary
-\href{https://github.com/sisl/Crux.jl}{Crux.jl} is a Julia library for deep reinforcement learning (RL) that provides concise, modular implementations of widely used algorithms.
+\href{https://github.com/sisl/Crux.jl}{Crux.jl} is a Julia [@julia] library for deep reinforcement learning (RL) that provides concise, modular implementations of widely used algorithms.
 The package offers CPU/GPU-accelerated training using Flux.jl [@flux] and is built upon shared abstractions (policies, value functions, buffers, objectives, and update rules).
 These abstractions helps with both code reuse and understanding the core differences between algorithms (e.g., their surrogate losses, trust-region constraints, or advantage estimations).
 Crux.jl includes policy-gradient and actor-critic methods such as REINFORCE [@reinforce], PPO [@ppo], and TRPO [@trpo], along with off-policy value-based and actor–critic variants such as DQN [@dqn], TD3 [@td3], and SAC [@sac], with additional support for imitation, offline, adversarial, and continual learning algorithms.

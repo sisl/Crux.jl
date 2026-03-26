@@ -1,10 +1,28 @@
 # Crux.jl
 
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://sisl.github.io/Crux.jl/dev/) [![Build Status](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml) [![Code Coverage](https://codecov.io/gh/sisl/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sisl/Crux.jl) [![status](https://joss.theoj.org/papers/e61a59852052dc0187ef03e063fe81ef/status.svg)](https://joss.theoj.org/papers/e61a59852052dc0187ef03e063fe81ef)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://sisl.github.io/Crux.jl/dev/) [![Build Status](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/sisl/Crux.jl/actions/workflows/CI.yml) [![Code Coverage](https://codecov.io/gh/sisl/Crux.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sisl/Crux.jl)
 
 Deep RL library with concise implementations of popular algorithms. Implemented using [Flux.jl](https://github.com/FluxML/Flux.jl) and fits into the [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl) interface.
 
 Supports CPU and GPU computation and implements deep reinforcement learning, imitation learning, batch RL, adversarial RL, and continual learning algorithms. See the [documentation](https://sisl.github.io/Crux.jl/dev/) for more details.
+
+### Citation
+
+If you use this package for research purposes, please cite the following:
+
+[![status](https://joss.theoj.org/papers/e61a59852052dc0187ef03e063fe81ef/status.svg)](https://joss.theoj.org/papers/e61a59852052dc0187ef03e063fe81ef)
+
+```
+@article{moss2026crux,
+  title = {{Crux.jl}: Deep Reinforcement Learning in Julia},
+  author = {Robert J. Moss, Anthony Corso, Mykel J. Kochenderfer},
+  journal = {Journal of Open Source Software},
+  year = {2026},
+  volume = {11},
+  number = {119},
+  doi = {10.21105/joss.09620}
+}
+```
 
 ### Reinforcement Learning
 * [Deep Q-Learning (DQN)](https://github.com/sisl/Crux.jl/blob/master/src/model_free/rl/dqn.jl)

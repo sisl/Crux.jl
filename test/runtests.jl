@@ -15,8 +15,8 @@ end
 @testset "spaces" begin
 	include("spaces_tests.jl")
 end
-USE_CUDA && @testset "devices" begin
-	include("devices_tests.jl")
+@testset "devices" begin
+    include("devices_tests.jl")
 end
 @testset "util" begin
 	include("util_tests.jl")
@@ -41,4 +41,7 @@ end
 end
 @testset "analysis" begin
 	include("analysis.jl")
+end
+@testset "cl" begin
+    include("cl_tests.jl")
 end
